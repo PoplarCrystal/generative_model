@@ -1,0 +1,31 @@
+# 模型参数
+model:
+  input_dim: 784  # 28 * 28
+  hidden_dim: 128
+  latent_dim: 16
+
+# 训练参数
+training:
+  epochs: 30
+  learning_rate: 0.0003  # 3e-4
+  batch_size: 32
+
+# 执行控制标志
+flags:
+  train: false   # 是否训练模型
+  infer1: true   # 是否执行推理1：从测试集采样图像，查看重构效果
+  infer2: true  # 是否执行推理2：从潜在空间随机采样生成新图像
+
+# 模型文件
+model_file:
+  model_name: 'ae_model.pth'
+
+# 数据参数
+data:
+  data_dir: '../../data'  # 相对于代码文件的路径
+
+# 可视化参数
+visualization:
+  sample_size: 16
+  nrow: 4
+

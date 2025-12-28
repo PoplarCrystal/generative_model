@@ -1,0 +1,55 @@
+# 模型参数
+model:
+  input_dim: 1  # MNIST 是灰度图，通道数为 1
+  dim: 64  # 潜在空间的通道数
+  n_embedding: 32  # codebook 大小
+
+# 训练参数
+training:
+  epochs: 50
+  learning_rate: 0.001  # 1e-3
+  batch_size: 64
+  embedding_loss_weight: 1.0  # embedding 损失权重
+  commitment_loss_weight: 0.25  # commitment 损失权重
+
+# 执行控制标志
+flags:
+  train: false   # 是否训练模型
+  infer1: true   # 是否执行推理1：从测试集采样图像，查看重构效果
+  infer2: true   # 是否执行推理2：从 codebook 生成新图像
+
+# 模型文件
+model_file:
+  model_name: 'vq_vae_model.pth'
+
+# PixelCNN 参数
+pixelcnn:
+  n_blocks: 5  # PixelCNN 残差块数量
+  dim: 64  # PixelCNN 隐藏维度
+  linear_dim: 128  # PixelCNN 线性层维度
+  use_bn: true  # 是否使用 BatchNorm
+
+# PixelCNN 训练参数
+pixelcnn_training:
+  epochs: 30
+  learning_rate: 0.001  # 1e-3
+  batch_size: 64
+
+# PixelCNN 模型文件
+pixelcnn_model_file:
+  model_name: 'pixelcnn_model.pth'  # PixelCNN 模型文件名
+
+# 数据参数
+data:
+  data_dir: '../../data'  # 相对于代码文件的路径
+
+# 可视化参数
+visualization:
+  sample_size: 16
+  nrow: 4
+
+# 潜在空间参数（用于生成）
+latent_space:
+  H_latent: 7  # VQ-VAE 潜在空间高度（28x28 -> 7x7）
+  W_latent: 7  # VQ-VAE 潜在空间宽度（28x28 -> 7x7）
+

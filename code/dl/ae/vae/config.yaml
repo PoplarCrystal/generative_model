@@ -1,0 +1,45 @@
+# 模型参数
+model:
+  model_type: 'vae_cnn'  # 模型类型：'vae' 或 'vae_cnn'
+                      # vae: 全连接网络，输入是展平的 784 维向量
+                      # vae_cnn: 卷积网络，输入是保持空间结构的图像 (1, 28, 28)
+  # vae 参数（全连接版本）
+  input_dim: 784  # 28 * 28
+  output_dim: 784  # 28 * 28
+  hidden_dim: 128
+  latent_dim: 16
+  # vae_cnn 参数（卷积版本）
+  input_channel: 1  # 输入通道数（MNIST 是灰度图）
+  output_channel: 1  # 输出通道数
+  hidden_channel: 32  # 隐藏层通道数（建议 32-64，太小会导致表达能力不足）
+  latent_channel: 16  # 潜在空间通道数（建议 8-16）
+
+# 训练参数
+training:
+  epochs: 30
+  learning_rate: 0.0003  # 3e-4 (vae 使用)
+  learning_rate_cnn: 0.001  # 1e-3 (vae_cnn 使用，CNN 通常需要更大的学习率)
+  batch_size: 32
+
+# 执行控制标志
+flags:
+  train: true   # 是否训练模型
+  infer1: true   # 是否执行推理1：从测试集采样图像，查看重构效果
+  infer2: true   # 是否执行推理2：从潜在空间随机采样生成新图像
+
+# 模型文件
+model_file:
+  model_name: ''  # 如果为空字符串，会根据 model_type 自动生成（推荐）
+                  # 例如：model_type='vae' -> 'vae_model.pth'
+                  #      model_type='vae_cnn' -> 'vae_cnn_model.pth'
+                  # 也可以手动指定文件名，但需确保与 model_type 匹配
+
+# 数据参数
+data:
+  data_dir: '../../data'  # 相对于代码文件的路径
+
+# 可视化参数
+visualization:
+  sample_size: 16
+  nrow: 4
+
