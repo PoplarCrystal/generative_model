@@ -12,6 +12,12 @@ __pycache__/
 *.ckpt
 *.pt
 
+# 图片文件
+pic/
+
+# 说明文字
+*.md
+
 # 数据文件
 data/
 *.txt

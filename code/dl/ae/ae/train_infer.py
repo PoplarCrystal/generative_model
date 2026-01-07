@@ -125,18 +125,10 @@ if not train:
 if infer1:
     model.eval()
     with torch.no_grad():
-        # 从测试集中收集足够的样本（可能需要多个批次）
-        x_test_list = []
-        labels_test_list = []
-        for x, labels in test_loader:
-            x_test_list.append(x)
-            labels_test_list.append(labels)
-            if len(x_test_list) * batch_size >= sample_size:
-                break
-        
-        # 拼接并截取所需数量的样本
-        x_test = torch.cat(x_test_list, dim=0)[:sample_size].view(-1, input_dim).to(device)
-        labels_test = torch.cat(labels_test_list, dim=0)[:sample_size]
+        # 从测试集第一个批次中取样本
+        x, labels = next(iter(test_loader))
+        x_test = x[:sample_size].view(-1, input_dim).to(device)
+        labels_test = labels[:sample_size]
         
         # 通过 AE 进行编码-解码重构
         x_reconstructed = model(x_test)
