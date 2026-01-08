@@ -235,9 +235,16 @@ if infer2:
             x = model.decoder(z)
             generated_images = x.view(sample_size, 1, 28, 28).cpu()
 
-    grid_img = torchvision.utils.make_grid(generated_images, nrow=nrow, padding=2, normalize=True)
-    plt.imshow(grid_img.permute(1, 2, 0).numpy())
-    plt.axis('off')
-    plt.title('Generated Images')
+    # 显示生成的图像
+    fig, axes = plt.subplots(nrow, nrow, figsize=(16, 16))
+    fig.suptitle('Generated Images (VAE)', fontsize=16, y=0.995)
+
+    for idx, ax in enumerate(axes.flat):
+        if idx < sample_size:
+            ax.imshow(generated_images[idx].squeeze().numpy(), cmap='gray')
+        ax.axis('off')
+
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.98, hspace=0.1, wspace=0.1)
     plt.show()
 

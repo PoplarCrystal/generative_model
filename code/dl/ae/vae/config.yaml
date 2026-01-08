@@ -1,6 +1,6 @@
 # 模型参数
 model:
-  model_type: 'vae_cnn'  # 模型类型：'vae' 或 'vae_cnn'
+  model_type: 'vae'  # 模型类型：'vae' 或 'vae_cnn'
                       # vae: 全连接网络，输入是展平的 784 维向量
                       # vae_cnn: 卷积网络，输入是保持空间结构的图像 (1, 28, 28)
   # vae 参数（全连接版本）
@@ -23,7 +23,7 @@ training:
 
 # 执行控制标志
 flags:
-  train: true   # 是否训练模型
+  train: false   # 是否训练模型
   infer1: true   # 是否执行推理1：从测试集采样图像，查看重构效果
   infer2: true   # 是否执行推理2：从潜在空间随机采样生成新图像
 
