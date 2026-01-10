@@ -5,7 +5,12 @@ from torchvision import datasets, transforms
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import yaml
-from cvae import CVAE, CVAE1, loss_function, onehot
+from cvae import (
+    CVAE, CVAE1, 
+    CVAE_prior, CVAE1_prior,
+    ConditionEncoder,
+    loss_function, loss_function_wo_prior, loss_function_prior
+)
 
 # 加载配置文件
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -17,7 +22,10 @@ with open(config_path, 'r', encoding='utf-8') as f:
 model_type = config['model']['model_type']  # 'cvae' 或 'cvae1'
 input_dim = config['model']['input_dim']
 output_dim = config['model']['output_dim']
-condition_dim = config['model']['condition_dim']
+n_classes = config['model']['n_classes']  # 类别数量（如MNIST是10）
+condition_encoding_type = config['model'].get('condition_encoding_type', 'onehot')  # 'onehot' 或 'embedding'
+# 如果是embedding，读取embed_dim；如果是onehot，不需要
+embed_dim = config['model'].get('embed_dim', None) if condition_encoding_type == 'embedding' else None
 hidden_dim = config['model']['hidden_dim']
 latent_dim = config['model']['latent_dim']
 epochs = config['training']['epochs']
@@ -56,13 +64,30 @@ test_dataset = datasets.MNIST(root=data_dir, train=False, download=False, transf
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
+# 创建条件编码器
+condition_encoder = ConditionEncoder(
+    n_classes=n_classes,
+    condition_encoding_type=condition_encoding_type,
+    embed_dim=embed_dim
+).to(device)
+condition_dim = condition_encoder.condition_dim  # 从编码器获取实际的条件维度
+print(f'条件编码方式: {condition_encoding_type}, 条件维度: {condition_dim}')
+
 # 模型构建 - 根据 model_type 选择模型
 if model_type == 'cvae':
-    model = CVAE(input_dim, output_dim, condition_dim, hidden_dim, latent_dim).to(device)
+    model = CVAE(input_dim, output_dim, condition_dim, hidden_dim, latent_dim,
+                 condition_encoder=condition_encoder).to(device)
 elif model_type == 'cvae1':
-    model = CVAE1(input_dim, output_dim, condition_dim, hidden_dim, latent_dim).to(device)
+    model = CVAE1(input_dim, output_dim, condition_dim, hidden_dim, latent_dim,
+                  condition_encoder=condition_encoder).to(device)
+elif model_type == 'cvae_prior':
+    model = CVAE_prior(input_dim, output_dim, condition_dim, hidden_dim, latent_dim,
+                       condition_encoder=condition_encoder).to(device)
+elif model_type == 'cvae1_prior':
+    model = CVAE1_prior(input_dim, output_dim, condition_dim, hidden_dim, latent_dim,
+                        condition_encoder=condition_encoder).to(device)
 else:
-    raise ValueError(f"不支持的模型类型: {model_type}，请选择 'cvae' 或 'cvae1'")
+    raise ValueError(f"不支持的模型类型: {model_type}，请选择 'cvae', 'cvae1', 'cvae_prior', 或 'cvae1_prior'")
 
 print(f'使用模型类型: {model_type}')
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -77,9 +102,17 @@ if train:
         pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{epochs}')
         for x, label in pbar:
             x = x.view(-1, input_dim).to(device)
-            c = onehot(label, condition_dim).to(device)
-            x_hat, mu, sigma = model(x, c)
-            loss = loss_function(x_hat, x, mu, sigma)
+            labels = label.to(device)  # 传递原始标签，模型内部会编码
+            
+            # 根据模型类型处理返回值
+            if model_type in ['cvae_prior', 'cvae1_prior']:
+                x_hat, mu, sigma, mu_prior, sigma_prior = model(x, labels)
+                loss = loss_function(x_hat, x, mu, sigma, mu_prior, sigma_prior)
+            else:
+                # 旧模型返回3个值
+                x_hat, mu, sigma = model(x, labels)
+                loss = loss_function(x_hat, x, mu, sigma)
+            
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -105,9 +138,16 @@ if train:
         pbar = tqdm(test_loader, desc='Testing')
         for x, label in pbar:
             x = x.view(-1, input_dim).to(device)
-            c = onehot(label, condition_dim).to(device)
-            x_hat, mu, sigma = model(x, c)
-            loss = loss_function(x_hat, x, mu, sigma)
+            labels = label.to(device)  # 传递原始标签，模型内部会编码
+            
+            # 根据模型类型处理返回值
+            if model_type in ['cvae_prior', 'cvae1_prior']:
+                x_hat, mu, sigma, mu_prior, sigma_prior = model(x, labels)
+                loss = loss_function(x_hat, x, mu, sigma, mu_prior, sigma_prior)
+            else:
+                x_hat, mu, sigma = model(x, labels)
+                loss = loss_function(x_hat, x, mu, sigma)
+            
             test_loss_sum += loss.item()
             test_cnt += 1
             pbar.set_postfix({'test_loss': f'{test_loss_sum/test_cnt:.4f}'})
@@ -153,16 +193,18 @@ if infer1:
         
         # 拼接并截取所需数量的样本
         x_test = torch.cat(x_test_list, dim=0)[:sample_size].view(-1, input_dim).to(device)
-        labels_test = torch.cat(labels_test_list, dim=0)[:sample_size]
-        c_test = onehot(labels_test, condition_dim).to(device)
+        labels_test = torch.cat(labels_test_list, dim=0)[:sample_size].to(device)
         
         # 通过 CVAE 进行编码-解码重构
-        x_reconstructed, mu, sigma = model(x_test, c_test)
+        if model_type in ['cvae_prior', 'cvae1_prior']:
+            x_reconstructed, mu, sigma, mu_prior, sigma_prior = model(x_test, labels_test)
+        else:
+            x_reconstructed, mu, sigma = model(x_test, labels_test)
         
         # 转换为图像格式用于显示
         original_images = x_test.view(sample_size, 1, 28, 28).cpu()
         reconstructed_images = x_reconstructed.view(sample_size, 1, 28, 28).cpu()
-        labels_cpu = labels_test.numpy()
+        labels_cpu = labels_test.cpu().numpy()
 
     # 显示原始图像和重构图像的对比（左右排布）
     fig, axes = plt.subplots(nrow, nrow * 2, figsize=(16, 8))
@@ -190,10 +232,18 @@ if infer2:
     model.eval()
     with torch.no_grad():
         # 1. 随机采样条件（0-9的数字）
-        conditions = torch.randint(0, 10, (sample_size,)).to(device)
-        c = onehot(conditions, condition_dim).to(device)
-        # 2. 从标准正态分布采样潜在向量
-        z = torch.randn(sample_size, latent_dim).to(device)
+        conditions = torch.randint(0, n_classes, (sample_size,)).to(device)
+        # 2. 从先验分布采样潜在向量
+        if model_type in ['cvae_prior', 'cvae1_prior']:
+            # 使用模型的sample_prior方法，传入原始标签
+            z = model.sample_prior(conditions)
+            # 编码条件用于解码器
+            c = condition_encoder(conditions)
+        else:
+            # 旧模型：从标准正态分布采样
+            z = torch.randn(sample_size, latent_dim).to(device)
+            # 编码条件用于解码器
+            c = condition_encoder(conditions)
         # 3. 将潜在向量和条件拼接后输入decoder
         z_with_condition = torch.cat((z, c), dim=1)
         x = model.decoder(z_with_condition)

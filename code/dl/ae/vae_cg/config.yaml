@@ -1,0 +1,49 @@
+# 模型参数
+model:
+  model_type: 'vae_cg'  # 模型类型选项：
+                       # 'vae_cg': VAE with Classifier Guidance - 使用分类器引导生成
+                       # 'vae_cfg': VAE with Classifier-Free Guidance - 无分类器引导生成
+  input_dim: 784  # 28 * 28
+  output_dim: 784  # 28 * 28
+  n_classes: 10  # 类别数量（MNIST 有 10 个类别）
+  condition_encoding_type: 'onehot'  # 条件编码方式：'onehot' 或 'embedding'
+  embed_dim: 5  # embedding的维度，仅在 condition_encoding_type='embedding' 时需要
+  hidden_dim: 128
+  latent_dim: 16
+  unconditional_prob: 0.1  # CFG训练时无条件生成的概率（0.1表示10%的时间使用None）
+  classification_weight: 0.1  # CG模型中分类损失的权重
+
+# 推理参数
+inference:
+  guidance_scale: 1.5  # 引导强度（>1.0增强引导效果，<1.0减弱）
+                       # 对于CFG，通常使用1.5-7.0
+                       # 对于CG，通常使用0.5-2.0
+
+# 训练参数
+training:
+  epochs: 30
+  learning_rate: 0.0003  # 3e-4
+  batch_size: 32
+
+# 执行控制标志
+flags:
+  train: true   # 是否训练模型
+  infer1: true   # 是否执行推理1：从测试集采样图像，查看重构效果
+  infer2: true   # 是否执行推理2：使用引导生成新图像（带条件标签）
+
+# 模型文件
+model_file:
+  model_name: ''  # 如果为空字符串，会根据 model_type 自动生成（推荐）
+                  # 例如：model_type='vae_cg' -> 'vae_cg_model.pth'
+                  #      model_type='vae_cfg' -> 'vae_cfg_model.pth'
+                  # 也可以手动指定文件名，但需确保与 model_type 匹配
+
+# 数据参数
+data:
+  data_dir: '../../data'  # 相对于代码文件的路径
+
+# 可视化参数
+visualization:
+  sample_size: 16
+  nrow: 4
+

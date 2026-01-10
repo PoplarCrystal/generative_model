@@ -1,11 +1,15 @@
 # 模型参数
 model:
-  model_type: 'cvae'  # 模型类型：'cvae' 或 'cvae1'
-                       # cvae: 条件在编码时与输入拼接
-                       # cvae1: 条件只在解码时使用
+  model_type: 'cvae1_prior'  # 模型类型选项：
+                       # 'cvae': 条件在编码时与输入拼接，先验 p(z)=N(0,I)
+                       # 'cvae1': 条件只在解码时使用，先验 p(z)=N(0,I)
+                       # 'cvae_prior': 条件在编码时使用，有Prior网络 p(z|c)=N(μ(c),σ(c))
+                       # 'cvae1_prior': 条件只在解码时使用，有Prior网络 p(z|c)=N(μ(c),σ(c))
   input_dim: 784  # 28 * 28
   output_dim: 784  # 28 * 28
-  condition_dim: 10  # 条件维度（MNIST 有 10 个类别）
+  n_classes: 10  # 类别数量（MNIST 有 10 个类别）
+  condition_encoding_type: 'onehot'  # 条件编码方式：'onehot' 或 'embedding'
+  embed_dim: 5  # embedding的维度，仅在 condition_encoding_type='embedding' 时需要（如32, 64等）
   hidden_dim: 128
   latent_dim: 16
 
