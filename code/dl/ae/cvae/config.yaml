@@ -34,7 +34,7 @@ model_file:
 
 # 数据参数
 data:
-  data_dir: '../../data'  # 相对于代码文件的路径
+  data_dir: '../../../data'  # 相对于代码文件的路径
 
 # 可视化参数
 visualization:

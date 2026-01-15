@@ -1,0 +1,38 @@
+# 模型参数
+model:
+  img_size: 28  # 图像尺寸（MNIST 是 28x28）
+  input_channel: 1  # 输入通道数（MNIST 是灰度图）
+  time_embed_dim: 128  # 时间嵌入维度
+
+# 扩散过程参数
+diffusion:
+  num_timesteps: 1000  # 扩散步数
+  beta_start: 0.0001  # beta 起始值
+  beta_end: 0.02  # beta 结束值
+  pred_objective: 'eps'  # 预测目标：'eps' (预测噪声), 'x0' (预测原始图像), 'score' (预测得分函数)
+
+# 训练参数
+training:
+  epochs: 30
+  learning_rate: 0.001  # 1e-3
+  batch_size: 32
+
+# 执行控制标志
+flags:
+  train: false   # 是否训练模型
+  infer: true   # 是否执行推理：从随机噪声生成新图像
+
+# 模型文件
+model_file:
+  model_name: ''  # 如果为空字符串，会自动生成 'ddpm_model.pth'
+                  # 也可以手动指定文件名
+
+# 数据参数
+data:
+  data_dir: '../../../data'  # 相对于代码文件的路径
+
+# 可视化参数
+visualization:
+  sample_size: 16  # 生成图像的数量
+  nrow: 4  # 显示时每行的图像数量
+

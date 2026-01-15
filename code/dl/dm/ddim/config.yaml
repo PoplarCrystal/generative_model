@@ -1,0 +1,38 @@
+# 模型参数（使用 ddpm 的模型）
+model:
+  img_size: 28  # 图像尺寸（MNIST 是 28x28）
+  in_channel: 1  # 输入通道数（MNIST 是灰度图）
+  time_embed_dim: 128  # 时间嵌入维度
+
+# 扩散过程参数
+diffusion:
+  num_timesteps: 1000  # 训练时的扩散步数
+  beta_start: 0.0001  # beta 起始值
+  beta_end: 0.02  # beta 结束值
+  ddim_steps: 50  # DDIM 采样步数（加速采样）
+  eta: 0.0  # DDIM 采样参数，0.0 是完全确定性，1.0 是 DDPM
+
+# 训练参数（通常不需要训练，直接使用 ddpm 的模型）
+training:
+  epochs: 30
+  learning_rate: 0.001
+  batch_size: 32
+
+# 执行控制标志
+flags:
+  train: false   # 是否训练模型（通常使用 ddpm 的预训练模型）
+  infer: true    # 是否执行推理：对比 DDPM 和 DDIM 采样
+
+# 模型文件（使用 ddpm 的模型）
+model_file:
+  model_path: '../ddpm/ddpm_model.pth'  # ddpm 模型的路径
+
+# 数据参数
+data:
+  data_dir: '../../../data'  # 相对于代码文件的路径
+
+# 可视化参数
+visualization:
+  sample_size: 16  # 生成图像的数量
+  nrow: 4  # 显示时每行的图像数量
+

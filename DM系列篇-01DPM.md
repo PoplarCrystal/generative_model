@@ -1,0 +1,317 @@
+# 深度学习DM篇01. DPM: 从VAE到分层VAE
+
+## 1. 从VAE到扩散模型
+
+### 1.1 复习VAE
+
+我们再来回顾一下VAE。VAE是一个拥有潜变量的模型。数据生成是通过从固定的正态分布中采样潜变量，并使用神经网络将潜变量转换为观测变量来实现的。另外，VAE还使用另一个神经网络，将观测变量转换为潜变量。VAE的结构如图1-1所示。
+
+![VAE的模型图](pic/dl/dm/1.1.jpeg)
+
+<small>**图1-1** VAE架构：输入 $x$ → 编码器 $q_\phi(z|x)$ → 潜在向量 $z$ → 解码器 $p_\theta(x|z)$ → 重构输出 $\hat{x}$</small>
+
+如图1-1所示，$p_\theta(x|z)$ 是从潜变量 $z$ 到观测变量 $x$ 的概率分布，我们使用神经网络对这个 $p_\theta(x|z)$ 进行建模。而 $q_\phi(z|x)$ 是从观测变量 $x$ 到潜变量 $z$ 的概率分布，我们使用另一个神经网络对 $q_\phi(z|x)$ 进行建模。
+
+### 1.2 分层VAE
+
+分层变分自编码器（Hierarchical VAE, HVAE）是VAE的推广，扩展到潜变量的多个层次。将潜变量分层后的模型是分层VAE。如图1-2所示，潜变量的数量增加到了多个（图中为 $T$ 个）。
+
+![分层VAE的模型图](pic/dl/dm/1.2.jpeg)
+
+<small>**图1-2** 分层VAE（HVAE）架构：输入 $x$ → 编码器 $q_\phi(z_1|x) \prod_{t=2}^{T} q_\phi(z_t|z_{t-1})$ → 多层级潜在向量 $z_{1:T}$ → 解码器 $p_\theta(x|z_1) \prod_{t=2}^{T} p_\theta(z_{t-1}|z_t)$ → 重构输出 $\hat{x}$</small>
+
+这里显示的分层VAE是只由前一个随机变量决定的模型。例如，图1-2中有一个概率分布 $p_\theta(z_t|z_{t-1})$，这里的 $z_t$ 仅以 $z_{t-1}$ 为条件，不考虑其他变量。这个特性称为"马尔可夫性"。通过假定马尔可夫性，可以防止参数增加。并且，通过对潜变量进行分层，可以更高效地进行复杂的表示。
+
+分层的优点在我们身边随处可见。例如，大规模软件开发团队的分层结构是很常见的。比起所有成员聚集在一起工作，分层的团队在工作时由于责任范围更加明确，从而提升了整体的开发过程的效率。
+
+数学上，我们将马尔可夫HVAE的联合分布和后验表示为：
+
+$$p(x, z_{1:T}) = p(z_T) p_\theta(x|z_1) \prod_{t=2}^{T} p_\theta(z_{t-1}|z_t) \tag{1}$$
+
+$$q_\phi(z_{1:T}|x) = q_\phi(z_1|x) \prod_{t=2}^{T} q_\phi(z_t|z_{t-1}) \tag{2}$$
+
+然后，我们可以轻松地将ELBO扩展为：
+
+$$\begin{aligned}
+\log p(x) &= \log \int p(x, z_{1:T}) dz_{1:T} \\
+&= \log \int \frac{p(x, z_{1:T}) q_\phi(z_{1:T}|x)}{q_\phi(z_{1:T}|x)} dz_{1:T} \quad \text{（乘以1）} \\
+&= \log \mathbb{E}_{q_\phi(z_{1:T}|x)} \left[\frac{p(x, z_{1:T})}{q_\phi(z_{1:T}|x)}\right] \quad \text{（期望的定义）} \\
+&\geq \mathbb{E}_{q_\phi(z_{1:T}|x)} \left[\log \frac{p(x, z_{1:T})}{q_\phi(z_{1:T}|x)}\right] \quad \text{（应用Jensen不等式）}
+\end{aligned} \tag{3}$$
+
+然后，我们可以将联合分布（方程1）和后验（方程2）代入上述表达式，产生另一种形式：
+
+$$\mathbb{E}_{q_\phi(z_{1:T}|x)} \left[\log \frac{p(x, z_{1:T})}{q_\phi(z_{1:T}|x)}\right] = \mathbb{E}_{q_\phi(z_{1:T}|x)} \left[\log \frac{p(z_T) p_\theta(x|z_1) \prod_{t=2}^{T} p_\theta(z_{t-1}|z_t)}{q_\phi(z_1|x) \prod_{t=2}^{T} q_\phi(z_t|z_{t-1})}\right] \tag{4}$$
+
+正如我们将在下面展示的，当我们研究变分扩散模型时，这个目标可以进一步分解为可解释的组件。
+
+### 1.3 进入扩散模型
+
+思考变分扩散模型（Variational Diffusion Model, DM）[4, 5, 6] 的最简单方法就是将其简单地视为具有三个关键限制的马尔可夫分层变分自编码器。
+
+现在我们将把分层式VAE演进到扩散模型。听上去很难，其实只需修改以下三点就能实现扩散模型：
+
+- 观测变量和潜变量的维度相同
+- 每个时间步的潜变量编码器结构不是学习的；换句话说，它是对前一个时间步的输出添加基于固定的正态分布采样的噪声
+- 潜变量编码器的高斯参数随时间变化，使得最终时间步 $T$ 的潜变量分布是标准正态分布
+
+进行这三项修改后的模型如图1-3所示。
+
+![扩散模型的模型图](pic/dl/dm/1.3.jpeg)
+
+<small>**图1-3** 扩散模型（DM）架构：观测变量 $x_0$ → 前向过程 $q(x_t|x_{t-1})$ → 潜变量 $x_{1:T}$ → 反向过程 $p_\theta(x_{t-1}|x_t)$ → 生成 $x_0$</small>
+
+图1-3中的 $x_0$ 是观测变量，其余的 $x_1, x_2, \ldots, x_T$ 为潜变量。在分层VAE中，像 $z$ 这样的潜变量使用了符号 $z$。但在扩散模型中，由于观测变量和潜变量的维度相同，因此统一使用 $x$ 表示。图1-3中另一个值得注意的地方是 $q$ 的表示方法。在分层VAE中，$q$ 被标注成 $q_\phi$，其中包含了参数 $\phi$。但在扩散模型中，由于 $q$ 只是简单地添加固定的高斯噪声，因此不需要参数 $\phi$。高斯噪声是指基于正态分布生成的随机数。
+
+让我们详细说明这三个假设的含义。从第一个限制来看，在符号的轻微滥用下，我们现在可以将真实数据样本和潜变量都表示为 $x_t$，其中 $t = 0$ 表示真实数据样本，$t \in [1, T]$ 表示由层次索引 $t$ 对应的潜变量。DM后验与MHVAE后验（方程2）相同，但现在可以重写为：
+
+$$q(x_{1:T}|x_0) = \prod_{t=1}^{T} q(x_t|x_{t-1}) \tag{5}$$
+
+从第二个假设来看，我们知道编码器中每个潜变量的分布是以前一个层次潜变量为中心的高斯分布。与马尔可夫HVAE不同，每个时间步 $t$ 的编码器结构不是学习的；它被固定为线性高斯模型，其中均值和标准差可以预先设置为超参数，或学习为参数。我们用均值 $\mu_t(x_t) = \sqrt{\alpha_t} x_{t-1}$ 和方差 $\Sigma_t(x_t) = (1 - \alpha_t) I$ 参数化高斯编码器，其中系数的形式被选择为使潜变量的方差保持在相似的尺度；换句话说，编码过程是方差保持的。注意，允许替代的高斯参数化，并导致类似的推导。主要的要点是 $\alpha_t$ 是一个（可能可学习的）系数，可以随层次深度 $t$ 变化，以获得灵活性。数学上，编码器转移表示为：
+
+$$q(x_t|x_{t-1}) = \mathcal{N}(x_t; \sqrt{\alpha_t} x_{t-1}, (1 - \alpha_t) I) \tag{6}$$
+
+从第三个假设来看，我们知道 $\alpha_t$ 根据固定或可学习的调度随时间演化，使得最终潜变量 $p(x_T)$ 的分布是标准高斯。然后，我们可以更新马尔可夫HVAE的联合分布（方程1），将DM的联合分布写为：
+
+$$p(x_{0:T}) = p(x_T) \prod_{t=1}^{T} p_\theta(x_{t-1}|x_t) \tag{7}$$
+
+其中：
+
+$$p(x_T) = \mathcal{N}(x_T; 0, I) \tag{8}$$
+
+总的来说，这组假设描述的是图像输入随时间的稳定噪声化过程；我们通过添加高斯噪声逐步破坏图像，直到最终它变得完全等同于纯高斯噪声。这个过程在视觉上如图1-3所示。
+
+注意，我们的编码器分布 $q(x_t|x_{t-1})$ 不再由 $\phi$ 参数化，因为它们在每个时间步都被完全建模为具有定义均值和方差参数的高斯分布。因此，在DM中，我们只对学习条件分布 $p_\theta(x_{t-1}|x_t)$ 感兴趣，以便我们可以模拟新数据。优化DM后，采样过程就像从 $p(x_T)$ 采样高斯噪声，然后迭代运行去噪转移 $p_\theta(x_{t-1}|x_t)$ 进行 $T$ 步以生成新的 $x_0$。
+
+以上是对扩散模型的简要介绍。接下来我们将详细介绍扩散模型的组成要素。
+
+## 2. 扩散过程和去噪过程
+
+扩散模型包含两个处理过程：前向过程和反向过程。
+
+其中前向过程是一个添加噪声的处理。由于这个过程类似于物理学中粒子通过随机运动均匀扩散的现象，因此也被称为扩散过程（diffusion process）。
+
+反向过程是与前向过程相反的处理，即去除噪声的处理。这被称为逆扩散过程（或去噪过程，denoising process）。下面我们来详细了解一下这两个处理过程。
+
+### 2.1 扩散过程
+
+扩散过程是在上一时刻的数据中添加噪声的处理（参见图1-4）。此时，添加噪声的方式应满足一个要求：最终时刻的 $x_T$ 必须是完全噪声。完全噪声的意思是不包含原始数据的成分。例如，$\mathcal{N}(x; 0, I)$ 就是完全噪声的一个例子。
+
+![扩散模型的扩散过程](pic/dl/dm/1.4.jpeg)
+
+<small>**图1-4** 扩散过程：从干净图像 $x_0$ → 逐步添加噪声 $x_1, x_2, \ldots, x_T$ → 最终变为纯噪声 $x_T \sim \mathcal{N}(0, I)$</small>
+
+下面调整在每个时刻添加的噪声大小，使得 $x_T$ 服从 $\mathcal{N}(x_T; 0, I)$。实现这个目标的一种方法是根据以下式子给出时刻 $t$ 的噪声。
+
+$$q(x_t|x_{t-1}) = \mathcal{N}(x_t; \sqrt{1-\beta_t}x_{t-1}, \beta_t I) \tag{9}$$
+
+上式中的 $t$ 为 $1$ 到 $T$ 的整数。$\beta_t$ 是用户预先设置的值（比如 $\beta_t = 0.01$）。$\beta_t$ 越大，添加的噪声就越大。像 $\beta_t = 0.01$ 这样的值，在每个时刻被设定为 $\{\beta_1, \beta_2, \ldots, \beta_T\}$，总共设定 $T$ 个值。如果将 $T$ 设定得足够大（如1000），并且将 $\{\beta_1, \beta_2, \ldots, \beta_T\}$ 调整到一定的范围，那么就可以得到 $p(x_T) \approx \mathcal{N}(x_T; 0, I)$。
+
+
+$\{\beta_1, \beta_2, \ldots, \beta_T\}$ 的值的确定方法称为"噪声调度"（noise schedule）。噪声调度对生成图像的质量有重大影响，为此人们提出了各种各样的设置方法。典型的例子包括根据线性、指数或余弦波等方式来设置这些值。
+
+公式9表示均值向量为 $\sqrt{1-\beta_t}x_{t-1}$、协方差矩阵为 $\beta_t I$ 的正态分布。使用重参数化技巧，基于该正态分布采样的数学表达式如下所示。
+
+$$x_t = \sqrt{1-\beta_t}x_{t-1} + \sqrt{\beta_t}\epsilon, \quad \epsilon \sim \mathcal{N}(\epsilon; 0, I) \tag{10}$$
+
+注意到公式（9）与公式（10）是等价的，其中 $\alpha_t = 1 - \beta_t$，即 $\alpha_t + \beta_t = 1$。
+
+### 2.2 逆扩散过程
+
+逆扩散过程是去除噪声的处理（参见图1-5）。这个去除噪声的过程通过神经网络进行。
+
+![扩散模型的逆扩散过程](pic/dl/dm/1.5.jpeg)
+
+<small>**图1-5** 逆扩散过程：从纯噪声 $x_T \sim \mathcal{N}(0, I)$ → 通过神经网络逐步去噪 $p_\theta(x_{t-1}|x_t)$ → 生成干净图像 $x_0$</small>
+
+扩散模型总共需要在 $T$ 个时刻进行噪声去除。虽然可以考虑在每个时刻使用一个单独的神经网络，但这种方法总共需要 $T$ 个神经网络。对于 $T=1000$，这种方法是不切实际的。
+
+在扩散模型中，变量 $\{x_0, x_1, \ldots, x_T\}$ 的维度都是相同的。因此，所有 $T$ 个神经网络的输入和输出的维度也完全相同，这意味着神经网络的结构在任意时刻都可通用。此外，将时刻 $t$ 作为输入信号是为了区分处理的是哪个时刻。基于以上探讨，我们可以使用图1-6中的单个神经网络对每个时刻进行噪声去除。
+
+![扩散模型的去噪过程](pic/dl/dm/1.6.jpeg)
+
+<small>**图1-6** 去噪过程：使用单个神经网络，输入噪声图像 $x_t$ 和时间步 $t$，输出预测的噪声或去噪后的图像</small>
+
+总的来说，这组假设描述的是图像输入随时间的稳定噪声化过程；我们通过添加高斯噪声逐步破坏图像，直到最终它变得完全等同于纯高斯噪声。这个过程在视觉上如图1-3所示。
+
+注意，我们的编码器分布 $q(x_t|x_{t-1})$ 不再由 $\phi$ 参数化，因为它们在每个时间步都被完全建模为具有定义均值和方差参数的高斯分布。因此，在DM中，我们只对学习条件分布 $p_\theta(x_{t-1}|x_t)$ 感兴趣，以便我们可以模拟新数据。优化DM后，采样过程就像从 $p(x_T)$ 采样高斯噪声，然后迭代运行去噪转移 $p_\theta(x_{t-1}|x_t)$ 进行 $T$ 步以生成新的 $x_0$。
+
+## 3. ELBO的推导
+
+### 3.1 第一种形式
+
+像任何HVAE一样，DM可以通过最大化ELBO来优化，可以推导为：
+
+$$\begin{aligned}
+\log p(x) &= \log \int p(x_{0:T}) dx_{1:T} \\
+&= \log \int \frac{p(x_{0:T}) q(x_{1:T}|x_0)}{q(x_{1:T}|x_0)} dx_{1:T} \\
+&= \log \mathbb{E}_{q(x_{1:T}|x_0)} \left[\frac{p(x_{0:T})}{q(x_{1:T}|x_0)}\right] \\
+&\geq \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_{0:T})}{q(x_{1:T}|x_0)}\right]
+\end{aligned} \tag{15}$$
+
+将联合分布和后验代入：
+
+$$\mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_{0:T})}{q(x_{1:T}|x_0)}\right] = \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_T) \prod_{t=1}^{T} p_\theta(x_{t-1}|x_t)}{\prod_{t=1}^{T} q(x_t|x_{t-1})}\right] \tag{16}$$
+
+重新排列：
+
+$$= \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_T) p_\theta(x_0|x_1) \prod_{t=2}^{T} p_\theta(x_{t-1}|x_t)}{q(x_T|x_{T-1}) \prod_{t=1}^{T-1} q(x_t|x_{t-1})}\right] \tag{17}$$
+
+$$= \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_T) p_\theta(x_0|x_1) \prod_{t=1}^{T-1} p_\theta(x_t|x_{t+1})}{q(x_T|x_{T-1}) \prod_{t=1}^{T-1} q(x_t|x_{t-1})}\right] \tag{18}$$
+
+$$= \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_T) p_\theta(x_0|x_1)}{q(x_T|x_{T-1})}\right] + \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \prod_{t=1}^{T-1} \frac{p_\theta(x_t|x_{t+1})}{q(x_t|x_{t-1})}\right] \tag{19}$$
+
+$$= \mathbb{E}_{q(x_{1:T}|x_0)} [\log p_\theta(x_0|x_1)] + \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_T)}{q(x_T|x_{T-1})}\right] + \mathbb{E}_{q(x_{1:T}|x_0)} \left[\sum_{t=1}^{T-1} \log \frac{p_\theta(x_t|x_{t+1})}{q(x_t|x_{t-1})}\right] \tag{20}$$
+
+$$= \mathbb{E}_{q(x_{1:T}|x_0)} [\log p_\theta(x_0|x_1)] + \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_T)}{q(x_T|x_{T-1})}\right] + \sum_{t=1}^{T-1} \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p_\theta(x_t|x_{t+1})}{q(x_t|x_{t-1})}\right] \tag{21}$$
+
+$$= \mathbb{E}_{q(x_1|x_0)} [\log p_\theta(x_0|x_1)] + \mathbb{E}_{q(x_{T-1}, x_T|x_0)} \left[\log \frac{p(x_T)}{q(x_T|x_{T-1})}\right] + \sum_{t=1}^{T-1} \mathbb{E}_{q(x_{t-1}, x_t, x_{t+1}|x_0)} \left[\log \frac{p_\theta(x_t|x_{t+1})}{q(x_t|x_{t-1})}\right] \tag{22}$$
+
+最终得到：
+
+$$= \mathbb{E}_{q(x_1|x_0)} [\log p_\theta(x_0|x_1)] - \mathbb{E}_{q(x_{T-1}|x_0)} [D_{KL}(q(x_T|x_{T-1}) \| p(x_T))] - \sum_{t=1}^{T-1} \mathbb{E}_{q(x_{t-1}, x_{t+1}|x_0)} [D_{KL}(q(x_t|x_{t-1}) \| p_\theta(x_t|x_{t+1}))] \tag{23}$$
+
+这个推导的ELBO形式可以根据其各个组件来解释：
+
+1. **重构项**：$\mathbb{E}_{q(x_1|x_0)} [\log p_\theta(x_0|x_1)]$ 可以解释为重构项，预测给定第一步潜变量的原始数据样本的对数概率。这个项也出现在普通VAE中，可以类似地训练。
+
+2. **先验匹配项**：$\mathbb{E}_{q(x_{T-1}|x_0)} [D_{KL}(q(x_T|x_{T-1}) \| p(x_T))]$ 是先验匹配项；当最终潜变量分布匹配高斯先验时它被最小化。这个项不需要优化，因为它没有可训练参数；此外，由于我们假设了足够大的 $T$ 使得最终分布是高斯分布，这个项实际上变为零。
+
+3. **一致性项**：$\mathbb{E}_{q(x_{t-1}, x_{t+1}|x_0)} [D_{KL}(q(x_t|x_{t-1}) \| p_\theta(x_t|x_{t+1}))]$ 是一致性项；它努力使 $x_t$ 处的分布在正向和反向过程中保持一致。也就是说，从更噪图像的去噪步骤应该匹配从更干净图像的相应加噪步骤，对于每个中间时间步；这在数学上通过KL散度反映。当我们训练 $p_\theta(x_t|x_{t+1})$ 以匹配高斯分布 $q(x_t|x_{t-1})$（在方程6中定义）时，这个项被最小化。
+
+![ELBO的第一种解释](pic/dl/dm/1.7.jpeg)
+
+<small>**图1-7** ELBO的第一种解释：重构项（从 $x_1$ 重构 $x_0$）+ 一致性项（正向和反向过程保持一致）+ 先验匹配项（$x_T$ 匹配高斯先验）</small>
+
+
+在这种推导下，ELBO的所有项都计算为期望，因此可以使用蒙特卡洛估计来近似。然而，使用我们刚刚推导的项来实际优化ELBO可能是次优的；因为一致性项计算为对两个随机变量 $\{x_{t-1}, x_{t+1}\}$ 的期望，对于每个时间步，其蒙特卡洛估计的方差可能比每个时间步仅使用一个随机变量估计的项更高。由于它通过求和 $T-1$ 个一致性项来计算，对于大的 $T$ 值，ELBO的最终估计值可能具有高方差。
+
+### 3.2 第二种形式（低方差）
+
+让我们尝试推导ELBO的一种形式，其中每项计算为每次仅对一个随机变量的期望。关键洞察是我们可以将编码器转移重写为 $q(x_t|x_{t-1}) = q(x_t|x_{t-1}, x_0)$，其中额外的条件项由于马尔可夫性质是多余的。然后，根据贝叶斯规则，我们可以将每个转移重写为：
+
+$$q(x_t|x_{t-1}, x_0) = \frac{q(x_{t-1}|x_t, x_0) q(x_t|x_0)}{q(x_{t-1}|x_0)} \tag{24}$$
+
+有了这个新方程，我们可以从方程15的ELBO重新开始推导：
+
+$$\begin{aligned}
+\log p(x) &\geq \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_{0:T})}{q(x_{1:T}|x_0)}\right] \\
+&= \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_T) \prod_{t=1}^{T} p_\theta(x_{t-1}|x_t)}{\prod_{t=1}^{T} q(x_t|x_{t-1})}\right] \\
+&= \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_T) p_\theta(x_0|x_1) \prod_{t=2}^{T} p_\theta(x_{t-1}|x_t)}{q(x_1|x_0) \prod_{t=2}^{T} q(x_t|x_{t-1})}\right] \\
+&= \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_T) p_\theta(x_0|x_1) \prod_{t=2}^{T} p_\theta(x_{t-1}|x_t)}{q(x_1|x_0) \prod_{t=2}^{T} q(x_t|x_{t-1}, x_0)}\right]
+\end{aligned} \tag{25}$$
+
+继续展开：
+
+$$= \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_T) p_\theta(x_0|x_1)}{q(x_1|x_0)} + \log \prod_{t=2}^{T} \frac{p_\theta(x_{t-1}|x_t)}{q(x_t|x_{t-1}, x_0)}\right] \tag{26}$$
+
+$$= \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_T) p_\theta(x_0|x_1)}{q(x_1|x_0)} + \log \prod_{t=2}^{T} \frac{p_\theta(x_{t-1}|x_t) q(x_{t-1}|x_0)}{q(x_{t-1}|x_t, x_0) q(x_t|x_0)}\right] \tag{27}$$
+
+$$= \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_T) p_\theta(x_0|x_1)}{q(x_1|x_0)} + \sum_{t=2}^{T} \log \frac{p_\theta(x_{t-1}|x_t)}{q(x_{t-1}|x_t, x_0)} + \log \frac{q(x_{t-1}|x_0)}{q(x_t|x_0)}\right] \tag{28}$$
+
+$$= \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p(x_T) p_\theta(x_0|x_1)}{q(x_1|x_0)} + \sum_{t=2}^{T} \log \frac{p_\theta(x_{t-1}|x_t)}{q(x_{t-1}|x_t, x_0)} + \log \frac{q(x_0|x_0)}{q(x_T|x_0)}\right] \tag{29}$$
+
+$$= \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log p_\theta(x_0|x_1) + \log \frac{p(x_T)}{q(x_T|x_0)} + \sum_{t=2}^{T} \log \frac{p_\theta(x_{t-1}|x_t)}{q(x_{t-1}|x_t, x_0)}\right] \tag{30}$$
+
+$$= \mathbb{E}_{q(x_1|x_0)} [\log p_\theta(x_0|x_1)] + \mathbb{E}_{q(x_T|x_0)} \left[\log \frac{p(x_T)}{q(x_T|x_0)}\right] + \sum_{t=2}^{T} \mathbb{E}_{q(x_t, x_{t-1}|x_0)} \left[\log \frac{p_\theta(x_{t-1}|x_t)}{q(x_{t-1}|x_t, x_0)}\right] \tag{31}$$
+
+$$= \mathbb{E}_{q(x_1|x_0)} [\log p_\theta(x_0|x_1)] - D_{KL}(q(x_T|x_0) \| p(x_T)) - \sum_{t=2}^{T} \mathbb{E}_{q(x_t|x_0)} [D_{KL}(q(x_{t-1}|x_t, x_0) \| p_\theta(x_{t-1}|x_t))] \tag{32}$$
+
+因此，我们成功推导了ELBO的一种解释，可以以更低的方差估计，因为每项计算为每次最多一个随机变量的期望。这个公式也有一个优雅的解释，在检查每个单独项时揭示：
+
+1. **重构项**：$\mathbb{E}_{q(x_1|x_0)} [\log p_\theta(x_0|x_1)]$ 可以解释为重构项；就像它在普通VAE的ELBO中的类似项一样，这个项可以使用蒙特卡洛估计来近似和优化。
+
+2. **先验匹配项**：$D_{KL}(q(x_T|x_0) \| p(x_T))$ 表示最终噪声化输入分布与标准高斯先验的接近程度。它没有可训练参数，在我们的假设下也等于零。
+
+3. **去噪匹配项**：$\mathbb{E}_{q(x_t|x_0)} [D_{KL}(q(x_{t-1}|x_t, x_0) \| p_\theta(x_{t-1}|x_t))]$ 是去噪匹配项。我们学习期望的去噪转移步骤 $p_\theta(x_{t-1}|x_t)$ 作为可处理的真实去噪转移步骤 $q(x_{t-1}|x_t, x_0)$ 的近似。$q(x_{t-1}|x_t, x_0)$ 转移步骤可以作为真实信号，因为它定义了如何在访问最终完全去噪图像 $x_0$ 应该是什么的情况下对噪声图像 $x_t$ 进行去噪。因此，当两个去噪步骤尽可能匹配时，这个项被最小化，通过它们的KL散度测量。
+
+![ELBO的第二种解释](pic/dl/dm/1.8.jpeg)
+
+<small>**图1-8** ELBO的第二种解释（低方差形式）：重构项 + 先验匹配项 + 去噪匹配项（学习去噪转移步骤 $p_\theta(x_{t-1}|x_t)$ 匹配真实去噪步骤 $q(x_{t-1}|x_t, x_0)$）</small>
+
+观察到在两种ELBO推导（方程23和方程32）的过程中，只使用了马尔可夫假设；因此，这些公式对于任何任意的马尔可夫HVAE都成立。此外，当我们将 $T = 1$ 时，DM的两种ELBO解释都完全重现了普通VAE的ELBO形式，如方程3所示。
+
+在这个ELBO推导中，优化成本的大部分再次在于求和项，它主导了重构项。虽然每个KL散度项 $D_{KL}(q(x_{t-1}|x_t, x_0) \| p_\theta(x_{t-1}|x_t))$ 对于任意复杂的马尔可夫HVAE中的任意后验来说很难最小化，因为同时学习编码器的额外复杂性，但在DM中，我们可以利用高斯转移假设使优化可处理。
+
+### 3.3 推导 $q(x_t|x_0)$ 和 $q(x_{t-1}|x_t, x_0)$ 的形式
+
+根据贝叶斯规则，我们有：
+
+$$q(x_{t-1}|x_t, x_0) = \frac{q(x_t|x_{t-1}, x_0) q(x_{t-1}|x_0)}{q(x_t|x_0)} \tag{33}$$
+
+由于我们已经知道 $q(x_t|x_{t-1}, x_0) = q(x_t|x_{t-1}) = \mathcal{N}(x_t; \sqrt{\alpha_t} x_{t-1}, (1 - \alpha_t) I)$（从我们关于编码器转移的假设，方程6），剩下的就是推导 $q(x_t|x_0)$ 和 $q(x_{t-1}|x_0)$ 的形式。
+
+幸运的是，通过利用DM的编码器转移是线性高斯模型这一事实，我们可以使这些推导变得可处理。回想一下，在重参数化技巧下，样本 $x_t \sim q(x_t|x_{t-1})$ 可以重写为：
+
+$$x_t = \sqrt{\alpha_t} x_{t-1} + \sqrt{1 - \alpha_t} \epsilon \quad \text{其中} \quad \epsilon \sim \mathcal{N}(\epsilon; 0, I) \tag{34}$$
+
+类似地，样本 $x_{t-1} \sim q(x_{t-1}|x_{t-2})$ 可以重写为：
+
+$$x_{t-1} = \sqrt{\alpha_{t-1}} x_{t-2} + \sqrt{1 - \alpha_{t-1}} \epsilon \quad \text{其中} \quad \epsilon \sim \mathcal{N}(\epsilon; 0, I) \tag{35}$$
+
+然后，$q(x_t|x_0)$ 的形式可以通过重复应用重参数化技巧递归推导。假设我们可以访问 $2T$ 个独立同分布的随机噪声变量 $\{\epsilon^*_t, \epsilon_t\}_{t=0}^{T} \sim \mathcal{N}(\epsilon; 0, I)$。那么，对于任意样本 $x_t \sim q(x_t|x_0)$，我们可以将其重写为：
+
+$$x_t = \sqrt{\alpha_t} x_{t-1} + \sqrt{1 - \alpha_t} \epsilon^*_{t-1} \tag{36}$$
+
+$$= \sqrt{\alpha_t} \left(\sqrt{\alpha_{t-1}} x_{t-2} + \sqrt{1 - \alpha_{t-1}} \epsilon^*_{t-2}\right) + \sqrt{1 - \alpha_t} \epsilon^*_{t-1} \tag{37}$$
+
+$$= \sqrt{\alpha_t \alpha_{t-1}} x_{t-2} + \sqrt{\alpha_t - \alpha_t \alpha_{t-1}} \epsilon^*_{t-2} + \sqrt{1 - \alpha_t} \epsilon^*_{t-1} \tag{38}$$
+
+$$= \sqrt{\alpha_t \alpha_{t-1}} x_{t-2} + \sqrt{1 - \alpha_t \alpha_{t-1}} \epsilon_{t-2} \tag{39}$$
+
+$$= \ldots$$
+
+$$= \sqrt{\prod_{i=1}^{t} \alpha_i} x_0 + \sqrt{1 - \prod_{i=1}^{t} \alpha_i} \epsilon_0 \tag{40}$$
+
+定义 $\bar{\alpha}_t = \prod_{i=1}^{t} \alpha_i$，我们得到：
+
+$$x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon_0 \sim \mathcal{N}(x_t; \sqrt{\bar{\alpha}_t} x_0, (1 - \bar{\alpha}_t) I) \tag{41}$$
+
+其中，在公式38中我们利用了以下事实：两个独立高斯随机变量的和仍然是高斯分布，其均值是两个均值的和，方差是两个方差的和。将 $\sqrt{1 - \alpha_t} \epsilon^*_{t-1}$ 解释为来自高斯 $\mathcal{N}(0, (1 - \alpha_t)I)$ 的样本，将 $\sqrt{\alpha_t - \alpha_t \alpha_{t-1}} \epsilon^*_{t-2}$ 解释为来自高斯 $\mathcal{N}(0, (\alpha_t - \alpha_t \alpha_{t-1})I)$ 的样本，我们可以将它们的和视为从高斯 $\mathcal{N}(0, (1 - \alpha_t + \alpha_t - \alpha_t \alpha_{t-1})I) = \mathcal{N}(0, (1 - \alpha_t \alpha_{t-1})I)$ 中采样的随机变量。然后可以使用重参数化技巧将这个分布的样本表示为 $\sqrt{1 - \alpha_t \alpha_{t-1}} \epsilon_{t-2}$，如公式39所示。
+
+
+因此，我们推导出了 $q(x_t|x_0)$ 的高斯形式。这个推导可以修改为也产生描述 $q(x_{t-1}|x_0)$ 的高斯参数化。现在，知道了 $q(x_t|x_0)$ 和 $q(x_{t-1}|x_0)$ 的形式，我们可以通过代入贝叶斯规则展开来计算 $q(x_{t-1}|x_t, x_0)$ 的形式：
+
+$$q(x_{t-1}|x_t, x_0) = \frac{q(x_t|x_{t-1}, x_0) q(x_{t-1}|x_0)}{q(x_t|x_0)} \tag{42}$$
+
+$$= \frac{\mathcal{N}(x_t; \sqrt{\alpha_t} x_{t-1}, (1 - \alpha_t)I) \mathcal{N}(x_{t-1}; \sqrt{\bar{\alpha}_{t-1}} x_0, (1 - \bar{\alpha}_{t-1})I)}{\mathcal{N}(x_t; \sqrt{\bar{\alpha}_t} x_0, (1 - \bar{\alpha}_t)I)} \tag{43}$$
+
+通过展开高斯分布的指数形式并完成平方，我们可以得到：
+
+$$q(x_{t-1}|x_t, x_0) \propto \exp\left(-\frac{1}{2}\left[\frac{(x_t - \sqrt{\alpha_t} x_{t-1})^2}{1 - \alpha_t} + \frac{(x_{t-1} - \sqrt{\bar{\alpha}_{t-1}} x_0)^2}{1 - \bar{\alpha}_{t-1}} - \frac{(x_t - \sqrt{\bar{\alpha}_t} x_0)^2}{1 - \bar{\alpha}_t}\right]\right) \tag{44}$$
+
+经过代数运算并完成平方，我们最终得到：
+
+$$q(x_{t-1}|x_t, x_0) = \mathcal{N}\left(x_{t-1}; \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + \sqrt{\bar{\alpha}_{t-1}}(1 - \alpha_t) x_0}{1 - \bar{\alpha}_t}, \frac{(1 - \alpha_t)(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} I\right) \tag{45}$$
+
+其中均值 $\mu_q(x_t, x_0)$ 和方差 $\Sigma_q(t)$ 分别为：
+
+$$\mu_q(x_t, x_0) = \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + \sqrt{\bar{\alpha}_{t-1}}(1 - \alpha_t) x_0}{1 - \bar{\alpha}_t}, \quad \Sigma_q(t) = \sigma_q^2(t) I = \frac{(1 - \alpha_t)(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} I \tag{46}$$
+
+
+因此，我们已经证明在每一步，$x_{t-1} \sim q(x_{t-1}|x_t, x_0)$ 是正态分布的，均值 $\mu_q(x_t, x_0)$ 是 $x_t$ 和 $x_0$ 的函数，方差 $\Sigma_q(t)$ 是 $\alpha$ 系数的函数。这些 $\alpha$ 系数在每个时间步都是已知且固定的；它们要么在建模为超参数时永久设置，要么被视为寻求建模它们的网络的当前推理输出。
+
+### 3.4 KL散度的简化和最终优化目标
+
+为了尽可能接近地将近似去噪转移步骤 $p_\theta(x_{t-1}|x_t)$ 匹配到真实去噪转移步骤 $q(x_{t-1}|x_t, x_0)$，我们也可以将其建模为高斯分布。此外，由于所有 $\alpha$ 项在每个时间步都是已知冻结的，我们可以立即构造近似去噪转移步骤的方差也为 $\Sigma_q(t) = \sigma_q^2(t) I$。然而，我们必须将其均值 $\mu_\theta(x_t, t)$ 参数化为 $x_t$ 的函数，因为 $p_\theta(x_{t-1}|x_t)$ 不以 $x_0$ 为条件。
+
+回想一下，两个高斯分布之间的KL散度是：
+
+$$D_{KL}(\mathcal{N}(x; \mu_x, \Sigma_x) \| \mathcal{N}(y; \mu_y, \Sigma_y)) = \frac{1}{2}\left[\log\frac{|\Sigma_y|}{|\Sigma_x|} - d + \text{tr}(\Sigma_y^{-1} \Sigma_x) + (\mu_y - \mu_x)^T \Sigma_y^{-1} (\mu_y - \mu_x)\right] \tag{47}$$
+
+在我们的情况下，我们可以将两个高斯分布的方差设置为完全匹配，优化KL散度项简化为最小化两个分布均值之间的差异：
+
+$$\arg\min_\theta D_{KL}(q(x_{t-1}|x_t, x_0) \| p_\theta(x_{t-1}|x_t)) = \arg\min_\theta D_{KL}(\mathcal{N}(x_{t-1}; \mu_q, \Sigma_q(t)) \| \mathcal{N}(x_{t-1}; \mu_\theta, \Sigma_q(t))) \tag{48}$$
+
+$$= \arg\min_\theta \frac{1}{2}\left[\log 1 - d + d + (\mu_\theta - \mu_q)^T \Sigma_q(t)^{-1} (\mu_\theta - \mu_q)\right] \tag{49}$$
+
+$$= \arg\min_\theta \frac{1}{2}(\mu_\theta - \mu_q)^T \Sigma_q(t)^{-1} (\mu_\theta - \mu_q) \tag{50}$$
+
+$$= \arg\min_\theta \frac{1}{2\sigma_q^2(t)} \|\mu_\theta - \mu_q\|_2^2 \tag{51}$$
+
+至此，我们通过推导，最终将DPM模型的ELBO转换为一个MSE问题。
+
+于是问题来了，我们神经网络到底该预测什么呢？下一节我们将介绍DPM模型的三种形式。
+
+## Reference
+[1] Understanding Diffusion Models: A Unified Perspective

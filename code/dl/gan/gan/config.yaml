@@ -1,0 +1,33 @@
+# 模型参数
+model:
+  img_size: 28  # 图像尺寸（MNIST 是 28x28）
+  in_channel: 1  # 输入通道数（MNIST 是灰度图）
+  noise_dim: 100  # 噪声向量维度（增加到100以获得更好的生成质量）
+  hidden_dim: 256  # 隐藏层维度（增加到256以增加模型容量）
+
+# 训练参数
+training:
+  epochs: 50  # 增加训练轮数以获得更好的效果
+  learning_rate: 0.0002  # 2e-4，GAN 通常使用较小的学习率
+  batch_size: 64  # 增加batch size以获得更稳定的训练
+  n_critic: 1  # 每次训练生成器前训练判别器的次数
+
+# 执行控制标志
+flags:
+  train: false   # 是否训练模型
+  infer: true   # 是否执行推理：生成新图像
+
+# 模型文件
+model_file:
+  generator_name: ''  # 生成器文件名，如果为空字符串，会自动生成 'generator_model.pth'
+  discriminator_name: ''  # 判别器文件名，如果为空字符串，会自动生成 'discriminator_model.pth'
+
+# 数据参数
+data:
+  data_dir: '../../../data'  # 相对于代码文件的路径
+
+# 可视化参数
+visualization:
+  sample_size: 16  # 生成图像的数量
+  nrow: 4  # 显示时每行的图像数量
+

@@ -1,0 +1,42 @@
+# 模型参数
+model:
+  img_size: 28  # 图像尺寸（MNIST 是 28x28）
+  in_channel: 1  # 输入通道数（MNIST 是灰度图）
+  time_embed_dim: 128  # 时间嵌入维度
+  num_labels: 10  # 标签数量（MNIST 有 10 个类别：0-9）
+
+# 扩散过程参数
+diffusion:
+  num_timesteps: 1000  # 扩散步数
+  beta_start: 0.0001  # beta 起始值
+  beta_end: 0.02  # beta 结束值
+
+# 训练参数
+training:
+  epochs: 30
+  learning_rate: 0.001  # 1e-3
+  batch_size: 32
+  cond_dropout_prob: 0.1  # CFG训练：条件丢弃概率（10%概率将labels设为None）
+
+# 执行控制标志
+flags:
+  train: true   # 是否训练模型
+  infer: true   # 是否执行推理：生成新图像
+
+# 模型文件
+model_file:
+  model_name: ''  # 模型文件名，如果为空字符串，会自动生成 'ddpm_cfg_model.pth'
+
+# 数据参数
+data:
+  data_dir: '../../../data'  # 相对于代码文件的路径
+
+# 可视化参数
+visualization:
+  sample_size: 16  # 生成图像的数量
+  nrow: 4  # 显示时每行的图像数量
+
+# 推理参数
+inference:
+  guidance_scale: 3.0  # CFG引导强度（gamma），越大条件控制越强
+

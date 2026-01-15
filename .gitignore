@@ -6,7 +6,6 @@ __pycache__/
 .Python
 
 # 模型文件
-*.pth
 *.pkl
 *.h5
 *.ckpt
@@ -15,8 +14,6 @@ __pycache__/
 # 图片文件
 pic/
 
-# 说明文字
-*.md
 
 # 数据文件
 data/
