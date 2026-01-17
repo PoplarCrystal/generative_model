@@ -102,43 +102,59 @@ $$\mathbb{E}[\mu|x] = x + \Sigma \nabla_x \log p(x) \tag{13}$$
 
 ### 4.2 分数表示的推导
 
-回到公式41，在前向过程中，我们得到：
+我们知道在前向过程中，$x_t$ 的边际分布（marginal distribution）是一个高斯分布：
 
 $$q(x_t|x_0) = \mathcal{N}(x_t; \sqrt{\bar{\alpha}_t} x_0, (1 - \bar{\alpha}_t) I) \tag{14}$$
 
-这是一个高斯分布，虽然已知它的均值是 $\sqrt{\bar{\alpha}_t} x_0$，但我们仍可以利用Tweedie公式估计它的均值参数：
+其中 $x_t$ 的边际分布为 $p(x_t)$。虽然我们知道给定 $x_0$ 时 $x_t$ 的均值是 $\sqrt{\bar{\alpha}_t} x_0$，但我们可以利用Tweedie公式，从 $x_t$ 的样本直接估计这个均值参数。根据Tweedie公式（公式13），我们有：
 
-$$\mathbb{E}[\sqrt{\bar{\alpha}_t} x_0 | x_t] = x_t + (1 - \bar{\alpha}_t) \nabla_{x_t} \log q(x_t|x_0) \tag{15}$$
+$$\mathbb{E}[\sqrt{\bar{\alpha}_t} x_0 | x_t] = x_t + (1 - \bar{\alpha}_t) \nabla_{x_t} \log p(x_t) \tag{15}$$
 
-对上式进行移项可以得到一个新的关系式：
+这里我们记 $\nabla_{x_t} \log p(x_t)$ 为 $\nabla \log p(x_t)$ 以简化符号。根据Tweedie公式，对于从均值 $\mu_{x_t} = \sqrt{\bar{\alpha}_t} x_0$ 生成的高斯分布，最佳估计为：
 
-$$x_0 = \frac{1}{\sqrt{\bar{\alpha}_t}} \left(x_t + (1 - \bar{\alpha}_t) \nabla_{x_t} \log q(x_t|x_0)\right) \tag{16}$$
+$$\sqrt{\bar{\alpha}_t} x_0 = x_t + (1 - \bar{\alpha}_t) \nabla \log p(x_t) \tag{16}$$
 
-这个关系式是一个分数表达 $x_0$ 的等式。现在回到逆过程中的真实分布 $q(x_{t-1}|x_t, x_0)$，它的均值 $\mu_q(x_t, x_0)$ 在公式3中已经给出，这里把公式16带入进去：
+对上式进行移项可以得到：
+
+$$x_0 = \frac{x_t + (1 - \bar{\alpha}_t) \nabla \log p(x_t)}{\sqrt{\bar{\alpha}_t}} \tag{17}$$
+
+这个关系式是一个分数表达 $x_0$ 的等式。现在回到逆过程中的真实分布 $q(x_{t-1}|x_t, x_0)$，它的均值 $\mu_q(x_t, x_0)$ 在公式3中已经给出，这里把公式17带入进去：
 
 $$\mu_q(x_t, x_0) = \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + \sqrt{\bar{\alpha}_{t-1}}(1 - \alpha_t) x_0}{1 - \bar{\alpha}_t}$$
 
-$$= \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + \sqrt{\bar{\alpha}_{t-1}}(1 - \alpha_t) \cdot \frac{1}{\sqrt{\bar{\alpha}_t}} \left(x_t + (1 - \bar{\alpha}_t) \nabla_{x_t} \log q(x_t|x_0)\right)}{1 - \bar{\alpha}_t}$$
+$$= \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + \sqrt{\bar{\alpha}_{t-1}}(1 - \alpha_t) \cdot \frac{x_t + (1 - \bar{\alpha}_t) \nabla \log p(x_t)}{\sqrt{\bar{\alpha}_t}}}{1 - \bar{\alpha}_t}$$
 
-$$= \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} \left(x_t + (1 - \bar{\alpha}_t) \nabla_{x_t} \log q(x_t|x_0)\right)}{1 - \bar{\alpha}_t}$$
+$$= \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + (1 - \alpha_t) \cdot \frac{x_t + (1 - \bar{\alpha}_t) \nabla \log p(x_t)}{\sqrt{\alpha_t}}}{1 - \bar{\alpha}_t}$$
 
-$$= \frac{1}{\sqrt{\alpha_t}} x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} \nabla_{x_t} \log q(x_t|x_0) \tag{17}$$
+$$= \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t}{1 - \bar{\alpha}_t} + \frac{(1 - \alpha_t) x_t}{(1 - \bar{\alpha}_t) \sqrt{\alpha_t}} + \frac{(1 - \alpha_t)(1 - \bar{\alpha}_t) \nabla \log p(x_t)}{(1 - \bar{\alpha}_t) \sqrt{\alpha_t}}$$
+
+$$= \left(\frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} + \frac{1 - \alpha_t}{(1 - \bar{\alpha}_t) \sqrt{\alpha_t}}\right) x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} \nabla \log p(x_t)$$
+
+$$= \frac{\alpha_t (1 - \bar{\alpha}_{t-1}) + 1 - \alpha_t}{(1 - \bar{\alpha}_t) \sqrt{\alpha_t}} x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} \nabla \log p(x_t)$$
+
+$$= \frac{\alpha_t - \bar{\alpha}_t + 1 - \alpha_t}{(1 - \bar{\alpha}_t) \sqrt{\alpha_t}} x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} \nabla \log p(x_t)$$
+
+$$= \frac{1 - \bar{\alpha}_t}{(1 - \bar{\alpha}_t) \sqrt{\alpha_t}} x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} \nabla \log p(x_t)$$
+
+$$= \frac{1}{\sqrt{\alpha_t}} x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} \nabla \log p(x_t) \tag{18}$$
 
 重新按照这个形式设定参数化分布 $p_\theta(x_{t-1}|x_t)$ 均值 $\mu_\theta(x_t, t)$ 的表达式：
 
-$$\mu_\theta(x_t, t) = \frac{1}{\sqrt{\alpha_t}} x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} s_\theta(x_t, t) \tag{18}$$
+$$\mu_\theta(x_t, t) = \frac{1}{\sqrt{\alpha_t}} x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} s_\theta(x_t, t) \tag{19}$$
 
-现在 $s_\theta(x_t, t)$ 是模型学习预测的内容，相当于模型直接预测的是分数 $\nabla_{x_t} \log q(x_t|x_0)$。
+现在 $s_\theta(x_t, t)$ 是模型学习预测的内容，相当于模型直接预测的是分数 $\nabla \log p(x_t)$。
 
 最后我们推导下目标函数ELBO中相关的KL散度：
 
 $$D_{KL}(q(x_{t-1}|x_t, x_0) \| p_\theta(x_{t-1}|x_t)) = \frac{1}{2\sigma_q^2(t)} \|\mu_\theta(x_t, t) - \mu_q(x_t, x_0)\|_2^2$$
 
-$$= \frac{1}{2\sigma_q^2(t)} \left\|\frac{1 - \alpha_t}{\sqrt{\alpha_t}} (s_\theta(x_t, t) - \nabla_{x_t} \log q(x_t|x_0))\right\|_2^2$$
+$$= \frac{1}{2\sigma_q^2(t)} \left\|\frac{1}{\sqrt{\alpha_t}} x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} s_\theta(x_t, t) - \frac{1}{\sqrt{\alpha_t}} x_t - \frac{1 - \alpha_t}{\sqrt{\alpha_t}} \nabla \log p(x_t)\right\|_2^2$$
 
-$$= \frac{1}{2\sigma_q^2(t)} \cdot \frac{(1 - \alpha_t)^2}{\alpha_t} \|s_\theta(x_t, t) - \nabla_{x_t} \log q(x_t|x_0)\|_2^2 \tag{19}$$
+$$= \frac{1}{2\sigma_q^2(t)} \left\|\frac{1 - \alpha_t}{\sqrt{\alpha_t}} (s_\theta(x_t, t) - \nabla \log p(x_t))\right\|_2^2$$
 
-最后的目标函数仍然是均方误差的形式，和原始扩散模型以及基于噪声的扩散模型是高度一致的。公式中的 $\nabla_{x_t} \log q(x_t|x_0)$ 是梯度的真实值，这个可以直接计算得到，PyTorch中可以计算指定变量的梯度。$s_\theta(x_t, t)$ 代表一个神经网络模型，它去学习和预测 $\nabla_{x_t} \log q(x_t|x_0)$。
+$$= \frac{1}{2\sigma_q^2(t)} \cdot \frac{(1 - \alpha_t)^2}{\alpha_t} \|s_\theta(x_t, t) - \nabla \log p(x_t)\|_2^2 \tag{20}$$
+
+最后的目标函数仍然是均方误差的形式，和原始扩散模型以及基于噪声的扩散模型是高度一致的。公式中的 $\nabla \log p(x_t)$ 是梯度的真实值，这个可以直接计算得到，PyTorch中可以计算指定变量的梯度。$s_\theta(x_t, t)$ 代表一个神经网络模型，它去学习和预测分数函数 $\nabla \log p(x_t)$，即对于任意噪声水平 $t$，在数据空间中 $x_t$ 的梯度。
 
 ### 4.3 梯度和噪声的关系
 

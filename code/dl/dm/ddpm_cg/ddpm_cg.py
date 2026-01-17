@@ -51,26 +51,55 @@ class Diffuser:
         alpha_bar = alpha_bar.view(N, 1, 1, 1)
         alpha_bar_prev = alpha_bar_prev.view(N, 1, 1, 1)
 
+        # 模型评估模式：采样时需要使用 eval 模式
         model.eval()
         with torch.no_grad():
             eps = model(x, t, labels)  # 条件预测
         
         # Classifier Guidance: 使用分类器梯度引导
         if classifier is not None and labels is not None:
-            x.requires_grad_(True)
-            logits = classifier(x, t)
+            # 需要确保 x 可以被求导
+            x_grad = x.clone().detach().requires_grad_(True)
+            classifier.eval()
+            
+            # 计算分类器预测
+            logits = classifier(x_grad, t)
             log_probs = F.log_softmax(logits, dim=-1)
             # 选择目标类别的 log 概率
             selected = log_probs[range(len(logits)), labels.view(-1)]
-            # 计算梯度
-            grad = torch.autograd.grad(selected.sum(), x, create_graph=False, retain_graph=False)[0]
+            
+            # 计算梯度（只对分类器进行反向传播）
+            grad = torch.autograd.grad(
+                selected.sum(), 
+                x_grad, 
+                create_graph=False, 
+                retain_graph=False,
+                only_inputs=True
+            )[0]
+            
+            # 梯度裁剪：防止梯度过大导致采样不稳定
+            # 计算每个样本的梯度范数
+            grad_norm = torch.norm(grad.view(len(grad), -1), dim=1, keepdim=True)
+            grad_norm = grad_norm.view(-1, 1, 1, 1) + 1e-8  # 避免除零
+            
+            # 梯度裁剪：限制梯度范数上限，防止过度引导
+            # 当梯度范数 > 1.0 时，进行归一化；否则保持原样
+            # 这样既能防止过大的梯度，又保留了正常梯度的信息
+            max_grad_norm = 1.0
+            grad_clipped = grad / torch.clamp(grad_norm, min=1.0)  # 只裁剪超过阈值的梯度
+            
             # CG 公式: eps_guided = eps_cond + s * sigma_t * grad(log p(y|x_t))
             # 其中 sigma_t = sqrt(1 - alpha_bar)
+            # 注意：即使加了梯度裁剪，也不建议使用过大的 classifier_scale (>2.0)
             sigma_t = torch.sqrt(1 - alpha_bar)
-            eps = eps + classifier_scale * sigma_t * grad
-            x.requires_grad_(False)
+            
+            # 应用引导：使用裁剪后的梯度
+            eps = eps + classifier_scale * sigma_t * grad_clipped
+            
+            # 清理
+            x_grad = None
         
-        model.train()
+        # 注意：采样时不改变模型状态，保持 eval 模式
 
         noise = torch.randn_like(x, device=self.device)
         noise[t == 1] = 0  # no noise at t=1

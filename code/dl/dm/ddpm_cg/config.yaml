@@ -13,7 +13,7 @@ diffusion:
 
 # 训练参数
 train_classifier:
-  epochs: 5
+  epochs: 30
   learning_rate: 0.001  # 1e-3
   batch_size: 32
 
@@ -24,8 +24,8 @@ train_ddpm:
 
 # 执行控制标志
 flags:
-  train_classifier: true  # 是否训练分类器
-  train_ddpm: true   # 是否训练模型
+  train_classifier: false  # 是否训练分类器
+  train_ddpm: false   # 是否训练模型
   infer: true   # 是否执行推理：生成新图像
 
 # 模型文件
@@ -44,5 +44,5 @@ visualization:
 
 # 推理参数
 inference:
-  classifier_scale: 1.0  # CG引导强度（s），越大条件控制越强
+  classifier_scale: 0.5  # CG引导强度（s），越大条件控制越强
 

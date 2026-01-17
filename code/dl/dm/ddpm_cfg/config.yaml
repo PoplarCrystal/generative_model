@@ -20,7 +20,7 @@ training:
 
 # 执行控制标志
 flags:
-  train: true   # 是否训练模型
+  train: false   # 是否训练模型
   infer: true   # 是否执行推理：生成新图像
 
 # 模型文件
@@ -38,5 +38,5 @@ visualization:
 
 # 推理参数
 inference:
-  guidance_scale: 3.0  # CFG引导强度（gamma），越大条件控制越强
+  guidance_scale: 0.5  # CFG引导强度（gamma），越大条件控制越强
 

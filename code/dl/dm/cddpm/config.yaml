@@ -19,7 +19,7 @@ training:
 
 # 执行控制标志
 flags:
-  train: true   # 是否训练模型
+  train: false   # 是否训练模型
   infer: true   # 是否执行推理：生成新图像
 
 # 模型文件
