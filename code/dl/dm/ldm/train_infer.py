@@ -271,50 +271,77 @@ if not train_ldm:
 if infer:
     model.eval()
     vae.eval()
-    print('\n开始生成图像...')
-    
-    # 生成潜在向量（使用 CFG）
-    z_shape = (sample_size, latent_dim)
-    labels = None  # None表示随机生成标签
     guidance_scale = config.get('inference', {}).get('guidance_scale', 3.0)
-    z, labels = diffuser.sample(
-        model, z_shape, labels=labels, guidance_scale=guidance_scale
-    )
     
-    # 将潜在向量解码为图像
-    with torch.no_grad():
-        x_hat_flat = vae.decode(z)  # [B, latent_dim] -> [B, C*H*W]
-        x_hat = x_hat_flat.view(sample_size, in_channel, img_size, img_size)
-    
-    # 将张量转换为 PIL 图像
-    images = []
-    for i in range(sample_size):
-        x_img = x_hat[i] * 255
-        x_img = x_img.clamp(0, 255)
-        x_img = x_img.to(torch.uint8)
-        x_img = x_img.cpu()
-        to_pil = transforms.ToPILImage()
-        images.append(to_pil(x_img))
-    
-    # 将最终生成的 PIL 图像转换为 numpy 数组用于显示
-    images_np = []
-    for img in images:
-        img_np = np.array(img.convert('L'))  # 转换为灰度图
-        images_np.append(img_np)
-    
-    # 显示最终生成的图像
-    fig, axes = plt.subplots(nrow, nrow, figsize=(16, 16))
-    fig.suptitle(
-        f'Generated Images (LDM+CFG, scale={guidance_scale})',
-        fontsize=16, y=0.995
-    )
+    def generate_and_show(labels, title_suffix, num_images):
+        """生成并显示图像
+        
+        Args:
+            labels: 条件标签，None表示无条件生成
+            title_suffix: 标题后缀
+            num_images: 生成图像数量
+        """
+        print(f'\n开始生成图像: {title_suffix}...')
+        
+        # 生成潜在向量
+        z_shape = (num_images, latent_dim)
+        z, labels = diffuser.sample(
+            model, z_shape, labels=labels, guidance_scale=guidance_scale
+        )
+        
+        # 将潜在向量解码为图像
+        with torch.no_grad():
+            x_hat_flat = vae.decode(z)  # [B, latent_dim] -> [B, C*H*W]
+            x_hat = x_hat_flat.view(num_images, in_channel, img_size, img_size)
+        
+        # 将张量转换为 PIL 图像
+        images = []
+        for i in range(num_images):
+            x_img = x_hat[i] * 255
+            x_img = x_img.clamp(0, 255)
+            x_img = x_img.to(torch.uint8)
+            x_img = x_img.cpu()
+            to_pil = transforms.ToPILImage()
+            images.append(to_pil(x_img))
+        
+        # 将最终生成的 PIL 图像转换为 numpy 数组用于显示
+        images_np = []
+        for img in images:
+            img_np = np.array(img.convert('L'))  # 转换为灰度图
+            images_np.append(img_np)
+        
+        # 计算网格大小
+        grid_size = int(np.sqrt(num_images))
+        if grid_size * grid_size < num_images:
+            grid_size += 1
+        
+        # 显示最终生成的图像
+        fig, axes = plt.subplots(grid_size, grid_size, figsize=(16, 16))
+        cfg_text = 'Unconditional (no CFG)' if labels is None else f'CFG scale={guidance_scale}'
+        fig.suptitle(
+            f'Generated Images (LDM, {cfg_text}) - {title_suffix}',
+            fontsize=16, y=0.995
+        )
 
-    for idx, ax in enumerate(axes.flat):
-        if idx < sample_size:
-            ax.imshow(images_np[idx], cmap='gray')
-            ax.set_title(f'Label: {labels[idx].item()}', fontsize=10)
-        ax.axis('off')
+        for idx, ax in enumerate(axes.flat):
+            if idx < num_images:
+                ax.imshow(images_np[idx], cmap='gray')
+                if labels is not None:
+                    ax.set_title(f'Label: {labels[idx].item()}', fontsize=10)
+                else:
+                    ax.set_title('Unconditional', fontsize=10)
+            ax.axis('off')
 
-    plt.tight_layout()
-    plt.subplots_adjust(top=0.98, hspace=0.1, wspace=0.1)
-    plt.show()
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.98, hspace=0.1, wspace=0.1)
+        plt.show()
+    
+    # 第一张：无条件生成（labels=None）
+    num_images_1 = sample_size
+    labels_1 = None  # None表示无条件生成
+    generate_and_show(labels_1, 'Unconditional (No Labels)', num_images_1)
+    
+    # 第二张：有label（4×4=16个，随机生成0-9的label）
+    num_images_2 = 16  # 4×4
+    labels_2 = torch.randint(0, 10, (num_images_2,), device=device)  # 随机生成0-9的标签
+    generate_and_show(labels_2, 'Conditional (Random 0-9 Labels)', num_images_2)

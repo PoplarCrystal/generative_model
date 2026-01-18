@@ -75,15 +75,16 @@ class LatentDiffuser:
         Args:
             model: UNet 模型
             z_shape: 潜在向量的形状 (batch_size, latent_dim)
-            labels: 可选的条件标签，如果为None则随机生成
+            labels: 可选的条件标签，如果为None则进行无条件生成（不使用CFG）
             guidance_scale: CFG 引导强度（gamma），默认3.0
         """
         batch_size = z_shape[0]
         z = torch.randn(z_shape, device=self.device)
         
-        # 如果未提供标签，随机生成
-        if labels is None:
-            labels = torch.randint(0, 10, (batch_size,), device=self.device)
+        # 如果labels=None，直接传递None给denoise，进行无条件生成
+        # 在denoise中，当labels=None时，eps_cond = model(z, t, None) = eps_uncond
+        # 所以 eps = eps_uncond + gamma * (eps_cond - eps_uncond) = eps_uncond
+        # 即CFG不起作用，完全使用无条件预测
 
         for i in tqdm(range(self.num_timesteps, 0, -1), desc='Sampling (LDM+CFG)'):
             t = torch.tensor([i] * batch_size, device=self.device, dtype=torch.long)

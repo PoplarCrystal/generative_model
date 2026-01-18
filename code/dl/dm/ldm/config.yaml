@@ -34,7 +34,7 @@ train_ldm:
 # 执行控制标志
 flags:
   train_vae: false  # 是否训练 VAE（如果为 false，则加载预训练的 VAE）
-  train_ldm: true   # 是否训练模型
+  train_ldm: false   # 是否训练模型
   infer: true   # 是否执行推理：生成新图像
   
 # 模型文件

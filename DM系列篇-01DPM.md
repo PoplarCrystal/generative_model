@@ -6,7 +6,7 @@
 
 我们再来回顾一下VAE。VAE是一个拥有潜变量的模型。数据生成是通过从固定的正态分布中采样潜变量，并使用神经网络将潜变量转换为观测变量来实现的。另外，VAE还使用另一个神经网络，将观测变量转换为潜变量。VAE的结构如图1-1所示。
 
-![VAE的模型图](pic/dl/dm/1.1.jpeg)
+<img src="pic/dl/dm/1.1.jpeg" alt="VAE的模型图" style="width: 65%;">
 
 <small>**图1-1** VAE架构：输入 $x$ → 编码器 $q_\phi(z|x)$ → 潜在向量 $z$ → 解码器 $p_\theta(x|z)$ → 重构输出 $\hat{x}$</small>
 
@@ -16,7 +16,7 @@
 
 分层变分自编码器（Hierarchical VAE, HVAE）是VAE的推广，扩展到潜变量的多个层次。将潜变量分层后的模型是分层VAE。如图1-2所示，潜变量的数量增加到了多个（图中为 $T$ 个）。
 
-![分层VAE的模型图](pic/dl/dm/1.2.jpeg)
+<img src="pic/dl/dm/1.2.jpeg" alt="分层VAE的模型图" style="width: 65%;">
 
 <small>**图1-2** 分层VAE（HVAE）架构：输入 $x$ → 编码器 $q_\phi(z_1|x) \prod_{t=2}^{T} q_\phi(z_t|z_{t-1})$ → 多层级潜在向量 $z_{1:T}$ → 解码器 $p_\theta(x|z_1) \prod_{t=2}^{T} p_\theta(z_{t-1}|z_t)$ → 重构输出 $\hat{x}$</small>
 
@@ -57,7 +57,7 @@ $$\mathbb{E}_{q_\phi(z_{1:T}|x)} \left[\log \frac{p(x, z_{1:T})}{q_\phi(z_{1:T}|
 
 进行这三项修改后的模型如图1-3所示。
 
-![扩散模型的模型图](pic/dl/dm/1.3.jpeg)
+<img src="pic/dl/dm/1.3.jpeg" alt="扩散模型的模型图" style="width: 65%;">
 
 <small>**图1-3** 扩散模型（DM）架构：观测变量 $x_0$ → 前向过程 $q(x_t|x_{t-1})$ → 潜变量 $x_{1:T}$ → 反向过程 $p_\theta(x_{t-1}|x_t)$ → 生成 $x_0$</small>
 
@@ -97,7 +97,7 @@ $$p(x_T) = \mathcal{N}(x_T; 0, I) \tag{8}$$
 
 扩散过程是在上一时刻的数据中添加噪声的处理（参见图1-4）。此时，添加噪声的方式应满足一个要求：最终时刻的 $x_T$ 必须是完全噪声。完全噪声的意思是不包含原始数据的成分。例如，$\mathcal{N}(x; 0, I)$ 就是完全噪声的一个例子。
 
-![扩散模型的扩散过程](pic/dl/dm/1.4.jpeg)
+<img src="pic/dl/dm/1.4.jpeg" alt="扩散模型的扩散过程" style="width: 65%;">
 
 <small>**图1-4** 扩散过程：从干净图像 $x_0$ → 逐步添加噪声 $x_1, x_2, \ldots, x_T$ → 最终变为纯噪声 $x_T \sim \mathcal{N}(0, I)$</small>
 
@@ -120,7 +120,7 @@ $$x_t = \sqrt{1-\beta_t}x_{t-1} + \sqrt{\beta_t}\epsilon, \quad \epsilon \sim \m
 
 逆扩散过程是去除噪声的处理（参见图1-5）。这个去除噪声的过程通过神经网络进行。
 
-![扩散模型的逆扩散过程](pic/dl/dm/1.5.jpeg)
+<img src="pic/dl/dm/1.5.jpeg" alt="扩散模型的逆扩散过程" style="width: 65%;">
 
 <small>**图1-5** 逆扩散过程：从纯噪声 $x_T \sim \mathcal{N}(0, I)$ → 通过神经网络逐步去噪 $p_\theta(x_{t-1}|x_t)$ → 生成干净图像 $x_0$</small>
 
@@ -128,7 +128,7 @@ $$x_t = \sqrt{1-\beta_t}x_{t-1} + \sqrt{\beta_t}\epsilon, \quad \epsilon \sim \m
 
 在扩散模型中，变量 $\{x_0, x_1, \ldots, x_T\}$ 的维度都是相同的。因此，所有 $T$ 个神经网络的输入和输出的维度也完全相同，这意味着神经网络的结构在任意时刻都可通用。此外，将时刻 $t$ 作为输入信号是为了区分处理的是哪个时刻。基于以上探讨，我们可以使用图1-6中的单个神经网络对每个时刻进行噪声去除。
 
-![扩散模型的去噪过程](pic/dl/dm/1.6.jpeg)
+<img src="pic/dl/dm/1.6.jpeg" alt="扩散模型的去噪过程" style="width: 65%;">
 
 <small>**图1-6** 去噪过程：使用单个神经网络，输入噪声图像 $x_t$ 和时间步 $t$，输出预测的噪声或去噪后的图像</small>
 
@@ -179,7 +179,7 @@ $$= \mathbb{E}_{q(x_1|x_0)} [\log p_\theta(x_0|x_1)] - \mathbb{E}_{q(x_{T-1}|x_0
 
 3. **一致性项**：$\mathbb{E}_{q(x_{t-1}, x_{t+1}|x_0)} [D_{KL}(q(x_t|x_{t-1}) \| p_\theta(x_t|x_{t+1}))]$ 是一致性项；它努力使 $x_t$ 处的分布在正向和反向过程中保持一致。也就是说，从更噪图像的去噪步骤应该匹配从更干净图像的相应加噪步骤，对于每个中间时间步；这在数学上通过KL散度反映。当我们训练 $p_\theta(x_t|x_{t+1})$ 以匹配高斯分布 $q(x_t|x_{t-1})$（在方程6中定义）时，这个项被最小化。
 
-![ELBO的第一种解释](pic/dl/dm/1.7.jpeg)
+<img src="pic/dl/dm/1.7.jpeg" alt="ELBO的第一种解释" style="width: 65%;">
 
 <small>**图1-7** ELBO的第一种解释：重构项（从 $x_1$ 重构 $x_0$）+ 一致性项（正向和反向过程保持一致）+ 先验匹配项（$x_T$ 匹配高斯先验）</small>
 
@@ -225,7 +225,7 @@ $$= \mathbb{E}_{q(x_1|x_0)} [\log p_\theta(x_0|x_1)] - D_{KL}(q(x_T|x_0) \| p(x_
 
 3. **去噪匹配项**：$\mathbb{E}_{q(x_t|x_0)} [D_{KL}(q(x_{t-1}|x_t, x_0) \| p_\theta(x_{t-1}|x_t))]$ 是去噪匹配项。我们学习期望的去噪转移步骤 $p_\theta(x_{t-1}|x_t)$ 作为可处理的真实去噪转移步骤 $q(x_{t-1}|x_t, x_0)$ 的近似。$q(x_{t-1}|x_t, x_0)$ 转移步骤可以作为真实信号，因为它定义了如何在访问最终完全去噪图像 $x_0$ 应该是什么的情况下对噪声图像 $x_t$ 进行去噪。因此，当两个去噪步骤尽可能匹配时，这个项被最小化，通过它们的KL散度测量。
 
-![ELBO的第二种解释](pic/dl/dm/1.8.jpeg)
+<img src="pic/dl/dm/1.8.jpeg" alt="ELBO的第二种解释" style="width: 65%;">
 
 <small>**图1-8** ELBO的第二种解释（低方差形式）：重构项 + 先验匹配项 + 去噪匹配项（学习去噪转移步骤 $p_\theta(x_{t-1}|x_t)$ 匹配真实去噪步骤 $q(x_{t-1}|x_t, x_0)$）</small>
 

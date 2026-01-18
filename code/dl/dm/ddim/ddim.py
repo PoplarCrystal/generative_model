@@ -107,7 +107,12 @@ class DDIMDiffuser:
         
         # DDIM 采样公式（参考主目录实现）
         # xt_next = at_next.sqrt() * x0_t + c1 * noise + c2 * et
-        noise = torch.randn_like(x_t)
+        # 当 eta=0 时，c1=0，使用零噪声实现确定性采样
+        # 当 eta>0 时，使用随机噪声实现随机采样
+        if self.eta > 0:
+            noise = torch.randn_like(x_t)
+        else:
+            noise = torch.zeros_like(x_t)  # 确定性采样：使用零噪声
         x_prev = at_next.sqrt() * pred_x0 + c1 * noise + c2 * pred_eps
         
         return x_prev

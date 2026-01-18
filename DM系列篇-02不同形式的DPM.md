@@ -34,7 +34,7 @@ $$= \frac{1}{2\sigma_q^2(t)} \cdot \frac{\bar{\alpha}_{t-1}(1 - \alpha_t)^2}{(1 
 
 由于KL散度是损失函数，而根据上式，损失函数可以表示为 $\hat{x}_\theta(x_t, t)$ 和 $x_0$ 之间的平方误差，因此，神经网络以 $x_0$ 作为训练数据进行训练，使得输出的 $\hat{x}_\theta(x_t, t)$ 与 $x_0$ 相同。
 
-![以x_0为训练数据的扩散模型](pic/dl/dm/2.1.jpeg)
+<img src="pic/dl/dm/2.1.jpeg" alt="以x_0为训练数据的扩散模型" style="width: 65%;">
 
 图2-1 以 $x_0$ 为训练数据的扩散模型
 
@@ -74,7 +74,7 @@ $$= \frac{1}{2\sigma_q^2(t)} \cdot \frac{\bar{\alpha}_{t-1}(1 - \alpha_t)^2}{\ba
 
 结果是 $\hat{\epsilon}_\theta(x_t, t)$ 和 $\epsilon$ 之间的平方误差。因此，神经网络 $\hat{\epsilon}_\theta(x_t, t)$ 预测了基于 $x_0$ 生成 $x_t$ 时使用的噪声分量 $\epsilon$。
 
-![使用epsilon作为训练数据的扩散模型](pic/dl/dm/2.2.jpeg)
+<img src="pic/dl/dm/2.2.jpeg" alt="使用epsilon作为训练数据的扩散模型" style="width: 65%;">
 
 图2-2 使用 $\epsilon$ 作为训练数据的扩散模型
 
@@ -164,7 +164,7 @@ $$\nabla_{x_t} \log q(x_t|x_0) = \nabla_{x_t} \log q(x_t|x_0) = -\frac{1}{1 - \b
 
 我们知道梯度的方向，是函数极值的方向。梯度 $\nabla_{x_t} \log q(x_t|x_0)$ 指向的是对数概率函数 $\log q(x_t|x_0)$ 概率密度最大的方向，它和添加的噪声相差一个负号，正好是相反的，梯度的方向是噪声的反方向，这十分符合直觉。
 
-![使用分数作为训练数据的扩散模型](pic/dl/dm/2.3.jpeg)
+<img src="pic/dl/dm/2.3.jpeg" alt="使用分数作为训练数据的扩散模型" style="width: 65%;">
 
 图2-3 使用分数作为训练数据的扩散模型
 
