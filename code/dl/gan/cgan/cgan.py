@@ -10,18 +10,25 @@ class ConditionalGenerator(nn.Module):
         self.num_labels = num_labels
         self.label_embed = nn.Embedding(num_labels, label_embed_dim)
         # 输入：噪声 + 标签嵌入
-        self.linear1 = nn.Linear(noise_dim + label_embed_dim, hidden_dim)
-        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
-        self.linear3 = nn.Linear(hidden_dim, output_dim)
+        input_dim = noise_dim + label_embed_dim
+        # 参考实现的结构：input_dim -> hidden_dim -> hidden_dim*2 -> hidden_dim*4 -> output_dim
+        self.linear1 = nn.Linear(input_dim, hidden_dim)
+        self.bn1 = nn.BatchNorm1d(hidden_dim)
+        self.linear2 = nn.Linear(hidden_dim, hidden_dim * 2)
+        self.bn2 = nn.BatchNorm1d(hidden_dim * 2)
+        self.linear3 = nn.Linear(hidden_dim * 2, hidden_dim * 4)
+        self.bn3 = nn.BatchNorm1d(hidden_dim * 4)
+        self.linear4 = nn.Linear(hidden_dim * 4, output_dim)
 
     def forward(self, z, labels):
         # 标签嵌入
         label_emb = self.label_embed(labels)  # [B, label_embed_dim]
         # 拼接噪声和标签嵌入
         z_cond = torch.cat([z, label_emb], dim=1)  # [B, noise_dim + label_embed_dim]
-        h = F.relu(self.linear1(z_cond))
-        h = F.relu(self.linear2(h))
-        x = torch.sigmoid(self.linear3(h))
+        h = F.leaky_relu(self.bn1(self.linear1(z_cond)), 0.2)
+        h = F.leaky_relu(self.bn2(self.linear2(h)), 0.2)
+        h = F.leaky_relu(self.bn3(self.linear3(h)), 0.2)
+        x = torch.tanh(self.linear4(h))  # 输出范围 [-1, 1]
         return x
 
 
@@ -32,17 +39,24 @@ class ConditionalDiscriminator(nn.Module):
         self.num_labels = num_labels
         self.label_embed = nn.Embedding(num_labels, label_embed_dim)
         # 输入：图像 + 标签嵌入
-        self.linear1 = nn.Linear(input_dim + label_embed_dim, hidden_dim)
-        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
-        self.linear3 = nn.Linear(hidden_dim, 1)
+        cond_input_dim = input_dim + label_embed_dim
+        # 参考实现的结构：cond_input_dim -> hidden_dim*4 -> hidden_dim*2 -> hidden_dim -> 1
+        self.linear1 = nn.Linear(cond_input_dim, hidden_dim * 4)
+        self.dropout1 = nn.Dropout(0.3)
+        self.linear2 = nn.Linear(hidden_dim * 4, hidden_dim * 2)
+        self.dropout2 = nn.Dropout(0.3)
+        self.linear3 = nn.Linear(hidden_dim * 2, hidden_dim)
+        self.dropout3 = nn.Dropout(0.3)
+        self.linear4 = nn.Linear(hidden_dim, 1)
 
     def forward(self, x, labels):
         # 标签嵌入
         label_emb = self.label_embed(labels)  # [B, label_embed_dim]
         # 拼接图像和标签嵌入
         x_cond = torch.cat([x, label_emb], dim=1)  # [B, input_dim + label_embed_dim]
-        h = F.relu(self.linear1(x_cond))
-        h = F.relu(self.linear2(h))
-        out = torch.sigmoid(self.linear3(h))
+        h = self.dropout1(F.leaky_relu(self.linear1(x_cond), 0.2))
+        h = self.dropout2(F.leaky_relu(self.linear2(h), 0.2))
+        h = self.dropout3(F.leaky_relu(self.linear3(h), 0.2))
+        out = torch.sigmoid(self.linear4(h))
         return out
 

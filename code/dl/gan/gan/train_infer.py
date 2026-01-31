@@ -61,8 +61,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'设备: {device}')
 
 # 数据集加载
+# 归一化到 [-1, 1] 以匹配生成器的 Tanh 输出
 transform = transforms.Compose([
     transforms.ToTensor(),
+    transforms.Normalize([0.5], [0.5])  # [0, 1] -> [-1, 1]
 ])
 train_dataset = datasets.MNIST(root=data_dir, train=True, download=False, transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -111,61 +113,69 @@ if train:
 
         pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{epochs}')
         for images, _ in pbar:
-            batch_size_actual = images.size(0)
-            images = images.view(batch_size_actual, -1).to(device)  # [B, 784]
+            images = images.view(-1, input_dim).to(device)  # [B, 784]，-1 自动推断batch大小
             
             # 真实标签和虚假标签
-            real_labels = torch.ones(batch_size_actual, 1, device=device)
-            fake_labels = torch.zeros(batch_size_actual, 1, device=device)
+            real_labels = torch.ones(len(images), 1, device=device)
+            fake_labels = torch.zeros(len(images), 1, device=device)
 
-            # ========== 训练判别器 ==========
-            d_optimizer.zero_grad()
-            
-            # 真实图像的损失
-            real_output = discriminator(images)
-            d_loss_real = criterion(real_output, real_labels)
-            
-            # 生成虚假图像
-            noise = torch.randn(batch_size_actual, noise_dim, device=device)
-            fake_images = generator(noise)
-            
-            # 虚假图像的损失
-            fake_output = discriminator(fake_images.detach())
-            d_loss_fake = criterion(fake_output, fake_labels)
-            
-            # 判别器总损失
-            d_loss = d_loss_real + d_loss_fake
-            d_loss.backward()
-            d_optimizer.step()
-            
-            # ========== 训练生成器 ==========
-            if (cnt + 1) % n_critic == 0:
-                g_optimizer.zero_grad()
+            # ========== 训练判别器 n_critic 次 ==========
+            # 让判别器训练更充分，通常 n_critic=5 效果较好
+            d_loss_batch = 0.0
+            for _ in range(n_critic):
+                d_optimizer.zero_grad()
                 
-                # 生成虚假图像
-                noise = torch.randn(batch_size_actual, noise_dim, device=device)
+                # 真实图像的损失
+                real_output = discriminator(images)
+                d_loss_real = criterion(real_output, real_labels)
+                
+                # 生成虚假图像（每次都用新的噪声）
+                noise = torch.randn(len(images), noise_dim, device=device)
                 fake_images = generator(noise)
                 
-                # 生成器希望判别器认为虚假图像是真实的
-                fake_output = discriminator(fake_images)
-                g_loss = criterion(fake_output, real_labels)
+                # 虚假图像的损失
+                fake_output = discriminator(fake_images.detach())
+                d_loss_fake = criterion(fake_output, fake_labels)
                 
-                g_loss.backward()
-                g_optimizer.step()
+                # 判别器总损失
+                d_loss = d_loss_real + d_loss_fake
+                d_loss.backward()
+                d_optimizer.step()
                 
-                g_loss_sum += g_loss.item()
-            else:
-                g_loss_sum += 0.0
+                d_loss_batch += d_loss.item()
             
-            d_loss_sum += d_loss.item()
+            d_loss_avg = d_loss_batch / n_critic
+            d_loss_sum += d_loss_avg
+            
+            # ========== 训练生成器 1 次 ==========
+            g_optimizer.zero_grad()
+            
+            # 生成虚假图像
+            noise = torch.randn(len(images), noise_dim, device=device)
+            fake_images = generator(noise)
+            
+            # 生成器希望判别器认为虚假图像是真实的
+            fake_output = discriminator(fake_images)
+            # 使用非饱和 loss：-log(D(x_fake))，而不是 BCE loss
+            # 这样可以避免梯度消失问题，训练更稳定
+            # 原 BCE loss: g_loss = criterion(fake_output, real_labels)
+            # 非饱和 loss 等价于最大化 log(D(x_fake))，即最小化 -log(D(x_fake))
+            # 为了数值稳定性，对 fake_output 进行 clamp，避免 log(0)
+            fake_output_clamped = torch.clamp(fake_output, min=1e-8, max=1.0)
+            g_loss = -torch.mean(torch.log(fake_output_clamped))
+            
+            g_loss.backward()
+            g_optimizer.step()
+            
+            g_loss_sum += g_loss.item()
             cnt += 1
             
             pbar.set_postfix({
                 'd_loss': f'{d_loss_sum/cnt:.4f}',
-                'g_loss': f'{g_loss_sum/max(1, (cnt//n_critic)):.4f}'
+                'g_loss': f'{g_loss_sum/cnt:.4f}'
             })
 
-        g_loss_avg = g_loss_sum / max(1, (cnt // n_critic))
+        g_loss_avg = g_loss_sum / cnt
         d_loss_avg = d_loss_sum / cnt
         g_losses.append(g_loss_avg)
         d_losses.append(d_loss_avg)
@@ -213,86 +223,183 @@ if not train:
 # 模型推理 - 生成新图像
 if infer:
     generator.eval()
-    print('\n开始生成图像...')
+    discriminator.eval()
+    print('\n开始生成图像和可视化...')
     
-    # 生成图像
+    # ========== 图1: 16张真实图像及其判别器输出 ==========
+    print('\n生成图1: 16张真实图像的判别器判断...')
+    real_images_list = []
+    real_predictions = []
+    
     with torch.no_grad():
-        noise = torch.randn(sample_size, noise_dim, device=device)
-        fake_images = generator(noise)
-        fake_images = fake_images.view(sample_size, in_channel, img_size, img_size)
+        # 收集16张真实图像
+        count = 0
+        for images, _ in train_loader:
+            images_flat = images.view(images.size(0), -1).to(device)  # [B, 784]
+            preds = discriminator(images_flat)
+            
+            for i in range(len(images)):
+                if count >= 16:
+                    break
+                real_images_list.append(images[i].cpu())  # [1, 28, 28]
+                real_predictions.append(preds[i].item())
+                count += 1
+            if count >= 16:
+                break
     
-    # 将张量转换为 numpy 数组用于显示
-    # 确保值在[0,1]范围内
-    fake_images = torch.clamp(fake_images, 0.0, 1.0)
-    images_np = []
-    for i in range(sample_size):
-        img = fake_images[i].cpu().numpy().squeeze()
-        images_np.append(img)
+    # 转换为numpy用于显示（真实图像已经是[0,1]范围，因为transform已经处理过）
+    real_images_np = []
+    for img in real_images_list:
+        img_np = img.numpy().squeeze()
+        # 如果图像是[-1,1]范围，需要转换
+        if img_np.min() < 0:
+            img_np = (img_np + 1) / 2
+        img_np = np.clip(img_np, 0.0, 1.0)
+        real_images_np.append(img_np)
     
-    # 显示生成的图像
-    fig, axes = plt.subplots(nrow, nrow, figsize=(16, 16))
-    fig.suptitle('Generated Images (GAN)', fontsize=16, y=0.995)
-
+    # 显示真实图像
+    fig, axes = plt.subplots(4, 4, figsize=(16, 16))
+    fig.suptitle('Real Images - Discriminator Predictions', fontsize=16, y=0.995)
+    
     for idx, ax in enumerate(axes.flat):
-        if idx < sample_size:
-            ax.imshow(images_np[idx], cmap='gray')
+        if idx < len(real_images_np):
+            ax.imshow(real_images_np[idx], cmap='gray')
+            pred_value = real_predictions[idx]
+            is_real = 'Real' if pred_value > 0.5 else 'Fake'
+            color = 'green' if pred_value > 0.5 else 'red'
+            ax.set_title(f'D={pred_value:.3f}\n{is_real}', 
+                        fontsize=10, color=color, fontweight='bold')
         ax.axis('off')
-
+    
     plt.tight_layout()
-    plt.subplots_adjust(top=0.98, hspace=0.1, wspace=0.1)
+    plt.subplots_adjust(top=0.96, hspace=0.2, wspace=0.1)
     plt.show()
     
-    # 噪声可视化：对生成的图像添加不同比例的噪声，并用判别器判断
-    print('\n显示噪声对判别器判断的影响...')
-    generator.eval()
-    discriminator.eval()
+    # ========== 图2: 16张生成图像及其判别器输出 ==========
+    print('\n生成图2: 16张生成图像的判别器判断...')
+    fake_images_list = []
+    fake_predictions = []
+    
+    with torch.no_grad():
+        # 生成16张图像
+        noise = torch.randn(16, noise_dim, device=device)
+        fake_images_flat = generator(noise)  # [16, 784]
+        fake_preds = discriminator(fake_images_flat)
+        
+        # 转换为图像格式 [16, 1, 28, 28]
+        fake_images_2d = fake_images_flat.view(16, in_channel, img_size, img_size)
+        
+        for i in range(16):
+            fake_images_list.append(fake_images_2d[i].cpu())
+            fake_predictions.append(fake_preds[i].item())
+    
+    # 转换为numpy用于显示（生成器输出是[-1,1]，需要转换）
+    fake_images_np = []
+    for img in fake_images_list:
+        img_np = img.numpy().squeeze()
+        img_np = (img_np + 1) / 2  # [-1, 1] -> [0, 1]
+        img_np = np.clip(img_np, 0.0, 1.0)
+        fake_images_np.append(img_np)
+    
+    # 显示生成图像
+    fig, axes = plt.subplots(4, 4, figsize=(16, 16))
+    fig.suptitle('Generated Images - Discriminator Predictions', fontsize=16, y=0.995)
+    
+    for idx, ax in enumerate(axes.flat):
+        if idx < len(fake_images_np):
+            ax.imshow(fake_images_np[idx], cmap='gray')
+            pred_value = fake_predictions[idx]
+            is_real = 'Real' if pred_value > 0.5 else 'Fake'
+            color = 'green' if pred_value > 0.5 else 'red'
+            ax.set_title(f'D={pred_value:.3f}\n{is_real}', 
+                        fontsize=10, color=color, fontweight='bold')
+        ax.axis('off')
+    
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.96, hspace=0.2, wspace=0.1)
+    plt.show()
+    
+    # ========== 图3: 真实图像和生成图像的混合 ==========
+    print('\n生成图3: 真实图像和生成图像的混合效果...')
+    
+    # 获取一张真实图像
+    real_image, _ = next(iter(train_loader))
+    real_image_flat = real_image[0:1].view(1, -1).to(device)  # [1, 784]
     
     # 生成一张新图像
     with torch.no_grad():
         noise = torch.randn(1, noise_dim, device=device)
-        original_image = generator(noise)  # [1, 784]
-        original_image_2d = original_image.view(1, in_channel, img_size, img_size)
+        fake_image_flat = generator(noise)  # [1, 784]
     
-    # 创建不同噪声比例的图像
+    # 创建不同混合比例的图像（alpha: 真实图像的比例）
     num_alphas = 16
     alphas = [i / num_alphas for i in range(num_alphas + 1)]  # [0, 1/16, 2/16, ..., 1]
-    noisy_images = []
+    mixed_images = []
     predictions = []
     alpha_labels = []
     
     with torch.no_grad():
         for alpha in alphas:
-            # 添加噪声：x = alpha * noise + (1 - alpha) * x
-            noise_tensor = torch.randn_like(original_image)
-            noisy_image = alpha * noise_tensor + (1 - alpha) * original_image
-            noisy_images.append(noisy_image)
+            # 混合：x = alpha * real + (1 - alpha) * fake
+            mixed_image = alpha * real_image_flat + (1 - alpha) * fake_image_flat
+            mixed_images.append(mixed_image)
             
             # 用判别器判断
-            pred = discriminator(noisy_image)
+            pred = discriminator(mixed_image)
             predictions.append(pred.item())
-            alpha_labels.append(f'α={alpha:.2f}, D={pred.item():.3f}')
+            alpha_labels.append(f'α={alpha:.2f}\nD={pred.item():.3f}')
     
     # 转换为 numpy 数组用于显示
-    # 确保值在[0,1]范围内
-    images_np = []
-    for img in noisy_images:
+    # 图像是 [-1, 1] 范围，需要转换回 [0, 1] 用于显示
+    mixed_images_np = []
+    for img in mixed_images:
+        img = (img + 1) / 2  # [-1, 1] -> [0, 1]
         img = torch.clamp(img, 0.0, 1.0)
         img_2d = img.view(1, in_channel, img_size, img_size)
-        images_np.append(img_2d[0].cpu().numpy().squeeze())
+        mixed_images_np.append(img_2d[0].cpu().numpy().squeeze())
     
-    # 显示结果
+    # 显示混合结果
     fig, axes = plt.subplots(4, 4, figsize=(16, 16))
-    fig.suptitle('Noise Effect on Discriminator (α: noise ratio)', fontsize=16, y=0.995)
+    fig.suptitle('Real vs Fake Mixing Effect (α: real image ratio)', fontsize=16, y=0.995)
     
     for idx, ax in enumerate(axes.flat):
-        if idx < len(images_np):
-            ax.imshow(images_np[idx], cmap='gray')
-            # 判断是真还是假（阈值 0.5）
-            is_real = 'Real' if predictions[idx] > 0.5 else 'Fake'
-            ax.set_title(f'{alpha_labels[idx]}\n{is_real}', fontsize=9)
+        if idx < len(mixed_images_np):
+            ax.imshow(mixed_images_np[idx], cmap='gray')
+            pred_value = predictions[idx]
+            is_real = 'Real' if pred_value > 0.5 else 'Fake'
+            color = 'green' if pred_value > 0.5 else 'red'
+            ax.set_title(f'{alpha_labels[idx]}\n{is_real}', 
+                        fontsize=9, color=color, fontweight='bold')
         ax.axis('off')
     
     plt.tight_layout()
     plt.subplots_adjust(top=0.96, hspace=0.3, wspace=0.1)
     plt.show()
+    
+    # 打印统计信息
+    print('\n判别器统计信息:')
+    real_mean = np.mean(real_predictions)
+    fake_mean = np.mean(fake_predictions)
+    print(f'真实图像平均输出: {real_mean:.4f}')
+    print(f'生成图像平均输出: {fake_mean:.4f}')
+    
+    # GAN的最终目标（纳什均衡）：判别器无法区分真实和生成图像
+    # 理想情况下，两者都应该接近 0.5（随机猜测）
+    print('\nGAN训练目标说明:')
+    print('  - 训练过程中: 真实图像输出 > 0.5，生成图像输出 < 0.5')
+    print('  - 理想状态（纳什均衡）: 两者都接近 0.5（判别器无法区分）')
+    
+    # 判断训练状态
+    if real_mean < 0.5:
+        print('\n⚠️  警告: 判别器对真实图像的输出 < 0.5')
+        print('   可能原因: 判别器训练不足，或生成器过强导致判别器被"欺骗"')
+        print('   建议: 检查训练过程，可能需要调整 n_critic 或学习率')
+    elif abs(real_mean - 0.5) < 0.1 and abs(fake_mean - 0.5) < 0.1:
+        print('\n✅ 训练状态良好: 判别器输出接近 0.5，说明生成器已能生成逼真图像！')
+        print('   (这是GAN的理想状态：判别器无法区分真实和生成图像)')
+    elif real_mean > 0.7 and fake_mean < 0.3:
+        print('\n📊 训练进行中: 判别器仍能较好地区分真实和生成图像')
+        print('   建议: 继续训练以达到纳什均衡（两者都接近 0.5）')
+    else:
+        print('\n📊 当前训练状态: 需要继续训练以达到平衡')
 

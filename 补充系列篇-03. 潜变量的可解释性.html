@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>补充系列篇-03. 潜变量的可解释性</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="补充系列篇-03.-潜变量的可解释性">补充系列篇-03. 潜变量的可解释性</h1>
+<h2 id="概述">0. 概述</h2>
+<p>我们之前介绍了AE、VAE、CVAE（c与z相互独立）、CVAE_prior（c与z非独立），了解了latent变量的概念，也知道了正则化和条件对于z的影响，但是还没有直观性地了解z。</p>
+<p>接下来我们设置<code>latent_dim=2</code>，通过2D可视化来直观解释一下latent变量，主要探讨以下几个问题：</p>
+<ol type="1">
+<li><strong>latent的分布</strong>：AE和VAE的潜在空间分布有何不同？</li>
+<li><strong>正则化的意义</strong>：KL散度正则化如何影响潜在空间的分布和生成能力？</li>
+<li><strong>条件对latent的影响</strong>：条件信息如何改变潜在空间的分布？</li>
+<li><strong>编码对latent的影响</strong>：条件编码方式（one-hot vs embedding）如何影响模型的扩展能力？</li>
+</ol>
+<hr />
+<h2 id="latent的分布">1. Latent的分布</h2>
+<h3 id="ae-vs-vae架构对比">1.1 AE vs VAE：架构对比</h3>
+<p><strong>AE（自编码器）</strong>和<strong>VAE（变分自编码器）</strong>在潜在空间的处理上有本质区别：</p>
+<ul>
+<li><strong>AE</strong>：编码器直接输出潜在向量<span class="math inline">\(z\)</span>，没有正则化约束</li>
+<li><strong>VAE</strong>：编码器输出分布参数<span class="math inline">\((\mu, \sigma)\)</span>，通过重参数化技巧采样<span class="math inline">\(z\)</span>，并用KL散度正则化潜在空间</li>
+</ul>
+<p>让我们先通过架构图直观对比两者的区别：</p>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.1.1.jpeg" width="80%"></p>
+</div>
+<p><small><strong>图1</strong> AE架构：编码器直接输出潜在向量<span class="math inline">\(z\)</span>，解码器重构输出<span class="math inline">\(\hat{x}\)</span></small></p>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.1.2.jpeg" width="80%"></p>
+</div>
+<p><small><strong>图2</strong> VAE架构：编码器输出分布参数<span class="math inline">\((\mu, \sigma)\)</span>，通过重参数化技巧采样<span class="math inline">\(z\)</span>，并用KL散度正则化潜在空间</small></p>
+<p><strong>关键区别</strong>：</p>
+<ol type="1">
+<li><strong>编码器输出</strong>：
+<ul>
+<li>AE：<span class="math inline">\(z = \text{Encoder}(x)\)</span>（直接输出向量）</li>
+<li>VAE：<span class="math inline">\(\mu, \sigma = \text{Encoder}(x)\)</span>，然后<span class="math inline">\(z = \mu + \epsilon \cdot \sigma\)</span>，其中<span class="math inline">\(\epsilon \sim \mathcal{N}(0, I)\)</span>（输出分布参数，通过重参数化采样得到向量）</li>
+</ul></li>
+<li><strong>潜在空间正则化</strong>：
+<ul>
+<li>AE：没有正则化约束，潜在空间分布任意，可能存在“空洞”</li>
+<li>VAE：通过KL散度<span class="math inline">\(\text{KL}(q(z|x) \| \mathcal{N}(0, I))\)</span>，将潜在空间约束到标准正态分布</li>
+</ul></li>
+<li><strong>损失函数</strong>：
+<ul>
+<li>AE：<span class="math inline">\(\mathcal{L} = \|\hat{x} - x\|^2\)</span>（只有重构损失）</li>
+<li>VAE：<span class="math inline">\(\mathcal{L} = \|\hat{x} - x\|^2 + \beta \cdot \text{KL}(q(z|x) \| \mathcal{N}(0, I))\)</span>（重构损失 + KL散度正则化项）</li>
+</ul></li>
+</ol>
+<p>这些架构上的差异直接影响潜在空间的分布特性。接下来我们通过2D可视化来直观对比两者的潜在空间分布：</p>
+<h3 id="ae-vs-vae潜在空间分布对比">1.2 AE vs VAE：潜在空间分布对比</h3>
+<p>让我们通过2D散点图来直观对比两者的潜在空间分布：</p>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.2.1.png" width="90%"></p>
+</div>
+<p><small><strong>图3</strong> AE和VAE的潜在空间分布对比（latent_dim=2）</small></p>
+<p>从图中可以观察到：</p>
+<ul>
+<li><strong>AE的潜在空间</strong>：数字的分布比较混乱，没有明显的结构。不同数字的潜在表示可能重叠，且分布不规律。</li>
+<li><strong>VAE的潜在空间</strong>：由于KL散度的正则化，潜在表示趋向于聚集在原点附近，形成更紧密的簇状结构。</li>
+</ul>
+<h3 id="从潜在空间采样生成">1.3 从潜在空间采样生成</h3>
+<p><strong>关键问题</strong>：潜在空间是否具有生成能力？即能否从潜在分布中采样得到有意义的样本？</p>
+<p>让我们从<strong>标准正态分布</strong>采样2个潜在向量<span class="math inline">\(z\)</span>，分别使用AE和VAE的解码器生成图像：</p>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.2.2.png" width="70%"></p>
+</div>
+<p><small><strong>图4</strong> 从标准正态分布采样<span class="math inline">\(z\)</span>，使用AE和VAE解码器生成的图像对比</small></p>
+<p><strong>观察结果</strong>：</p>
+<ul>
+<li><strong>AE</strong>：从标准正态分布采样的 <span class="math inline">\(z\)</span>，通过AE解码器生成的图像往往没有意义。这是因为AE没有正则化潜在空间，潜在分布与标准正态分布不匹配。</li>
+<li><strong>VAE</strong>：从标准正态分布采样的 <span class="math inline">\(z\)</span>，通过VAE解码器能够生成合理的数字图像。这是因为VAE通过KL散度正则化，使得潜在空间接近标准正态分布。</li>
+</ul>
+<p><strong>核心结论</strong>：AE的latent没有明确的分布，缺乏生成能力；VAE的latent遵循标准正态分布，具有强大的生成能力。</p>
+<hr />
+<h2 id="正则化的意义">2. 正则化的意义</h2>
+<h3 id="vae潜在空间的分布特性">2.1 VAE潜在空间的分布特性</h3>
+<p>VAE通过KL散度正则化，使得潜在空间<span class="math inline">\(q(z|x)\)</span>接近标准正态分布<span class="math inline">\(\mathcal{N}(0, I)\)</span>。让我们单独查看VAE的潜在空间分布：</p>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.3.1.png" width="70%"></p>
+</div>
+<p><small><strong>图5</strong> VAE的潜在空间分布（latent_dim=2，使用<span class="math inline">\(\mu\)</span>表示）</small></p>
+<p><strong>观察要点</strong>：</p>
+<ol type="1">
+<li><strong>分布特性</strong>：潜在表示大致围绕原点分布，符合标准正态分布的特性</li>
+<li><strong>数字分离</strong>：不同数字的潜在表示虽然可能重叠，但整体上有一定的分离趋势</li>
+<li><strong>颜色编码</strong>：不同颜色代表不同的数字标签（0-9），从深到浅表示0到9</li>
+</ol>
+<h3 id="潜在空间的叠加性interpolation">2.2 潜在空间的“叠加性”（Interpolation）</h3>
+<p>正则化的另一个重要作用是使得潜在空间具有<strong>连续性</strong>和<strong>叠加性</strong>。这意味着可以在潜在空间中平滑地从一个点过渡到另一个点，生成的图像也会平滑地变化。</p>
+<p><strong>实验设计</strong>：</p>
+<ol type="1">
+<li>从测试集获取一张数字1的图片和一张数字8的图片</li>
+<li>通过VAE编码器得到<span class="math inline">\(z_1\)</span>和<span class="math inline">\(z_8\)</span></li>
+<li>进行线性插值：<span class="math inline">\(z = \alpha \cdot z_1 + (1-\alpha) \cdot z_8\)</span>，其中<span class="math inline">\(\alpha\)</span>从1渐变到0</li>
+<li>将插值后的<span class="math inline">\(z\)</span>输入解码器，观察生成的图像变化</li>
+</ol>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.3.2.png" width="60%"></p>
+</div>
+<p><small><strong>图6</strong> VAE潜在空间插值：从数字1平滑过渡到数字8（关键帧）</small></p>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.3.3.gif" width="60%"></p>
+</div>
+<p><small><strong>图7</strong> VAE潜在空间插值动画：从数字1平滑过渡到数字8</small></p>
+<p><strong>关键发现</strong>：</p>
+<ul>
+<li><strong>平滑过渡</strong>：插值过程中，生成的图像从数字1逐渐变化到数字8，中间过渡平滑自然</li>
+<li><strong>语义连续性</strong>：潜在空间中的线性插值对应图像空间中的语义连续变化</li>
+<li><strong>生成能力</strong>：这表明VAE的潜在空间是一个<strong>连续且有意义的语义空间</strong></li>
+</ul>
+<p><strong>为什么AE不具备这种特性？</strong></p>
+<p>AE没有正则化约束，潜在空间的分布是任意的，因此：</p>
+<ul>
+<li>从标准正态分布采样的<span class="math inline">\(z\)</span>无法生成有意义的图像</li>
+<li>潜在空间中的插值可能导致生成图像的突变或不连续</li>
+</ul>
+<p><strong>正则化的核心意义</strong>：将潜在空间约束到标准正态分布，使得整个潜在空间都具有生成能力，并且潜在空间具有连续性和叠加性。</p>
+<hr />
+<h2 id="条件对latent的影响">3. 条件对Latent的影响</h2>
+<p>在探讨条件对潜在空间的影响之前，让我们先对比VAE、CVAE和CVAE_prior的架构差异：</p>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.1.2.jpeg" width="80%"></p>
+</div>
+<p><small><strong>图8</strong> VAE架构：编码器输出分布参数<span class="math inline">\((\mu, \sigma)\)</span>，通过重参数化技巧采样<span class="math inline">\(z\)</span>，并用KL散度正则化潜在空间</small></p>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.1.3.jpeg" width="80%"></p>
+</div>
+<p><small><strong>图9</strong> CVAE架构：条件<span class="math inline">\(c\)</span>与输入<span class="math inline">\(x\)</span>拼接后输入编码器，条件<span class="math inline">\(c\)</span>也与潜在向量<span class="math inline">\(z\)</span>拼接后输入解码器（c与z相互独立）</small></p>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.1.4.jpeg" width="80%"></p>
+</div>
+<p><small><strong>图10</strong> CVAE_prior架构：条件<span class="math inline">\(c\)</span>不仅影响编码器和解码器，还影响先验分布<span class="math inline">\(p(z|c)\)</span>（c与z非独立）</small></p>
+<p><strong>架构对比</strong>：</p>
+<ol type="1">
+<li><strong>VAE</strong>：
+<ul>
+<li>无条件的生成模型</li>
+<li>先验分布：<span class="math inline">\(p(z) = \mathcal{N}(0, I)\)</span>（标准正态分布）</li>
+<li>后验分布：<span class="math inline">\(q(z|x) = \mathcal{N}(\mu(x), \sigma(x))\)</span></li>
+</ul></li>
+<li><strong>CVAE</strong>：
+<ul>
+<li>条件生成模型，条件<span class="math inline">\(c\)</span>与潜在变量<span class="math inline">\(z\)</span>相互独立</li>
+<li>先验分布：<span class="math inline">\(p(z|c) = p(z) = \mathcal{N}(0, I)\)</span>（仍然是标准正态分布，不受<span class="math inline">\(c\)</span>影响）</li>
+<li>后验分布：<span class="math inline">\(q(z|x, c) = \mathcal{N}(\mu(x, c), \sigma(x, c))\)</span></li>
+<li>编码器输入：<span class="math inline">\([x, c]\)</span>；解码器输入：<span class="math inline">\([z, c]\)</span></li>
+</ul></li>
+<li><strong>CVAE_prior</strong>：
+<ul>
+<li>条件生成模型，条件<span class="math inline">\(c\)</span>影响先验分布</li>
+<li>先验分布：<span class="math inline">\(p(z|c) = \mathcal{N}(\mu_p(c), \sigma_p(c))\)</span>（依赖于条件<span class="math inline">\(c\)</span>）</li>
+<li>后验分布：<span class="math inline">\(q(z|x, c) = \mathcal{N}(\mu(x, c), \sigma(x, c))\)</span></li>
+<li>编码器输入：<span class="math inline">\([x, c]\)</span>；解码器输入：<span class="math inline">\([z, c]\)</span>；先验网络输入：<span class="math inline">\(c\)</span></li>
+</ul></li>
+</ol>
+<p><strong>关键区别</strong>：CVAE和CVAE_prior的主要区别在于先验分布是否依赖于条件。CVAE中<span class="math inline">\(p(z|c) = p(z)\)</span>，条件只影响编码器和解码器；而CVAE_prior中<span class="math inline">\(p(z|c)\)</span>是条件依赖的，先验网络会学习条件相关的先验分布。</p>
+<h3 id="cvae中的条件控制">3.1 CVAE中的条件控制</h3>
+<p>在CVAE中，条件变量<span class="math inline">\(c\)</span>可以控制生成过程。让我们通过实验观察条件对潜在空间的影响。</p>
+<p><strong>实验设计</strong>：</p>
+<ol type="1">
+<li>从标准正态分布采样一个固定的潜在向量<span class="math inline">\(z\)</span></li>
+<li>条件<span class="math inline">\(c\)</span>从0到9渐变（使用embedding编码）</li>
+<li>将<span class="math inline">\((z, c)\)</span>输入CVAE解码器，观察生成的图像</li>
+</ol>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.4.1.png" width="60%"></p>
+</div>
+<p><small><strong>图11</strong> CVAE条件插值：固定<span class="math inline">\(z\)</span>，条件从0渐变到9（关键帧）</small></p>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.4.2.gif" width="60%"></p>
+</div>
+<p><small><strong>图12</strong> CVAE条件插值动画：固定<span class="math inline">\(z\)</span>，条件从0渐变到9</small></p>
+<p><strong>关键观察</strong>：</p>
+<ul>
+<li><strong>条件控制生成</strong>：相同的潜在向量<span class="math inline">\(z\)</span>，不同的条件<span class="math inline">\(c\)</span>，生成的图像完全不同</li>
+<li><strong>条件改变分布</strong>：条件<span class="math inline">\(c\)</span>实际上改变了潜在空间的“有效分布”。虽然<span class="math inline">\(z\)</span>不变，但条件与<span class="math inline">\(z\)</span>的拼接<span class="math inline">\((z, c)\)</span>改变了解码器的输入，相当于改变了有效的潜在表示</li>
+<li><strong>条件作为“开关”</strong>：条件就像是一个“开关”，决定了从同一个<span class="math inline">\(z\)</span>生成什么类别的图像</li>
+</ul>
+<p><strong>数学理解</strong>：</p>
+<p>在CVAE中，生成过程为<span class="math inline">\(p(x|z, c)\)</span>。对于固定的<span class="math inline">\(z\)</span>，条件<span class="math inline">\(c\)</span>的作用是：</p>
+<ul>
+<li>在解码器中，条件<span class="math inline">\(c\)</span>与潜在向量<span class="math inline">\(z\)</span>拼接：<span class="math inline">\([z, c]\)</span></li>
+<li>不同的<span class="math inline">\(c\)</span>导致不同的解码器输入，从而生成不同的输出</li>
+<li>相当于条件改变了潜在空间的"视角"或"分布"</li>
+</ul>
+<p><strong>核心结论</strong>：条件信息可以控制生成过程，即使使用相同的潜在向量<span class="math inline">\(z\)</span>，不同的条件也能生成完全不同类别的图像。这体现了CVAE在可控生成方面的优势。</p>
+<hr />
+<h2 id="编码对latent的影响">4. 编码对Latent的影响</h2>
+<h3 id="实验设计部分数据训练与编码微调">4.1 实验设计：部分数据训练与编码微调</h3>
+<p>前面的实验展示了条件对生成的影响。现在我们来探讨一个更深层次的问题：<strong>条件编码方式如何影响模型的扩展能力？</strong></p>
+<p><strong>实验设置</strong>：</p>
+<ol type="1">
+<li><strong>训练阶段</strong>：使用0-7的数字训练CVAE模型（排除8和9）</li>
+<li><strong>测试阶段</strong>：使用8和9的条件进行解码，观察生成效果（优化前）</li>
+<li><strong>微调阶段</strong>：冻结模型的所有参数，只优化embedding层，使用8和9的数据微调embedding</li>
+<li><strong>对比阶段</strong>：再次使用8和9的条件解码，观察优化后的效果</li>
+</ol>
+<p>这个实验的关键在于：<strong>模型从未见过8和9的训练数据，能否通过只优化embedding层来生成合理的8和9数字？</strong></p>
+<h3 id="实验结果编码微调的效果">4.2 实验结果：编码微调的效果</h3>
+<p><strong>优化前的效果</strong>：</p>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.5.1.png" width="80%"></p>
+</div>
+<p><small><strong>图13</strong> 优化embedding前：使用6、7、8、9条件生成的图像</small></p>
+<p><strong>观察</strong>：</p>
+<ul>
+<li>数字6和7：模型在0-7数据上训练，能够生成相对合理的图像</li>
+<li>数字8和9：模型从未见过8和9的数据，生成的图像不准确或模糊</li>
+</ul>
+<p><strong>优化后的效果</strong>：</p>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.5.2.png" width="80%"></p>
+</div>
+<p><small><strong>图14</strong> 优化embedding后：使用6、7、8、9条件生成的图像</small></p>
+<p><strong>对比分析</strong>：</p>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.5.3.png" width="80%"></p>
+</div>
+<p><small><strong>图15</strong> 优化前后对比：第一行为优化前，第二行为优化后</small></p>
+<p><strong>关键发现</strong>：</p>
+<ol type="1">
+<li><strong>数字8和9的改善</strong>：
+<ul>
+<li>优化前：生成的8和9图像模糊或不准确</li>
+<li>优化后：只优化embedding层后，模型能够生成更合理的8和9数字</li>
+</ul></li>
+<li><strong>数字6和7的变化</strong>：
+<ul>
+<li>embedding微调后，6和7的生成效果可能略有变化，但基本保持合理</li>
+</ul></li>
+<li><strong>embedding的泛化能力</strong>：
+<ul>
+<li>即使模型的其他部分（编码器、解码器）没有见过8和9的数据</li>
+<li>只优化embedding层就能让模型生成合理的8和9数字</li>
+<li>这说明<strong>embedding层具有强大的泛化能力</strong></li>
+</ul></li>
+</ol>
+<h3 id="多样本验证">4.3 多样本验证</h3>
+<p>为了进一步验证embedding微调的效果，我们使用多个不同的潜在向量<span class="math inline">\(z\)</span>进行测试：</p>
+<div data-align="center">
+<p><img src="pic/dl/ae_all/4.5.4.png" width="80%"></p>
+</div>
+<p><small><strong>图16</strong> 多个样本对比：不同<span class="math inline">\(z\)</span>值下生成的6、7、8、9图像（优化后）</small></p>
+<p><strong>观察</strong>：</p>
+<ul>
+<li>不同<span class="math inline">\(z\)</span>值生成的图像有变化（体现了潜在空间的生成多样性）</li>
+<li>但每个数字都能保持其基本的视觉特征（体现了embedding的控制能力）</li>
+</ul>
+<h3 id="编码方式的影响">4.4 编码方式的影响</h3>
+<p><strong>为什么embedding编码方式具有这种能力？</strong></p>
+<ol type="1">
+<li><strong>Embedding的优势</strong>：
+<ul>
+<li>Embedding是<strong>可学习的低维表示</strong>，能够捕获类别之间的语义关系</li>
+<li>在训练0-7的过程中，embedding学会了数字的语义特征</li>
+<li>当用8和9的数据微调时，embedding能够快速适应新的类别</li>
+</ul></li>
+<li><strong>与One-Hot的对比</strong>：
+<ul>
+<li>One-hot编码是<strong>固定的、稀疏的</strong>，无法学习语义关系</li>
+<li>Embedding编码是<strong>可学习的、密集的</strong>，能够灵活调整</li>
+</ul></li>
+<li><strong>参数效率</strong>：
+<ul>
+<li>只需要微调embedding层（相对较少的参数）</li>
+<li>不需要重新训练整个模型（编码器和解码器保持不变）</li>
+</ul></li>
+</ol>
+<p><strong>核心结论</strong>：</p>
+<p>虽然本文并未对模型性能进行任何系统性的评估，但我们可以看到，<strong>学习到的嵌入（embedding）对于向CVAE模型添加新条件非常有用，而无需重新训练整个模型</strong>。</p>
+<p>这说明了：</p>
+<ol>
+<li><strong>Embedding编码的灵活性</strong>：可以通过微调embedding来扩展模型到新的类别</li>
+<li><strong>模型的模块化设计</strong>：条件编码层与其他部分相对独立，便于扩展</li>
+<li><strong>潜在空间的语义理解</strong>：模型学会了数字的潜在语义，只需调整embedding就能适应新类别</li>
+</ol>
+<hr />
+<h2 id="总结">5. 总结</h2>
+<p>通过设置<code>latent_dim=2</code>的2D可视化实验，我们直观地理解了潜变量的几个关键特性：</p>
+<h3 id="latent的分布-1">5.1 Latent的分布</h3>
+<ul>
+<li><strong>AE</strong>：潜在空间没有明确的分布，缺乏生成能力</li>
+<li><strong>VAE</strong>：通过KL散度正则化，潜在空间接近标准正态分布，具有强大的生成能力</li>
+</ul>
+<h3 id="正则化的意义-1">5.2 正则化的意义</h3>
+<ul>
+<li><strong>分布约束</strong>：KL散度将潜在空间约束到标准正态分布</li>
+<li><strong>连续性</strong>：潜在空间具有连续性和叠加性，可以进行平滑插值</li>
+<li><strong>生成能力</strong>：整个潜在空间都具有生成能力，可以从任意位置采样</li>
+</ul>
+<h3 id="条件对latent的影响-1">5.3 条件对Latent的影响</h3>
+<ul>
+<li><strong>条件控制</strong>：条件变量<span class="math inline">\(c\)</span>可以控制生成过程</li>
+<li><strong>分布改变</strong>：条件改变了有效的潜在表示，即使<span class="math inline">\(z\)</span>不变也能生成不同类别的图像</li>
+<li><strong>可控生成</strong>：实现了从“随机生成”到“条件可控生成”的跨越</li>
+</ul>
+<h3 id="编码对latent的影响-1">5.4 编码对Latent的影响</h3>
+<ul>
+<li><strong>Embedding的泛化能力</strong>：通过微调embedding层，可以为模型添加新的条件类别</li>
+<li><strong>参数效率</strong>：只需微调少量参数（embedding），无需重新训练整个模型</li>
+<li><strong>模块化设计</strong>：条件编码层相对独立，便于模型扩展</li>
+</ul>
+<p>这些实验为我们理解变分自编码器的潜在空间提供了直观的认识，也为后续更复杂的生成模型（如GAN、扩散模型等）奠定了基础。</p>
+<hr />
+<h2 id="附录实验代码">附录：实验代码</h2>
+<p>本节的实验代码位于<code>code/dl/ae/ae_all/</code>目录下：</p>
+<ul>
+<li><strong>test1_ae_vae.py</strong>：对比AE和VAE从标准正态分布采样生成的图像</li>
+<li><strong>test2_vae.py</strong>：VAE潜在空间插值动画（从数字1到8）</li>
+<li><strong>test3_cvae.py</strong>：CVAE条件插值动画（条件从0到9渐变）</li>
+<li><strong>test4_cvae_embed.py</strong>：Embedding微调实验（使用0-7训练，微调8和9的embedding）</li>
+</ul>
+<p>所有代码都已实现<code>latent_dim=2</code>的2D可视化，便于直观理解潜在空间的特性。</p>
+</body>
+</html>

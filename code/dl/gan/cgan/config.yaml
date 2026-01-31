@@ -4,7 +4,7 @@ model:
   in_channel: 1  # 输入通道数（MNIST 是灰度图）
   num_labels: 10  # 标签数量（MNIST 有 10 个类别：0-9）
   noise_dim: 100  # 噪声向量维度
-  label_embed_dim: 10  # 标签嵌入维度
+  label_embed_dim: 5  # 标签嵌入维度（embedding编码通常5维就足够）
   hidden_dim: 256  # 隐藏层维度
 
 # 训练参数

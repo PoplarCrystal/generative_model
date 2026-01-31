@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>深度学习AE篇01. AE: 从"矩阵分解"到"数据压缩"</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="深度学习ae篇01.-ae-从矩阵分解到数据压缩">深度学习AE篇01. AE: 从“矩阵分解”到“数据压缩”</h1>
+<h2 id="从矩阵分解到数据压缩">1. 从“矩阵分解”到“数据压缩”</h2>
+<h3 id="矩阵分解的启示">1.1 矩阵分解的启示</h3>
+<p>在数学和线性代数中，矩阵分解是一个核心概念。以<strong>奇异值分解（SVD, Singular Value Decomposition）</strong>为例，任意矩阵 <span class="math inline">\(A \in \mathbb{R}^{m \times n}\)</span> 可以分解为：</p>
+<p><span class="math display">\[A = U \Sigma V^T\]</span></p>
+<p>其中：</p>
+<ul>
+<li><span class="math inline">\(U \in \mathbb{R}^{m \times m}\)</span> 和 <span class="math inline">\(V \in \mathbb{R}^{n \times n}\)</span> 是正交矩阵</li>
+<li><span class="math inline">\(\Sigma \in \mathbb{R}^{m \times n}\)</span> 是对角矩阵，对角线上的元素是奇异值 <span class="math inline">\(\sigma_1 \geq \sigma_2 \geq \cdots \geq \sigma_r &gt; 0\)</span>（<span class="math inline">\(r\)</span> 是矩阵的秩）</li>
+</ul>
+<p><strong>核心思想</strong>：在实际应用中，大矩阵中真正"有效"的信息往往只集中在少数几个大的奇异值上，而很多奇异值接近零，对应的信息是冗余的。这意味着我们可以用更少的维度来表示原始数据，而不会丢失太多信息。</p>
+<p>例如，如果我们只保留前 <span class="math inline">\(k\)</span> 个最大的奇异值，可以得到一个低秩近似：</p>
+<p><span class="math display">\[A \approx U_k \Sigma_k V_k^T\]</span></p>
+<p>其中 <span class="math inline">\(U_k\)</span> 和 <span class="math inline">\(V_k\)</span> 只包含前 <span class="math inline">\(k\)</span> 列，<span class="math inline">\(\Sigma_k\)</span> 只包含前 <span class="math inline">\(k\)</span> 个奇异值。这样就将原始 <span class="math inline">\(m \times n\)</span> 的矩阵压缩到了更小的表示空间。</p>
+<h4 id="具体例子1010矩阵的svd压缩">具体例子：10×10矩阵的SVD压缩</h4>
+<p>让我们通过一个具体的例子来直观理解数据压缩的效果。假设我们有一个 <span class="math inline">\(10 \times 10\)</span> 的矩阵 <span class="math inline">\(A\)</span>：</p>
+<p><span class="math display">\[A = \begin{bmatrix}
+1.2 &amp; 0.8 &amp; 0.6 &amp; 0.4 &amp; 0.3 &amp; 0.2 &amp; 0.1 &amp; 0.05 &amp; 0.02 &amp; 0.01 \\
+0.8 &amp; 1.5 &amp; 1.1 &amp; 0.7 &amp; 0.5 &amp; 0.3 &amp; 0.15 &amp; 0.08 &amp; 0.03 &amp; 0.01 \\
+0.6 &amp; 1.1 &amp; 1.8 &amp; 1.2 &amp; 0.8 &amp; 0.5 &amp; 0.25 &amp; 0.12 &amp; 0.05 &amp; 0.02 \\
+0.4 &amp; 0.7 &amp; 1.2 &amp; 1.6 &amp; 1.0 &amp; 0.6 &amp; 0.3 &amp; 0.15 &amp; 0.06 &amp; 0.02 \\
+0.3 &amp; 0.5 &amp; 0.8 &amp; 1.0 &amp; 1.4 &amp; 0.8 &amp; 0.4 &amp; 0.2 &amp; 0.08 &amp; 0.03 \\
+0.2 &amp; 0.3 &amp; 0.5 &amp; 0.6 &amp; 0.8 &amp; 1.2 &amp; 0.6 &amp; 0.3 &amp; 0.12 &amp; 0.04 \\
+0.1 &amp; 0.15 &amp; 0.25 &amp; 0.3 &amp; 0.4 &amp; 0.6 &amp; 1.0 &amp; 0.5 &amp; 0.2 &amp; 0.08 \\
+0.05 &amp; 0.08 &amp; 0.12 &amp; 0.15 &amp; 0.2 &amp; 0.3 &amp; 0.5 &amp; 0.8 &amp; 0.3 &amp; 0.12 \\
+0.02 &amp; 0.03 &amp; 0.05 &amp; 0.06 &amp; 0.08 &amp; 0.12 &amp; 0.2 &amp; 0.3 &amp; 0.6 &amp; 0.25 \\
+0.01 &amp; 0.01 &amp; 0.02 &amp; 0.02 &amp; 0.03 &amp; 0.04 &amp; 0.08 &amp; 0.12 &amp; 0.25 &amp; 0.5
+\end{bmatrix}\]</span></p>
+<p>对 <span class="math inline">\(A\)</span> 进行SVD分解：<span class="math inline">\(A = U \Sigma V^T\)</span>，我们得到10个奇异值（按降序排列）：</p>
+<p><span class="math display">\[\sigma_1 = 5.23, \quad \sigma_2 = 2.18, \quad \sigma_3 = 1.45, \quad \sigma_4 = 0.89, \quad \sigma_5 = 0.52,\]</span> <span class="math display">\[\sigma_6 = 0.28, \quad \sigma_7 = 0.15, \quad \sigma_8 = 0.08, \quad \sigma_9 = 0.04, \quad \sigma_{10} = 0.02\]</span></p>
+<p><strong>观察</strong>：前5个奇异值（5.23, 2.18, 1.45, 0.89, 0.52）占据了总能量的绝大部分，而后5个奇异值（0.28, 0.15, 0.08, 0.04, 0.02）非常小，接近零。</p>
+<p><strong>压缩过程</strong>：我们只保留前 <span class="math inline">\(k=5\)</span> 个奇异值，用 <span class="math inline">\(A_5 = U_5 \Sigma_5 V_5^T\)</span> 来近似原始矩阵 <span class="math inline">\(A\)</span>。</p>
+<p><strong>压缩效果对比</strong>：</p>
+<table>
+<thead>
+<tr class="header">
+<th>指标</th>
+<th>原始矩阵 <span class="math inline">\(A\)</span></th>
+<th>压缩后 <span class="math inline">\(A_5\)</span></th>
+<th>压缩比</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>存储空间</strong></td>
+<td>100个元素</td>
+<td>50个元素（<span class="math inline">\(U_5\)</span>: 10×5, <span class="math inline">\(\Sigma_5\)</span>: 5, <span class="math inline">\(V_5\)</span>: 10×5）</td>
+<td><strong>50%</strong></td>
+</tr>
+<tr class="even">
+<td><strong>重构误差</strong></td>
+<td>-</td>
+<td><span class="math inline">\(\|A - A_5\|_F = 0.35\)</span></td>
+<td>-</td>
+</tr>
+<tr class="odd">
+<td><strong>相对误差</strong></td>
+<td>-</td>
+<td><span class="math inline">\(\frac{\|A - A_5\|_F}{\|A\|_F} = 2.8\%\)</span></td>
+<td>-</td>
+</tr>
+<tr class="even">
+<td><strong>信息保留率</strong></td>
+<td>100%</td>
+<td>97.2%</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<p><strong>数值结果</strong>：</p>
+<ul>
+<li><strong>压缩比</strong>：从100个元素减少到50个元素，压缩了50%</li>
+<li><strong>重构误差</strong>：Frobenius范数误差仅为0.35</li>
+<li><strong>信息保留</strong>：保留了97.2%的信息，仅损失2.8%</li>
+</ul>
+<p><strong>总结</strong>：</p>
+<ol type="1">
+<li><strong>大部分信息集中在少数几个大的奇异值上</strong>：前5个奇异值就捕获了97.2%的信息</li>
+<li><strong>小的奇异值可以安全丢弃</strong>：后5个奇异值总共只贡献了2.8%的信息</li>
+<li><strong>压缩是可行的</strong>：用一半的存储空间就能表示几乎全部的信息</li>
+</ol>
+<p>这个例子清楚地展示了：<strong>大矩阵中真正有效的信息只集中在少数几个特征值/奇异值上，很多都是零或接近零，没有意义</strong>。这正是数据压缩和降维的核心思想，也是自编码器要解决的根本问题。</p>
+<h3 id="数据压缩的必要性">1.2 数据压缩的必要性</h3>
+<p><strong>数据压缩是训练网络的重要阶段</strong>。核心思想是：用更少的比特来表示相同数量的信息。这在深度学习中尤为重要，原因包括：</p>
+<ol type="1">
+<li><p><strong>维度灾难（Curse of Dimensionality）</strong>：具有大量属性的数据集难以训练，因为模型容易过拟合。高维空间中，数据点之间的距离变得相似，导致模型难以学习有效的模式。</p></li>
+<li><p><strong>计算和存储成本</strong>：高维数据需要更多的计算资源和存储空间。通过降维，可以显著减少这些成本。</p></li>
+<li><p><strong>去除冗余信息</strong>：真实数据中往往存在大量冗余。例如，图像中相邻像素通常高度相关，很多信息是重复的。</p></li>
+</ol>
+<h3 id="自编码器的引入">1.3 自编码器的引入</h3>
+<p>正是在这样的背景下，<strong>自编码器（Autoencoder, AE）</strong>和<strong>变分自编码器（Variational Autoencoder, VAE）</strong>应运而生。它们是端到端的神经网络，用于压缩输入数据。</p>
+<p>自编码器和变分自编码器都将数据从高维空间转换到低维空间，本质上实现了数据压缩。与传统的线性降维方法（如PCA）不同，它们通过非线性变换可以学习更强大的数据表示。</p>
+<hr />
+<h2 id="潜在空间latent-space与自编码器ae">2. 潜在空间（Latent Space）与自编码器（AE）</h2>
+<h3 id="什么是自编码器">2.1 什么是自编码器？</h3>
+<p><strong>自编码器（Autoencoder, AE）</strong>是一种用于学习无标签数据高效嵌入（embeddings）的无监督学习模型。对于给定的网络配置，它可以学习数据的紧凑表示。</p>
+<p>自编码器由两个主要部分组成：</p>
+<ul>
+<li><strong>编码器（Encoder）</strong>：将高维输入数据压缩到低维潜在空间（latent space）</li>
+<li><strong>解码器（Decoder）</strong>：将潜在表示重构回高维数据空间</li>
+</ul>
+<p>解码器的作用是确保潜在空间能够捕获数据集空间中的大部分信息，通过强制其输出与编码器输入尽可能接近来实现这一点。</p>
+<h3 id="矩阵分解与数据压缩">2.1.1 矩阵分解与数据压缩</h3>
+<p>自编码器的核心思想与矩阵分解（如SVD）一脉相承：<strong>通过降维实现数据压缩</strong>。让我们通过两个例子来理解这一过程。</p>
+<p><strong>例子1：矩阵分解（SVD）</strong></p>
+<p>下图展示了10×10矩阵A通过SVD分解实现压缩的过程：</p>
+<div data-align="center">
+<p><img src="pic/dl/ae/1.1.png" width="80%"></p>
+</div>
+<p><small><strong>图1.1</strong> 左侧：原始矩阵A（<span class="math inline">\(10 \times 10\)</span>，高维空间） | 中间：SVD分解结果（<span class="math inline">\(A = U\Sigma V^T\)</span>，显示所有10个奇异值） | 右侧：前5个最大的奇异值（低维空间）</small></p>
+<p><strong>压缩</strong>：原始矩阵 <span class="math inline">\(10 \times 10\)</span> 是高维空间，通过SVD分解保留前5个奇异值，压缩到低维空间。</p>
+<p><strong>例子2：自编码器（AE）</strong></p>
+<p>下图展示了MNIST图像通过自编码器实现压缩的过程：</p>
+<div data-align="center">
+<p><img src="pic/dl/ae/1.2.png" width="80%"></p>
+</div>
+<p><small><strong>图1.2</strong> 左侧：原始MNIST图像（28×28像素，高维空间） | 中间：28×28数字矩阵（每个像素值0-255） | 右侧：16维潜在向量（Latent空间，低维空间）</small></p>
+<p><strong>压缩</strong>：原始图像 <span class="math inline">\(28 \times 28 = 784\)</span> 维是高维空间，通过编码器压缩到16维Latent空间（低维空间）。</p>
+<h3 id="架构与工作原理">2.2 架构与工作原理</h3>
+<p>自编码器由编码器和解码器两部分组成，通过编码-解码过程实现数据压缩和重构：</p>
+<div data-align="center">
+<p><img src="pic/dl/ae/1.3.png" width="70%"></p>
+</div>
+<p><small><strong>图1.3</strong> 自编码器架构：输入 x → 编码器 e_θ(x) → 潜在向量 z → 解码器 d_φ(z) → 重构输出 x̂</small></p>
+<h3 id="损失函数">2.3 损失函数</h3>
+<p>自编码器的目标是实现重构，因此损失函数即为重构误差，即编码器输入和解码器输出之间的均方误差：</p>
+<p><span class="math display">\[\mathcal{L}_{AE} = \|x - \hat{x}\|^2 = \|x - d_\phi(e_\theta(x))\|^2\]</span></p>
+<hr />
+<h2 id="可视化潜在空间">3. 可视化潜在空间</h2>
+<h3 id="潜在空间的聚类特性">3.1 潜在空间的聚类特性</h3>
+<p>下图展示了在MNIST数据集上训练自编码器后生成的潜在空间可视化示例：</p>
+<div data-align="center">
+<p><img src="pic/dl/ae/1.4.png" width="70%"></p>
+</div>
+<p><small><strong>图1.4</strong> 潜在空间可视化：相同的数字倾向于在潜在空间中聚集在一起，形成不同的簇。同时，潜在空间中存在一些不对应任何数据点的“空洞”区域。</small></p>
+<p>从图中可以观察到：</p>
+<ol type="1">
+<li><p><strong>聚类现象</strong>：相同的数字倾向于在潜在空间中聚集在一起。例如，所有的“0”会形成一个簇，所有的“1”会形成另一个簇，以此类推。</p></li>
+<li><p><strong>空洞区域</strong>：潜在空间中存在一些不对应任何数据点的部分。如果将这些区域的值作为解码器的输入，会产生不像MNIST数据中任何数字的输出。</p></li>
+</ol>
+<h3 id="非正则化潜在空间的问题">3.2 非正则化潜在空间的问题</h3>
+<p>这正是我们所说的<strong>潜在空间是非正则化的（unregularized）</strong>。这种潜在空间的特点包括：</p>
+<ol type="1">
+<li><p><strong>有限的生成能力</strong>：只有少数区域/簇具有生成能力。这意味着从属于某个簇的潜在空间中采样任何点，都会生成属于该簇的数据的变体。但<strong>整个潜在空间并不都具有生成能力</strong>。</p></li>
+<li><p><strong>垃圾输出区域</strong>：不属于任何簇的区域会生成垃圾输出。一旦网络训练完成，训练数据被移除，我们无法知道从随机采样的潜在向量通过解码器生成的输出是否有效。</p></li>
+</ol>
+<hr />
+<h2 id="代码实现">4. 代码实现</h2>
+<h3 id="网络定义ae.py">4.1 网络定义（<code>ae.py</code>）</h3>
+<p>自编码器的网络结构定义如下：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="im">import</span> torch</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="im">import</span> torch.nn <span class="im">as</span> nn</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a><span class="im">import</span> torch.nn.functional <span class="im">as</span> F</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a><span class="kw">class</span> Encoder(nn.Module):</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, input_dim, hidden_dim, latent_dim):</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>        <span class="va">self</span>.linear1 <span class="op">=</span> nn.Linear(input_dim, hidden_dim)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>        <span class="va">self</span>.linear2 <span class="op">=</span> nn.Linear(hidden_dim, latent_dim)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, x):</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a>        h <span class="op">=</span> F.relu(<span class="va">self</span>.linear1(x))</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a>        z <span class="op">=</span> <span class="va">self</span>.linear2(h)  <span class="co"># 直接输出潜在向量，不需要概率分布</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true"></a>        <span class="cf">return</span> z</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true"></a><span class="kw">class</span> Decoder(nn.Module):</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, latent_dim, hidden_dim, output_dim):</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true"></a>        <span class="va">self</span>.linear1 <span class="op">=</span> nn.Linear(latent_dim, hidden_dim)</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true"></a>        <span class="va">self</span>.linear2 <span class="op">=</span> nn.Linear(hidden_dim, output_dim)</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true"></a></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, z):</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true"></a>        h <span class="op">=</span> F.relu(<span class="va">self</span>.linear1(z))</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true"></a>        x_hat <span class="op">=</span> F.sigmoid(<span class="va">self</span>.linear2(h))</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true"></a>        <span class="cf">return</span> x_hat</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true"></a></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true"></a><span class="kw">class</span> AE(nn.Module):</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, input_dim, hidden_dim, latent_dim):</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true"></a>        <span class="va">self</span>.encoder <span class="op">=</span> Encoder(input_dim, hidden_dim, latent_dim)</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true"></a>        <span class="va">self</span>.decoder <span class="op">=</span> Decoder(latent_dim, hidden_dim, input_dim)</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true"></a>    </span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, x):</span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true"></a>        z <span class="op">=</span> <span class="va">self</span>.encoder(x)  <span class="co"># 编码：x -&gt; z</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true"></a>        x_hat <span class="op">=</span> <span class="va">self</span>.decoder(z)  <span class="co"># 解码：z -&gt; x_hat</span></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true"></a>        <span class="cf">return</span> x_hat</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true"></a></span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true"></a><span class="kw">def</span> loss_function(x_hat, x):</span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true"></a>    <span class="co"># AE 只有重构损失，没有 KL 散度</span></span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true"></a>    <span class="cf">return</span> F.mse_loss(x_hat, x, reduction<span class="op">=</span><span class="st">&#39;mean&#39;</span>)</span></code></pre></div>
+<div data-align="center">
+<p><img src="pic/dl/ae/1.5.png" height="50%"></p>
+</div>
+<p><small><strong>图1.5</strong> 自编码器网络结构</small></p>
+<p>图1.5展示了自编码器网络结构，其中Encoder为两层全连接网络（使用ReLU激活函数），将输入压缩到潜在空间；Decoder为两层全连接网络（使用ReLU和Sigmoid激活函数），将潜在向量重构回原始空间。损失函数仅包含重构损失（MSE），没有正则化项。</p>
+<h3 id="训练与推理">4.2 训练与推理</h3>
+<h4 id="模型训练">4.2.1 模型训练</h4>
+<p>训练过程的核心代码如下：</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="co"># 模型构建</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>model <span class="op">=</span> AE(input_dim, hidden_dim, latent_dim).to(device)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>optimizer <span class="op">=</span> optim.Adam(model.parameters(), lr<span class="op">=</span>learning_rate)</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a><span class="co"># 训练循环</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a><span class="cf">for</span> epoch <span class="kw">in</span> <span class="bu">range</span>(epochs):</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>    <span class="cf">for</span> x, label <span class="kw">in</span> train_loader:</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a>        x <span class="op">=</span> x.view(<span class="op">-</span><span class="dv">1</span>, input_dim).to(device)</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a>        x_hat <span class="op">=</span> model(x)  <span class="co"># 前向传播：编码-解码</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a>        loss <span class="op">=</span> loss_function(x_hat, x)  <span class="co"># 计算重构损失</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a>        </span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true"></a>        optimizer.zero_grad()</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true"></a>        loss.backward()  <span class="co"># 反向传播</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true"></a>        optimizer.step()  <span class="co"># 更新参数</span></span></code></pre></div>
+<p><strong>训练流程</strong>： 1. 将输入数据展平为向量（MNIST: 28×28 = 784维） 2. 通过模型进行前向传播，得到重构输出 3. 计算重构损失（MSE） 4. 反向传播更新参数</p>
+<h4 id="模型测试">4.2.2 模型测试</h4>
+<p>训练完成后，在测试集上评估模型性能：</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a>model.<span class="bu">eval</span>()</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a><span class="cf">with</span> torch.no_grad():</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>    <span class="cf">for</span> x, label <span class="kw">in</span> test_loader:</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a>        x <span class="op">=</span> x.view(<span class="op">-</span><span class="dv">1</span>, input_dim).to(device)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a>        x_hat <span class="op">=</span> model(x)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a>        loss <span class="op">=</span> loss_function(x_hat, x)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true"></a>        <span class="co"># 记录测试损失</span></span></code></pre></div>
+<hr />
+<h2 id="重建能力-vs.-生成能力">5. 重建能力 vs. 生成能力</h2>
+<h3 id="推理1重建能力reconstruction">5.1 推理1：重建能力（Reconstruction）</h3>
+<p>代码中的 <code>infer1</code> 部分展示了AE的<strong>重建能力</strong>：</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a><span class="co"># 模型推理1 - 从测试集采样图像，查看重构效果</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a><span class="cf">if</span> infer1:</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a>    model.<span class="bu">eval</span>()</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a>    <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a>        <span class="co"># 从测试集第一个批次中取样本</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a>        x, labels <span class="op">=</span> <span class="bu">next</span>(<span class="bu">iter</span>(test_loader))</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a>        x_test <span class="op">=</span> x[:sample_size].view(<span class="op">-</span><span class="dv">1</span>, input_dim).to(device)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a>        labels_test <span class="op">=</span> labels[:sample_size]</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a>        </span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true"></a>        <span class="co"># 通过 AE 进行编码-解码重构</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true"></a>        x_reconstructed <span class="op">=</span> model(x_test)</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true"></a>        </span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true"></a>        <span class="co"># 转换为图像格式用于显示</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true"></a>        original_images <span class="op">=</span> x_test.view(sample_size, <span class="dv">1</span>, <span class="dv">28</span>, <span class="dv">28</span>).cpu()</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true"></a>        reconstructed_images <span class="op">=</span> x_reconstructed.view(sample_size, <span class="dv">1</span>, <span class="dv">28</span>, <span class="dv">28</span>).cpu()</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true"></a>        labels_cpu <span class="op">=</span> labels_test.numpy()</span></code></pre></div>
+<div data-align="center">
+<p><img src="pic/dl/ae/1.6.png" width="70%"></p>
+</div>
+<p><small><strong>图1.6</strong> AE的重建能力：左列为原始图像，右列为重构图像。</small></p>
+<p>图1.6展示了AE的重建能力，两者非常相似，说明潜在空间成功捕获了输入的关键信息，证明了AE在数据压缩方面的有效性。</p>
+<h3 id="推理2生成能力generation">5.2 推理2：生成能力（Generation）</h3>
+<p>代码中的 <code>infer2</code> 部分展示了AE的<strong>生成能力</strong>（或更准确地说，是生成能力的局限性）：</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a><span class="co"># 模型推理2 - 生成新图像（从潜在空间随机采样）</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a><span class="cf">if</span> infer2:</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true"></a>    model.<span class="bu">eval</span>()</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true"></a>    <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true"></a>        <span class="co"># 从标准正态分布采样潜在向量</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true"></a>        z <span class="op">=</span> torch.randn(sample_size, latent_dim).to(device)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true"></a>        x <span class="op">=</span> model.decoder(z)  <span class="co"># 仅使用解码器生成图像</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true"></a>        generated_images <span class="op">=</span> x.view(sample_size, <span class="dv">1</span>, <span class="dv">28</span>, <span class="dv">28</span>).cpu()</span></code></pre></div>
+<div data-align="center">
+<p><img src="pic/dl/ae/1.7.png" width="70%"></p>
+</div>
+<p><small><strong>图1.7</strong> AE的生成能力</small></p>
+<p>图1.7展示了AE生成能力的局限性：从标准正态分布随机采样潜在向量 <span class="math inline">\(z\)</span>，直接通过解码器生成图像。结果生成的图像通常是<strong>无意义的</strong>或<strong>模糊的</strong>，这是因为AE的潜在空间是非正则化的，存在大量“空洞”区域。</p>
+<p>这与3中的描述是一致的，至于如何解决这个问题，我们在下一节VAE中进行介绍。</p>
+</body>
+</html>

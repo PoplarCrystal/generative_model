@@ -10,7 +10,7 @@ training:
   epochs: 50  # 增加训练轮数以获得更好的效果
   learning_rate: 0.0002  # 2e-4，GAN 通常使用较小的学习率
   batch_size: 64  # 增加batch size以获得更稳定的训练
-  n_critic: 1  # 每次训练生成器前训练判别器的次数
+  n_critic: 1  # 每次训练生成器前训练判别器的次数（建议5，让判别器训练更充分）
 
 # 执行控制标志
 flags:
