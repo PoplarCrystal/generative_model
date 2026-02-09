@@ -1,0 +1,32 @@
+# 模型参数
+model:
+  vocab_size: 256  # 像素值的词汇表大小（0-255）
+  embedding_dim: 128  # 嵌入维度
+  hidden_dim: 256  # 因果卷积隐藏层维度
+  num_layers: 4  # 因果卷积层数
+  kernel_size: 3  # 卷积核大小
+  seq_len: 784  # 序列长度（MNIST: 28*28=784）
+
+# 训练参数
+training:
+  epochs: 30
+  learning_rate: 0.001  # 1e-3
+  batch_size: 128  # 增加batch size以充分利用GPU
+
+# 执行控制标志
+flags:
+  train: true   # 是否训练模型
+  infer: true   # 是否执行推理：生成新图像
+
+# 模型文件
+model_file:
+  model_name: 'ar_cnn_model.pth'
+
+# 数据参数
+data:
+  data_dir: '../../../data'  # 相对于代码文件的路径
+
+# 可视化参数
+visualization:
+  sample_size: 16  # 生成图像的数量
+  nrow: 4  # 显示时每行的图像数量
