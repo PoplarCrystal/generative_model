@@ -22,6 +22,10 @@ data/
 *.npy
 *.npz
 
+# 允许提交 code/data 目录
+!code/data/
+!code/data/**
+
 # Jupyter Notebook
 .ipynb_checkpoints
 
@@ -45,5 +49,4 @@ Thumbs.db
 # 临时文件
 *.log
 *.tmp
-
 

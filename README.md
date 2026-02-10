@@ -130,7 +130,6 @@ generative_model/
 - `机器学习篇-03潜变量估计.md` - 潜变量估计方法
 - `机器学习篇-04变分推断.md` - 变分推断理论
 
-
 ### AE系列篇
 
 - `AE系列篇-01AE.md` - 自编码器基础
@@ -162,20 +161,41 @@ generative_model/
 
 - `VQ-VAE_算法推导.md` - VQ-VAE算法详细推导
 
-## 环境安装
+## 环境安装与代码拉取
 
-### 快速安装（推荐）
+### 1. 使用 Git LFS 拉取代码（推荐）
+本项目使用 Git LFS 管理大文件（如 `code/data` 和 `ref` 目录下的文件）。请确保您的系统中已安装 Git LFS。
+
+**安装 Git LFS**：
+- Mac: `brew install git-lfs`
+- Linux (Ubuntu): `sudo apt-get install git-lfs`
+- Windows: 下载并安装 Git LFS
+
+**初始化 LFS 并拉取代码**：
+```bash
+# 1. 初始化 LFS
+git lfs install
+
+# 2. 克隆仓库
+git clone <repo_url>
+cd generative_model
+
+# 3. 拉取 LFS 管理的大文件
+git lfs pull
+```
+
+### 2. 快速安装环境（推荐）
 
 **Linux/macOS:**
 ```bash
 bash setup_env.sh
 ```
 
-### 手动安装
+### 3. 手动安装环境
 
 详细安装步骤请参考 [INSTALL.md](INSTALL.md)（如果存在）
 
-### 环境要求
+### 4. 环境要求
 
 - Python 3.9+
 - PyTorch 1.12+
@@ -274,6 +294,7 @@ python em.py
 - **丰富的代码实现**：涵盖AE、VAE、DDPM、DDIM、LDM、GAN等多种模型
 - **可视化实验**：包含多种可视化工具和实验代码
 - **清晰的代码结构**：每个模型都有独立的目录和配置文件
+- **Git LFS 支持**：使用 Git LFS 高效管理数据文件
 
 ## License
 
