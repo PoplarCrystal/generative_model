@@ -15,7 +15,7 @@ with open(config_path, 'r', encoding='utf-8') as f:
     config = yaml.safe_load(f)
 
 # 从配置文件读取参数
-vocab_size = config['model']['vocab_size']
+input_dim = config['model']['input_dim']
 d_model = config['model']['d_model']
 nhead = config['model']['nhead']
 num_layers = config['model']['num_layers']
@@ -69,7 +69,7 @@ test_loader = torch.utils.data.DataLoader(
 
 # 模型构建
 model = AR_Transformer(
-    vocab_size=vocab_size,
+    input_dim=input_dim,
     d_model=d_model,
     nhead=nhead,
     num_layers=num_layers,
@@ -87,26 +87,27 @@ def preprocess_images(images):
     Args:
         images: (batch_size, 1, 28, 28) 图像张量，值在[0, 1]范围
     Returns:
-        pixel_seq: (batch_size, 784) 像素序列，值在[0, 255]范围（整数）
+        pixel_seq: (batch_size, 784, 1) 像素序列，值在[0, 1]范围（二值化）
     """
-    # 展平图像
-    images_flat = images.reshape(images.size(0), -1)  # (batch_size, 784)
-    # 转换为0-255范围并量化
-    pixel_seq = (images_flat * 255).long().clamp(0, 255)
-    return pixel_seq
+    # 二值化：大于0.5为1，小于等于0.5为0
+    images = (images > 0.5).float()
+    
+    # 展平图像并添加维度
+    images_flat = images.reshape(images.size(0), -1, 1)  # (batch_size, 784, 1)
+    return images_flat
 
 
 def prepare_sequences(pixel_seq):
     """准备训练序列：输入是前n-1个像素，目标是后n-1个像素（shift by 1）
     
     Args:
-        pixel_seq: (batch_size, seq_len) 像素序列
+        pixel_seq: (batch_size, seq_len, input_dim) 像素序列
     Returns:
-        inputs: (batch_size, seq_len-1) 输入序列
-        targets: (batch_size, seq_len-1) 目标序列
+        inputs: (batch_size, seq_len-1, input_dim) 输入序列
+        targets: (batch_size, seq_len-1, input_dim) 目标序列
     """
-    inputs = pixel_seq[:, :-1]  # 前n-1个像素作为输入
-    targets = pixel_seq[:, 1:]  # 后n-1个像素作为目标（shift by 1）
+    inputs = pixel_seq[:, :-1, :]  # 前n-1个像素作为输入
+    targets = pixel_seq[:, 1:, :]  # 后n-1个像素作为目标（shift by 1）
     return inputs, targets
 
 
@@ -201,13 +202,11 @@ if infer:
         generated_sequences = model.generate(
             batch_size=sample_size,
             seq_len=seq_len,
-            device=device,
-            temperature=1.0
-        )  # (sample_size, 784)
+            device=device
+        )  # (sample_size, 784, 1)
         
-        # 转换为图像格式：将像素值从[0, 255]转换回[0, 1]
-        generated_images = generated_sequences.float() / 255.0
-        generated_images = generated_images.view(sample_size, 1, 28, 28).cpu()
+        # 转换为图像格式：已经是[0, 1]范围
+        generated_images = generated_sequences.squeeze(-1).view(sample_size, 1, 28, 28).cpu()
     
     # 显示生成的图像
     fig, axes = plt.subplots(nrow, nrow, figsize=(16, 16))

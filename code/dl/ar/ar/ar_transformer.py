@@ -71,18 +71,18 @@ class TransformerBlock(nn.Module):
 class AR_Transformer(nn.Module):
     """基于Transformer的自回归模型，用于生成MNIST图像
     
-    使用Transformer的自注意力机制建模序列依赖关系，每个像素值被量化为256个级别（0-255）
+    使用Transformer的自注意力机制建模序列依赖关系，每个像素值是连续的[0, 1]范围
     """
-    def __init__(self, vocab_size=256, d_model=256, nhead=8, num_layers=4, 
+    def __init__(self, input_dim=1, d_model=256, nhead=8, num_layers=4, 
                  dim_feedforward=1024, dropout=0.1, max_len=1000):
         super().__init__()
-        self.vocab_size = vocab_size
+        self.input_dim = input_dim
         self.d_model = d_model
         self.nhead = nhead
         self.num_layers = num_layers
         
-        # 嵌入层：将像素值（0-255）映射到d_model空间
-        self.embedding = nn.Embedding(vocab_size, d_model)
+        # 输入层：将像素值映射到d_model空间
+        self.input_proj = nn.Linear(input_dim, d_model)
         
         # 位置编码
         self.pos_encoder = PositionalEncoding(d_model, max_len, dropout)
@@ -93,8 +93,12 @@ class AR_Transformer(nn.Module):
             for _ in range(num_layers)
         ])
         
-        # 输出层：预测下一个像素值的分布
-        self.output = nn.Linear(d_model, vocab_size)
+        # 输出层：预测下一个像素值的Logits
+        self.output = nn.Sequential(
+            nn.Linear(d_model, dim_feedforward),
+            nn.ReLU(),
+            nn.Linear(dim_feedforward, input_dim)
+        )
         
     def _generate_causal_mask(self, seq_len, device):
         """生成因果注意力掩码，防止看到未来信息"""
@@ -105,16 +109,16 @@ class AR_Transformer(nn.Module):
     def forward(self, x, use_causal_mask=True):
         """
         Args:
-            x: (batch_size, seq_len) 输入序列，每个元素是像素值（0-255）
+            x: (batch_size, seq_len, input_dim) 输入序列，每个元素是像素值[0, 1]
             use_causal_mask: 是否使用因果掩码（训练时通常为True）
         Returns:
-            logits: (batch_size, seq_len, vocab_size) 每个位置的下一个像素值的logits
+            output: (batch_size, seq_len, input_dim) 每个位置的下一个像素值预测
         """
-        # 嵌入
-        x_emb = self.embedding(x)  # (batch_size, seq_len, d_model)
+        # 投影到d_model空间
+        x_proj = self.input_proj(x)  # (batch_size, seq_len, d_model)
         
         # 位置编码
-        x_emb = self.pos_encoder(x_emb)
+        x_proj = self.pos_encoder(x_proj)
         
         # 生成因果掩码
         attn_mask = None
@@ -122,14 +126,14 @@ class AR_Transformer(nn.Module):
             attn_mask = self._generate_causal_mask(x.size(1), x.device)
         
         # 通过Transformer层
-        out = x_emb
+        out = x_proj
         for transformer_block in self.transformer_blocks:
             out = transformer_block(out, attn_mask=attn_mask)
         
-        # 输出logits
-        logits = self.output(out)  # (batch_size, seq_len, vocab_size)
+        # 输出下一个像素值
+        output = self.output(out)  # (batch_size, seq_len, input_dim)
         
-        return logits
+        return output
     
     def generate(self, batch_size=1, seq_len=784, device='cpu', temperature=1.0):
         """自回归生成图像
@@ -138,51 +142,47 @@ class AR_Transformer(nn.Module):
             batch_size: 生成图像的数量
             seq_len: 序列长度（MNIST: 28*28=784）
             device: 设备
-            temperature: 采样温度，控制随机性
+            temperature: 采样温度，控制多样性
         Returns:
-            generated: (batch_size, seq_len) 生成的像素序列
+            generated_seq: (batch_size, seq_len, input_dim) 生成的像素序列
         """
         self.eval()
         with torch.no_grad():
-            # 初始化：全零序列，让模型生成所有像素
-            generated = torch.zeros(batch_size, seq_len, dtype=torch.long, device=device)
+            # 1. 初始化画布 (全0)
+            generated_seq = torch.zeros(batch_size, seq_len, self.input_dim, device=device)
             
-            # 自回归生成
-            for t in range(seq_len):
-                # 获取当前序列（到位置t）
-                x_in = generated[:, :t+1]  # (batch_size, t+1)
+            # 2. 自回归生成
+            # 注意：Transformer没有隐藏状态，每次必须把整个历史序列喂进去
+            # 虽然效率不如RNN的O(N)，但是并行计算能力强
+            for t in range(1, seq_len):
+                # A: 获取当前已生成的序列（到位置t-1）
+                current_seq = generated_seq[:, :t, :]  # Shape: (batch, t, input_dim)
                 
-                # 获取当前序列的logits（使用因果掩码）
-                logits = self.forward(x_in, use_causal_mask=True)  # (batch_size, t+1, vocab_size)
+                # B: 前向传播（预测整个序列）
+                # output shape: (batch, t, input_dim)
+                output = self.forward(current_seq, use_causal_mask=True)
                 
-                # 取最后一个位置的logits
-                next_logits = logits[:, -1, :]  # (batch_size, vocab_size)
-                next_logits = next_logits / temperature
+                # C: 取最后一个位置的预测 (Logits)
+                logits = output[:, -1, :]
                 
-                # 采样
-                probs = F.softmax(next_logits, dim=-1)
-                next_pixel = torch.multinomial(probs, 1).squeeze(-1)  # (batch_size,)
+                # D: 采样
+                probs = torch.sigmoid(logits / temperature)
+                next_pixel = torch.bernoulli(probs)
                 
-                # 更新序列
-                generated[:, t] = next_pixel
+                # E: 填入画布
+                generated_seq[:, t, :] = next_pixel
             
-            return generated
+            return generated_seq
 
 
-def loss_function(logits, targets):
-    """计算交叉熵损失
+def loss_function(pred, target):
+    """计算BCEWithLogits损失
     
     Args:
-        logits: (batch_size, seq_len, vocab_size) 模型输出的logits
-        targets: (batch_size, seq_len) 目标像素值
-    Returns:
-        loss: 平均交叉熵损失
+        pred: (batch_size, seq_len, input_dim) 模型输出的Logits
+        target: (batch_size, seq_len, input_dim) 目标像素值[0,1]
     """
-    # 将logits和targets展平
-    logits_flat = logits.reshape(-1, logits.size(-1))  # (batch_size * seq_len, vocab_size)
-    targets_flat = targets.reshape(-1)  # (batch_size * seq_len)
-    
-    # 计算交叉熵损失
-    loss = F.cross_entropy(logits_flat, targets_flat)
-    
+    pred_flat = pred.reshape(-1)
+    target_flat = target.reshape(-1)
+    loss = F.binary_cross_entropy_with_logits(pred_flat, target_flat)
     return loss

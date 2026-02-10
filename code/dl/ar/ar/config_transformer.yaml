@@ -1,23 +1,22 @@
-# 模型参数
 model:
-  vocab_size: 256  # 像素值的词汇表大小（0-255）
-  d_model: 256  # Transformer模型维度
-  nhead: 8  # 注意力头数
-  num_layers: 4  # Transformer编码器层数
-  dim_feedforward: 1024  # 前馈网络维度
+  input_dim: 1  # 输入维度（每个像素是1维的连续值[0,1]）
+  d_model: 128  # 这里的256->128
+  nhead: 4  # 8->4
+  num_layers: 2  # 4->2
+  dim_feedforward: 512  # 1024->512
   dropout: 0.1  # Dropout比率
   max_len: 1000  # 最大序列长度（用于位置编码）
   seq_len: 784  # 序列长度（MNIST: 28*28=784）
 
 # 训练参数
 training:
-  epochs: 30
-  learning_rate: 0.0001  # 1e-4，Transformer通常使用较小的学习率
+  epochs: 20 # 稍微增加一点epoch，因为模型变小了，可能需要多一点迭代
+  learning_rate: 0.001 # Transformer通常使用较小的学习率，但小模型可以用0.001
   batch_size: 128  # 增加batch size以充分利用GPU
 
 # 执行控制标志
 flags:
-  train: true   # 是否训练模型
+  train: false   # 是否训练模型
   infer: true   # 是否执行推理：生成新图像
 
 # 模型文件

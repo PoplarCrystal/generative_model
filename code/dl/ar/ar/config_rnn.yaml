@@ -1,7 +1,6 @@
 # 模型参数
 model:
-  vocab_size: 256  # 像素值的词汇表大小（0-255）
-  embedding_dim: 128  # 嵌入维度
+  input_dim: 1  # 输入维度（每个像素是1维的连续值[0,1]）
   hidden_dim: 256  # LSTM隐藏层维度
   num_layers: 2  # LSTM层数
   dropout: 0.2  # Dropout比率
@@ -9,13 +8,13 @@ model:
 
 # 训练参数
 training:
-  epochs: 30
+  epochs: 20
   learning_rate: 0.001  # 1e-3
   batch_size: 128  # 增加batch size以充分利用GPU
 
 # 执行控制标志
 flags:
-  train: true   # 是否训练模型
+  train: false   # 是否训练模型
   infer: true   # 是否执行推理：生成新图像
 
 # 模型文件
