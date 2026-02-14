@@ -1,329 +1,349 @@
+# GAN系列篇05. GAN的改进1：WGAN
 
-# GAN系列篇01. GAN理论篇
+原始 GAN 通过判别器与生成器的极小极大博弈，等价于最小化真实分布与生成分布之间的 JS 散度。当两分布支撑集不重叠时，JS 散度常为常数，导致梯度消失、训练不稳定。WGAN（Wasserstein GAN）用 Wasserstein 距离替代 JS 散度，并引入 Critic（评论家）与权重裁剪或梯度惩罚，使损失具有更好的梯度性质，训练更稳定。本章介绍 WGAN 的动机、理论基础、目标函数与实现要点。
 
-## 1. GAN的概述
+## 1. WGAN 的动机
 
-### 1.1 GAN 是什么？
+### 1.1 GAN 的局限性
 
-GAN（Generative Adversarial Network，生成对抗网络）由三个关键词组成：
+原始 GAN 的目标函数为：
 
-*   **Generative**（生成式）：目标是学习真实数据 $p_{data}(x)$ 的分布，并能从中采样生成新的、逼真的数据。
-*   **Adversarial**（对抗式）：通过引入一个"对手"（判别器 D）来训练生成器（G），形成一种博弈关系。
-*   **Networks**（网络）：生成器 G 和判别器 D 都由神经网络实现，通过反向传播和随机梯度下降 (SGD) 进行优化。
+$$\min_G \max_D \, \mathbb{E}_{x \sim p_{\text{data}}}[\log D(x)] + \mathbb{E}_{z \sim p_z}[\log(1 - D(G(z)))] \tag{1}$$
 
-**核心机制：**
+在最优判别器 $D^*$ 下，该目标等价于最小化真实分布 $p_{\text{data}}$ 与生成分布 $p_g$ 的 **Jensen-Shannon 散度**：
 
-1.  **生成器**（Generator, G）：接收一个简单的随机噪声向量 $z$（通常来自标准正态分布或均匀分布），并将其映射为一个看起来像真实数据的样本 $x' = G(z)$。它的目标是"以假乱真"。
-2.  **判别器**（Discriminator, D）：接收一个数据样本（可能是真实的 $x \sim p_{data}$，也可能是生成的 $x' = G(z)$），并输出一个概率值，表示该样本是真实数据的可能性。它的目标是"火眼金睛"，准确区分真假。
+$$\min_G \, 2\cdot\text{JS}(p_{\text{data}} \| p_g) - 2\log 2 \tag{2}$$
 
-这两个网络在训练过程中相互对抗、共同进化：
+**JS 散度的局限**：
 
-*   **D 的训练**：在 G 固定的情况下，D 被训练得越来越好，能更准确地分辨出 G 生成的假样本。
-*   **G 的训练**：在 D 固定的情况下，G 被训练得越来越好，能生成让当前 D 误判为真实的假样本。
+1. **支撑集不重叠时梯度消失**：当 $p_{\text{data}}$ 与 $p_g$ 的支撑集在高维空间中不重叠（例如两个低维流形），JS 散度恒为 $\log 2$，对 $G$ 的梯度为 0，生成器无法得到有效更新。
+2. **判别器饱和**：判别器很容易将真实与生成样本完全分开（$D(x_{\text{real}}) \approx 1$，$D(G(z)) \approx 0$），此时 $\log(1-D(G(z)))$ 梯度很小，生成器训练困难。
+3. **模式崩塌与训练不稳定**：实践中常出现模式崩塌、震荡，难以调参。
 
-这个过程就是一个**极小-极大**（min-max）的优化问题。
+因此需要一种**即使分布不重叠仍能提供有效梯度**的度量，并对应更稳定的训练目标。
 
-### 1.2 与 VAE 的对比：为什么需要 GAN？
+<div align="center">
 
-为了更好地理解 GAN 的动机，我们先回顾一下变分自编码器 (VAE) 的局限性。
+<img src="pic/gan/5.1.jpeg" alt="JS散度在支撑集不重叠时恒为常数" style="width: 65%;">
 
-**VAE 的局限性：**
+</div>
 
-*   VAE 使用重构损失（如 L2 或交叉熵）。这种损失函数隐含了一个很强的假设：数据的各个维度（例如图像的每个像素）是独立同分布的。
-*   对于高维复杂数据（如自然图像），像素之间存在强烈的依赖关系，这个假设显然不成立。这导致 VAE 生成的图像往往比较模糊，缺乏高频细节和锐利的纹理。
+<small>**图1** 当 $p_{\text{data}}$ 与 $p_g$ 不重叠时，JS 散度恒为 $\log 2$。</small>
 
-![VAE 生成结果对比](pic/dl/gan/1.1.jpeg)
+<div align="center">
 
-图1：VAE 的架构图
+<img src="pic/gan/5.2.jpeg" alt="JS散度在delta函数下的情形" style="width: 65%;">
 
-**GAN 的优势：**
+</div>
 
-*   GAN 不直接计算逐像素的误差，而是通过判别器 D 来学习一个整体的、感知层面的损失函数。
-*   判别器 D 作为一个可学习的"裁判"，能够捕捉到数据分布中复杂的、全局的结构和模式。只要生成的图像在整体上"看起来真实"，即使某些像素点有偏差，D 也可能给出高分。
-*   因此，GAN 通常能生成更清晰、更逼真的图像。
+<small>**图2** 当 $p_{\text{data}}$ 与 $p_g$ 为 delta 函数时，JS 散度的情形。</small>
 
-![GAN 生成结果对比](pic/dl/gan/1.2.jpeg)
+### 1.2 WGAN 的改进目标
 
-图2：GAN 生成结果对比
+WGAN（Arjovsky et al., 2017）做了以下改进：
 
-**形象比喻：**
+- **用 Wasserstein 距离替代 JS 散度**：Wasserstein-1 距离（Earth-Mover 距离）在分布不重叠时仍可提供有效梯度，且与生成质量更相关。
+- **用 Critic 替代 Discriminator**：不再输出“真/假”概率，而是输出一个实数分数；在 1-Lipschitz 约束下，$\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(G(z))]$ 近似 Wasserstein 距离。
+- **通过权重裁剪（或后续 WGAN-GP 的梯度惩罚）** 近似满足 1-Lipschitz，使训练稳定、损失可解释。
 
-*   **VAE** 像是一个临摹者，老师（重构损失）会逐笔指出他画错了哪里（哪个像素不对），但他可能只学会了模仿局部，而没掌握整体神韵。
-*   **GAN** 像是一个造假者，他有一个专门鉴定真伪的专家（判别器 D）在不断挑战他。造假者必须从整体风格、质感等宏观层面去模仿，才能骗过专家，因此他的作品往往更具"灵魂"。
+<div align="center">
 
-![VAE 和 GAN 的框架对比图](pic/dl/gan/1.4.jpeg)
+<img src="pic/gan/5.3.jpeg" alt="JS散度与支撑集不重叠" style="width: 65%;">
 
-图3：VAE 和 GAN 的框架对比图
+</div>
 
-### 1.3 GAN 的网络设计图
+<small>**图3** JS 散度在支撑集不重叠时恒为常数，导致梯度消失；Wasserstein 距离仍随分布变化而变化，可提供有效梯度。</small>
 
-GAN 的训练过程包含两个关键步骤：
+## 2. WGAN 的理论基础
 
-**生成部分：**
+Wasserstein 距离（Wasserstein Distance），又称**推土机距离**（Earth Mover’s Distance, EMD），是一种衡量两个概率分布之间差异的度量方式。它在最优传输理论（Optimal Transport Theory）中具有核心地位，近年来因其在生成模型（如 WGAN）中的优异表现而广受关注。
 
-通过先验分布 $z \sim p(z)$ 采样噪声向量，送入生成网络 $G$，生成一个假图片 $x' = G(z)$，然后送入判别网络 $D$，被判别为假（输出接近 0）。
+### 2.0 一个小故事
 
-![GAN 生成部分示意图](pic/dl/gan/1.3.1.jpeg)
+想象你有两堆沙子，形状不同，但总质量相同。你想把其中一堆沙子重新堆成另一堆的形状。Wasserstein 距离就是完成这个任务所需的最小“工作量”——即（每单位沙子移动的距离）×（移动的沙子量）的总和。
+- 如果两堆沙子很接近，只需轻微挪动 → Wasserstein 距离小。
+- 如果两堆沙子相距很远或完全不重叠 → 需要大量搬运 → Wasserstein 距离大。
 
-图4-1：GAN 生成部分示意图
+这比“是否重叠”更精细，因此比 KL 散度、JS 散度更适合处理支撑集不重叠（support disjoint）的分布（这在高维空间中非常常见）。
 
-**对抗部分：**
+<div align="center">
 
-从真实数据集 $x \sim p_{data}(x)$ 采样的真实图片，送入判别网络 $D$，被判别为真（输出接近 1）。
+<img src="pic/gan/5.4.jpeg" alt="Wasserstein距离推土机直观" style="width: 65%;">
 
-![GAN 对抗部分示意图](pic/dl/gan/1.3.2.jpeg)
+<img src="pic/gan/5.5.jpeg" alt="把P分布通过铲子变成Q分布" style="width: 65%;">
 
-图4-2：GAN 对抗部分示意图
+</div>
 
-## 2. GAN 的数学原理与理论结果
+<small>**图4、图5** 把 P 分布通过“铲子”变成 Q 分布所需要的步骤。</small>
 
-这里先给出论文（Goodfellow et al., 2014）中 GAN 的经典目标函数：
+### 2.1 Wasserstein-1 距离
 
-$$\min_G \max_D L(D, G) = \mathbb{E}_{x \sim p_{data}}[\log D(x)] + \mathbb{E}_{z \sim p_z}[\log(1 - D(G(z)))] \tag{1}$$
+**定义**：对两个概率分布 $p_{\text{data}}$ 与 $p_g$，Wasserstein-1 距离（Kantorovich-Rubinstein 形式）为：
 
-这个公式完美体现了 min-max 博弈：
-*   $\max_D$：判别器 D 希望最大化这个值。它希望对真实数据 $x$ 输出接近 1（$\log D(x)$ 趋近于 0），对生成数据 $G(z)$ 输出接近 0（$\log(1-D(G(z)))$ 也趋近于 0）。
-*   $\min_G$：生成器 G 希望最小化这个值。由于第二项是负的，所以 G 实际上是在最大化 $\mathbb{E}[\log D(G(z))]$，即努力让 D 认为它的假样本是真实的。
+$$W_1(p_{\text{data}}, p_g) = \inf_{\gamma \in \Pi(p_{\text{data}}, p_g)} \mathbb{E}_{(x,y)\sim\gamma}[\|x - y\|] \tag{3}$$
 
-![GAN 的 Loss 图](pic/dl/gan/1.5.jpeg)
+其中 $\Pi(p_{\text{data}}, p_g)$ 为边际分布为 $p_{\text{data}}$ 与 $p_g$ 的所有联合分布。直观上，$W_1$ 表示把 $p_g$ 的“质量”搬到 $p_{\text{data}}$ 所需的最小平均移动距离。
 
-图5：GAN 的 Loss 图
+<div align="center">
 
-接下来，我们看看在训练过程中这个目标函数是怎么发挥作用的。
+<img src="pic/gan/5.6.jpeg" alt="1-D离散与连续Wasserstein-1距离" style="width: 65%;">
 
-### 2.1 D-step
+</div>
 
-在这个过程中，我们冻结生成网络 $G$，优化对抗网络 $D$，于是公式(1)就变成了
+<small>**图6** 1-D 情况下离散与连续的 Wasserstein-1 距离计算公式。</small>
 
-$$\begin{aligned}
-\max_D L(D) &= \mathbb{E}_{x \sim p_{data}}[\log D(x)] + \mathbb{E}_{z \sim p_z}[\log(1 - D(G(z)))] \\
-&= \mathbb{E}_{x \sim p_{data}}[\log D(x)] + \mathbb{E}_{x \sim p_g}[\log(1 - D(x))]
-\end{aligned} \tag{2}$$
+**对偶形式（Kantorovich-Rubinstein 对偶）**：
 
-即：此时目标函数（对抗网络）为一个分类器，于是可以使用 BCE（Binary Cross Entropy）来描述。
+$$W_1(p_{\text{data}}, p_g) = \sup_{\|f\|_L \leq 1} \left\{ \mathbb{E}_{x \sim p_{\text{data}}}[f(x)] - \mathbb{E}_{x \sim p_g}[f(x)] \right\} \tag{6}$$
 
-![冻结生成网络 G 的 Loss](pic/dl/gan/1.6.jpeg)
+其中 $\|f\|_L \leq 1$ 表示 $f$ 为 **1-Lipschitz**（即 $|f(x)-f(y)| \leq \|x-y\|$）。因此，若我们用神经网络 $f_w$ 近似满足 1-Lipschitz 的 $f$，则：
 
-图6：冻结生成网络 G 的 Loss 图
+$$\max_{w:\, f_w \text{ 1-Lipschitz}} \left\{ \mathbb{E}_{x \sim p_{\text{data}}}[f_w(x)] - \mathbb{E}_{z \sim p_z}[f_w(G(z))] \right\} \tag{7}$$
 
-### 2.2 G-step
+在最优时等于 $W_1(p_{\text{data}}, p_g)$。WGAN 即用该式训练 **Critic** $f_w$，并同时最小化 $W_1$ 来训练生成器 $G$。
 
-在这个过程中，我们冻结对抗网络 $D$，优化生成网络 $G$，于是公式(1)就变成了
+<div align="center">
 
-$$\min_G L(G) = \mathbb{E}_{z \sim p_z}[\log(1 - D(G(z)))] \tag{3}$$
+<img src="pic/gan/5.7.jpeg" alt="使用神经网络近似1-Lipschitz" style="width: 65%;">
 
-即：此时目标函数（生成网络）的目标是生成假图片，让对抗网络 $D$ 误以为真，于是可以使用最大似然估计来描述。
+</div>
 
-![冻结对抗网络 D 的 Loss](pic/dl/gan/1.7.jpeg)
+<small>**图7** 使用神经网络 $f_w$ 近似满足 1-Lipschitz 的 $f$。</small>
 
-图7：冻结对抗网络 D 的 Loss 图
+### 2.2 Critic 与 1-Lipschitz 约束
 
-## 3. GAN的详细推导
+- **Discriminator（GAN）**：输出 $D(x) \in [0,1]$，表示“样本为真”的概率，用 sigmoid；目标为二分类交叉熵。
+- **Critic（WGAN）**：输出 $f(x) \in \mathbb{R}$，无界标量；在 1-Lipschitz 约束下，$\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(x_{\text{fake}})]$ 近似 $W_1$。
 
-给定真实数据分布 $p_{\text{data}}(x)$，我们希望训练一个生成器 $G$，使其诱导的分布 $p_g(x)$ 尽可能接近 $p_{\text{data}}(x)$。
+WGAN 论文通过 **权重裁剪** 近似 1-Lipschitz：将 Critic 的权重限制在 $[-w, w]$（如 $w=0.01$）。这样 $f$ 的 Lipschitz 常数被界住，虽非严格为 1，但实践上能稳定训练。
 
-GAN 通过引入一个判别器 $D$，将这个问题转化为一个极小极大博弈（minimax game）：
+**WGAN-GP（Gradient Penalty）**：Gulrajani et al. (2017) 用 **梯度惩罚** 替代权重裁剪，直接约束 Critic 在样本处的梯度范数接近 1。惩罚项为：
 
-$$\min_G \max_D L(D, G)$$
+$$\mathcal{L}_{GP} = \lambda \, \mathbb{E}_{\hat{x}}\left[ \left( \|\nabla_{\hat{x}} f(\hat{x})\|_2 - 1 \right)^2 \right] \tag{8}$$
 
-通过详细的推导，我们可以得到三个有用的结论。
+其中 $\hat{x} = \varepsilon x_{\text{real}} + (1-\varepsilon) x_{\text{fake}}$，$\varepsilon \sim U(0,1)$，即真实样本与生成样本的**随机凸插值**。Critic 总损失为：
 
-### 3.1 构建二分类问题 → 推导损失函数
+$$L_c = -\big(\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(x_{\text{fake}})]\big) + \mathcal{L}_{GP} \tag{9}$$
 
-设定
+这样无需裁剪权重，Critic 表达能力更强，且 1-Lipschitz 约束更贴近理论；$\lambda$ 常用 10。本项目实现采用 **WGAN-GP**。
 
-- **真实样本**：$x \sim p_{\text{data}}(x)$，标签为 1
-- **生成样本**：$x = G(z), z \sim p_z(z)$，其分布记为 $p_g(x)$，标签为 0
-- **判别器**：$D(x) \in [0,1]$ 输出"$x$ 是真实样本"的概率
+<div align="center">
 
-使用最大似然估计（MLE）
+<img src="pic/gan/5.8.jpeg" alt="权重裁剪示意" style="width: 65%;">
 
-我们希望 $D(x)$ 能正确区分真假样本。对数似然为：
+</div>
 
-$$\mathcal{L}(D) = \mathbb{E}_{x \sim p_{\text{data}}}[log D(x)] + \mathbb{E}_{x \sim p_g}[log (1 - D(x))]$$
+<small>**图8** 权重裁剪示意：Critic 权重限制在 $[-w, w]$（如 $w=0.01$）。WGAN-GP 则用梯度惩罚替代裁剪。</small>
 
-这正是标准的二分类交叉熵损失的负值（因为 MLE 要最大化似然）。
+### 2.3 目标函数小结
 
-因此，**判别器的目标是最大化该式**。
+| 角色   | 目标（WGAN） |
+|--------|----------------|
+| **Critic** | 最大化 $\mathbb{E}_{x \sim p_{\text{data}}}[f(x)] - \mathbb{E}_{z \sim p_z}[f(G(z))]$，即估计 $W_1$ |
+| **Generator** | 最小化 $W_1$，即最大化 $\mathbb{E}_{z \sim p_z}[f(G(z))]$（让生成样本在 Critic 下得高分） |
 
-而生成器希望让判别器犯错，即让 $D(G(z))$ 接近 1，等价于最小化 $\mathbb{E}_z[log(1 - D(G(z)))]$。
+因此训练时：
+- **Critic**：最小化 $L_c = -\big(\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(G(z))]\big)$；
+- **Generator**：最小化 $L_g = -\mathbb{E}[f(G(z))]$。
 
-于是，整个博弈的目标函数为：
 
-$$
-\min_G \max_D L(D, G) = \mathbb{E}_{x \sim p_{\text{data}}}[log D(x)] + \mathbb{E}_{z \sim p_z}[log (1 - D(G(z)))]
-$$
+## 3. WGAN 与 GAN 的对比
 
-这就是 GAN 的原始损失函数（minimax 形式）。
+<div align="center">
 
+<img src="pic/gan/5.9.jpeg" alt="WGAN与GAN对比" style="width: 65%;">
 
-### 3.2 求最优判别器 $D^*(x)$（固定 $G$）
+<img src="pic/gan/5.10.jpeg" alt="WGAN与GAN对比" style="width: 65%;">
 
-我们现在固定生成器 $G$（即固定 $p_g$），求使 $L(D, G)$ 最大的判别器 $D^*$。
+</div>
 
-将期望写成积分形式：
+<small>**图9、图10** WGAN 与原始 GAN 的对比。</small>
 
-$$L(D, G) = \int_x p_{\text{data}}(x) log D(x) \, dx + \int_x p_g(x) log (1 - D(x)) \, dx$$
+主要差异可概括为三点：
 
-由于积分是对每个 $x$ 独立的，我们可以对每个 $x$ 单独最大化被积函数：
+1. **约束**：WGAN 增加了权重裁剪（或梯度惩罚）约束，使 Critic 满足 1-Lipschitz，保证梯度有效。
+2. **损失形式**：WGAN 在 Loss 中移除了 Log，直接优化 Wasserstein 距离的近似，梯度更平滑。
+3. **角色定位**：原始 GAN 的 Discriminator 像是一位**鉴伪专家**（Forgery Expert），只能做“真/假”二分类；WGAN 的 Critic 则更像**艺术评论家**（Art Critic）——不只说“好/坏”，而是给出连续的质量评分；其评分差异（真实样本得分高、生成样本得分低）直接构成优化目标，生成器通过拉高自己的分数来学习，Critic 的梯度则告诉它“往哪个方向改能更像真品”。
 
-$$f(D) = p_{\text{data}}(x) log D + p_g(x) log (1 - D)$$
+| 特性           | GAN                          | WGAN                                |
+|----------------|------------------------------|-------------------------------------|
+| 度量           | JS 散度                      | Wasserstein-1 距离                  |
+| 判别端         | Discriminator，输出概率 $[0,1]$ | Critic，输出标量 $\mathbb{R}$       |
+| 最后一层       | Sigmoid                      | 无激活（线性）                      |
+| 约束           | 无                           | 1-Lipschitz（权重裁剪或梯度惩罚）   |
+| 损失含义       | 二分类交叉熵                 | $W_1$ 的近似，可解释为“距离”        |
+| 梯度性质       | 支撑不重叠时易梯度消失       | 仍可提供有效梯度                   |
+| 训练稳定性     | 对超参敏感，易模式崩塌       | 相对更稳定，损失可作监控            |
+| 典型优化器     | Adam                         | RMSprop（论文推荐）                 |
 
-对 $D$ 求导（注意 $D = D(x)$ 是标量）：
 
-$$\frac{df}{dD} = \frac{p_{\text{data}}(x)}{D} - \frac{p_g(x)}{1 - D}$$
+## 4. 训练流程与实现要点
 
-令导数为 0：
+### 4.1 算法步骤
 
-$$\frac{p_{\text{data}}(x)}{D} = \frac{p_g(x)}{1 - D}$$
-$$\Rightarrow p_{\text{data}}(x)(1 - D) = p_g(x) D$$
-$$\Rightarrow p_{\text{data}}(x) = D \left( p_{\text{data}}(x) + p_g(x) \right)$$
+**WGAN（权重裁剪）**：
 
-解得：
+1. **Critic 更新**（每步 $n_{\text{critic}}$ 次）：计算 $L_c = -\big(\mathbb{E}[f(x)] - \mathbb{E}[f(\tilde{x})]\big)$，更新后对 Critic 所有权重做 $\theta \leftarrow \text{clip}(\theta, -w, w)$。
+2. **Generator 更新**（每步 1 次）：最小化 $L_g = -\mathbb{E}[f(G(z))]$。
 
-$$
-D^*(x) = \frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_g(x)}
- \tag{4}$$
+**WGAN-GP（梯度惩罚，本项目采用）**：
 
-> **✅ 结论1**：对于任意给定的生成网络 $G$，其最优的对抗网络 $D$ 为公式(4)。
+1. **Critic 更新**（每 batch 1 次）：计算 Wasserstein 项 $-\big(\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(x_{\text{fake}})]\big)$，再在真实与生成样本的**随机插值** $\hat{x}$ 上计算梯度惩罚 $\mathcal{L}_{GP} = \lambda \mathbb{E}[(\|\nabla_{\hat{x}} f(\hat{x})\|_2 - 1)^2]$，总损失 $L_c = L_{W} + \mathcal{L}_{GP}$，反向传播更新 Critic（**无权重裁剪**）。
+2. **Generator 更新**：每 $n_{\text{critic}}$ 个 batch 训练 1 次，最小化 $L_g = -\mathbb{E}[f(G(z))]$。
 
-![最优判别器示意图](pic/dl/gan/1.8.jpeg)
+### 4.2 实现细节
 
-图8：最优判别器示意图
+- **最后一层无 sigmoid**：Critic 输出层为线性，输出任意实数。
+- **WGAN（权重裁剪）**：$w$ 常取 $0.01$；优化器多用 RMSprop，学习率约 $5\times 10^{-5}$。
+- **WGAN-GP（梯度惩罚）**：
+  - **惩罚项**：在 $\hat{x} = \varepsilon x_{\text{real}} + (1-\varepsilon) x_{\text{fake}}$（$\varepsilon \sim U(0,1)$）上计算 $\|\nabla_{\hat{x}} f(\hat{x})\|_2$，惩罚 $( \|\nabla_{\hat{x}} f\|_2 - 1 )^2$；$\lambda$ 常用 **10**。
+  - **优化器**：推荐 **Adam**，$\beta_1=0$、$\beta_2=0.9$，学习率常用 $1\times 10^{-4}$；无需权重裁剪。
+- **不要对 Critic 使用 BatchNorm**：会改变每层输入分布，不利于 1-Lipschitz；可用 LayerNorm 或不用归一化。
 
+### 4.3 损失与指标
 
-### 3.3 将 $D^*$ 代入 $L(D, G)$，得到散度形式
+- **Critic 损失** $L_c$：在训练良好时，$-L_c$（即 $\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(G(z))]$）可视为 $W_1$ 的估计，**可作为训练进度与生成质量的参考**（值越大说明分布越接近或 Critic 越强）。
+- 与 GAN 不同：GAN 的判别器输出接近 0.5 表示“无法区分”；WGAN 的 Critic 分数无固定阈值，**分数越高越像真实分布**，且损失曲线更有信息量。
 
-将 $D^*(x)$ 代回目标函数：
 
-$$L(D^*, G) = \mathbb{E}_{p_{\text{data}}} \left[ log \frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_g(x)} \right] + \mathbb{E}_{p_g} \left[ log \frac{p_g(x)}{p_{\text{data}}(x) + p_g(x)} \right]$$
+## 5. 代码实现要点
 
-我们引入中间分布：
+本项目在 `code/dl/gan/wgan/` 下实现了 **WGAN-GP**（梯度惩罚版）：
 
-$$m(x) = \frac{p_{\text{data}}(x) + p_g(x)}{2}$$
+- **`wgan.py`**：`Generator` 与 GAN 相同；`Critic` 与 Discriminator 结构类似，最后一层为 `nn.Linear(..., 1)`，无 sigmoid。
+- **`train_infer.py`**：每个 batch 先更新 Critic 一次（Wasserstein 项 + 梯度惩罚），再按 `n_critic` 每若干 batch 更新 Generator 一次；推理时展示真实/生成样本的 Critic 分数及插值效果。
+- **`config.yaml`**：可配置 `n_critic`、`lambda_gp`（梯度惩罚系数，默认 10）、`optimizer`（WGAN-GP 推荐 `adam`）、学习率等；**无** `weight_clip`。
 
-注意到：
+**梯度惩罚计算**：在真实样本与生成样本的随机插值 $\hat{x}$ 上对 Critic 输出求梯度，惩罚梯度范数偏离 1。
 
-$$\frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_g(x)} = \frac{1}{2} \cdot \frac{p_{\text{data}}(x)}{m(x)}, \quad
-\frac{p_g(x)}{p_{\text{data}}(x) + p_g(x)} = \frac{1}{2} \cdot \frac{p_g(x)}{m(x)}$$
-
-因此，
-
-$$\begin{aligned}
-L(D^*, G) &= \mathbb{E}_{p_{\text{data}}} \left[ log \left( \frac{1}{2} \cdot \frac{p_{\text{data}}}{m} \right) \right] + \mathbb{E}_{p_g} \left[ log \left( \frac{1}{2} \cdot \frac{p_g}{m} \right) \right] \\
-&= \mathbb{E}_{p_{\text{data}}} \left[ log \frac{p_{\text{data}}}{m} - log 2 \right] + \mathbb{E}_{p_g} \left[ log \frac{p_g}{m} - log 2 \right] \\
-&= \underbrace{\int p_{\text{data}} log \frac{p_{\text{data}}}{m} dx}_{\text{KL}(p_{\text{data}} || m)} + \underbrace{\int p_g log \frac{p_g}{m} dx}_{\text{KL}(p_g || m)} - 2 log 2 \\
-&= 2 \cdot \underbrace{ \left( \frac{1}{2} \text{KL}(p_{\text{data}} || m) + \frac{1}{2} \text{KL}(p_g || m) \right) }_{\text{JS}(p_{\text{data}} || p_g)} - 2 log 2
-\end{aligned}$$
-
-即：
-
-$$L(D^*, G) = 2 \cdot \text{JS}(p_{\text{data}} || p_g) - 2 log 2  \tag{5}$$
-
-> **✅ 结论2**：在最优判别器 $D^*$ 的情况下，GAN 的目标函数为公式(5)，即 GAN 优化目标为 JS 散度。
-
-![JS 散度示意图](pic/dl/gan/1.9.jpeg)
-
-图9：JS 散度示意图
-
-其中 **Jensen-Shannon 散度（JS 散度）** 定义为：
-
-$$\text{JS}(P || Q) = \frac{1}{2} \text{KL}\left(P \,||\, \frac{P+Q}{2}\right) + \frac{1}{2} \text{KL}\left(Q \,||\, \frac{P+Q}{2}\right)$$
-
-**JS 散度的特点：**
-
-*   $D_{JS}$ 是对称的，$D_{KL}$ 不是对称的
-*   $D_{JS}$ 是有边界的 $[0, log 2]$，$D_{KL}$ 没有边界 $[0, +\infty)$
-*   $D_{JS}$ 更加稳定
-
-
-
-### 3.4 求最优生成器 $G^*$
-
-现在我们最小化 $L(D^*, G)$ 关于 $G$（即关于 $p_g$）：
-
-$$\min_G L(D^*, G) = \min_{p_g} \left[ 2 \cdot \text{JS}(p_{\text{data}} || p_g) - 2 log 2 \right]$$
-
-由于 $-2 log 2$ 是常数，等价于：
-
-$$\min_{p_g} \text{JS}(p_{\text{data}} || p_g)$$
-
-而 JS 散度具有以下性质：
-- $\text{JS}(P || Q) \geq 0$
-- $\text{JS}(P || Q) = 0$ 当且仅当 $P = Q$（几乎处处相等）
-
-因此，全局最小值在 $p_g = p_{\text{data}}$ 时取得，此时：
-
-$$D^*(x) = \frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_{\text{data}}(x)} = \frac{1}{2}$$
-
-即：
-
-$$L(D^*, G^*) = 2 \cdot 0 - 2 log 2 = -2 log 2 = -log 4 \tag{6}$$
-
-> **✅ 结论3**：全局最优解在 $p_g = p_{\text{data}}$ 时得到，结果为公式(6)。
-
-![GAN 最优条件总结](pic/dl/gan/1.11.jpeg)
-
-图10：GAN 最优条件总结
-
-## 七、重要说明
-
-### 1. JS 散度的局限性
-
-当 $p_{\text{data}}$ 和 $p_g$ 支撑集不重叠（如高维空间中两个低维流形），JS 散度恒为 $log 2$，梯度为 0 → **梯度消失问题**。这也是 GAN 训练困难的原因之一。
-
-![JS 散度局限性](pic/dl/gan/1.9.jpeg)
-
-### 2. 为什么不用 KL 散度？
-
-- $\text{KL}(p_g || p_{\text{data}})$：鼓励生成器覆盖所有模式（但可能模糊）
-- $\text{KL}(p_{\text{data}} || p_g)$：惩罚遗漏模式（但可能导致模式崩塌）
-- JS 是对称的，但在无重叠时失效 → 后续有 WGAN（用 Wasserstein 距离）等改进。
-
-![KL 散度问题](pic/dl/gan/1.10.jpeg)
-
-### 3. 实际训练中的损失函数
-
-通常使用 **非饱和损失（non-saturating loss）**：
-
-$$\min_G -\mathbb{E}_z[log D(G(z))]$$
-
-而不是 minimax 中的 $\min_G \mathbb{E}_z[log(1 - D(G(z)))]$，因为后者在初期梯度太小。
-
-![饱和 vs 非饱和损失](pic/dl/gan/1.11.jpeg)
-
-### 4. 训练过程可视化
-
-![训练过程](pic/dl/gan/1.12.jpeg)
-![判别器输出变化](pic/dl/gan/1.13.jpeg)
-
-## 八、实际训练中的两个 Loss
-
-在代码实现中，通常分别定义两个 loss：
-
-**判别器 Loss：**
 ```python
-loss_D = -torch.mean(torch.log(D(x_real)) + torch.log(1 - D(x_fake)))
-# 或用 BCEWithLogitsLoss: BCE(D(x_real), 1) + BCE(D(x_fake), 0)
+def compute_gradient_penalty(critic, real_samples, fake_samples):
+    alpha = torch.rand(real_samples.size(0), 1).to(device)
+    interpolates = (alpha * real_samples + (1 - alpha) * fake_samples).requires_grad_(True)
+    d_interpolates = critic(interpolates)
+    gradients = autograd.grad(
+        outputs=d_interpolates, inputs=interpolates,
+        grad_outputs=torch.ones_like(d_interpolates), create_graph=True, retain_graph=True, only_inputs=True
+    )[0]
+    gradients = gradients.view(gradients.size(0), -1)
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * lambda_gp
+    return gradient_penalty
 ```
 
-**生成器 Loss（常用非饱和版本）：**
+**Critic 与 Generator 更新（WGAN-GP）**：
+
 ```python
-loss_G = -torch.mean(torch.log(D(x_fake)))   # 非饱和 loss
-# 而不是 torch.mean(torch.log(1 - D(x_fake))) （饱和 loss，梯度差）
+# Critic：Wasserstein 项 + 梯度惩罚（无权重裁剪）
+real_validity = critic(images)
+fake_images = generator(noise).detach()
+fake_validity = critic(fake_images)
+c_loss_w = -torch.mean(real_validity) + torch.mean(fake_validity)
+gradient_penalty = compute_gradient_penalty(critic, images, fake_images)
+c_loss = c_loss_w + gradient_penalty
+c_loss.backward()
+c_optimizer.step()
+
+# Generator：每 n_critic 个 batch 更新一次
+fake_validity = critic(generator(noise))
+g_loss = -torch.mean(fake_validity)
+g_loss.backward()
+g_optimizer.step()
 ```
 
-## 九、GAN Loss 的推导逻辑链
+优化器使用 **Adam**，`betas=(0.0, 0.9)`，与 WGAN-GP 论文一致。
 
-1. 建模为二分类问题 → 判别器最大化对数似然；
-2. 生成器对抗判别器 → 最小化被判别器识破的概率；
-3. 组合成博弈框架 → 得到 min-max 目标函数；
-4. 理论分析 → 该目标等价于最小化 JS 散度；
-5. 实践调整 → 生成器 loss 改为 $-log D(G(z))$ 以缓解梯度消失。
 
-## 📚 参考
+## 6. 试验结果
 
-- Goodfellow et al., *Generative Adversarial Nets*, NeurIPS 2014.
-- Arjovsky & Bottou, *Towards Principled Methods for Training Generative Adversarial Networks*, 2017.
+本节基于 `code/dl/gan/wgan/` 的 WGAN-GP 实现，在 MNIST 上训练后的推理与 Critic 评分结果。
 
-  
+### 6.1 生成器：生成新图像
+
+代码中的 `infer` 部分展示 WGAN-GP 的**生成能力**：
+
+```python
+# 模型推理 - 生成新图像
+if infer:
+    generator.eval()
+    with torch.no_grad():
+        noise = torch.randn(sample_size, noise_dim, device=device)
+        fake_images = generator(noise)
+        fake_images = fake_images.view(sample_size, 1, 28, 28)
+        # 将输出从 [-1, 1] 转换回 [0, 1] 用于显示
+        fake_images = (fake_images + 1) / 2
+        fake_images = torch.clamp(fake_images, 0.0, 1.0)
+```
+
+<div align="center">
+
+<img src="pic/gan/5.11.jpg" alt="WGAN-GP生成图像" style="width: 70%;">
+
+</div>
+
+<small>**图11** WGAN-GP 的生成能力：从随机噪声生成的 MNIST 数字图像及 Critic 分数（分数越高表示 Critic 认为越接近真实分布）。</small>
+
+从生成结果可以观察：
+
+- **生成质量**：在训练充分且 Critic 保持「真实均分 > 生成均分」时，生成器能产出清晰、类 MNIST 的数字图像。
+- **多模态**：生成器可覆盖多种数字形态，减轻模式崩塌。
+
+### 6.2 Critic：评分能力
+
+与 GAN 的判别器不同，WGAN 的 Critic 输出**无界标量**，不做 0/1 二分类。代码中通过真实样本与生成样本的 Critic 分数统计评估训练状态：
+
+```python
+# 真实样本与生成样本的 Critic 分数
+generator.eval()
+critic.eval()
+with torch.no_grad():
+    real_score = critic(real_images).mean().item()
+    fake_images = generator(noise)
+    fake_score = critic(fake_images).mean().item()
+# 统计：真实均分、生成均分、差距（真实 − 生成）
+```
+
+<div align="center">
+
+<img src="pic/gan/5.12.jpg" alt="真实图像与Critic分数" style="width: 70%;">
+
+</div>
+
+<small>**图12** 真实图像的 Critic 分数（同一 batch）。</small>
+
+根据真实样本与生成样本的 Critic 分数统计（例如在同一 batch 上）：
+
+- **真实图像**：平均分数记为 $\bar{f}_{\text{real}}$，本例为 **5.7097**；不同真实样本分数有高有低，取决于在 Critic 学到的分布中的「典型程度」。
+- **生成图像**：平均分数记为 $\bar{f}_{\text{fake}}$，本例为 **4.3750**。
+- **差距**：$\bar{f}_{\text{real}} - \bar{f}_{\text{fake}} = 5.7097 - 4.3750 = 1.3347$。理论期望为 $W_1$ 的近似，应 **> 0**，本例满足，说明 Critic 能有效区分真假、训练状态健康。
+
+从上述统计可得到以下结论：
+
+- **Critic 的评分含义**：
+  - Critic 分数**无固定阈值**（不能像 GAN 的 0.5 那样作真假界限）；**分数越高**表示在该 Critic 下越「像真实分布」。
+  - 应比较**同一模型、同一 batch**下的**真实均分**与**生成均分**，而非单张对比。
+
+- **WGAN 训练状态评估**：
+  - **健康**：$\bar{f}_{\text{real}} > \bar{f}_{\text{fake}}$，且训练过程中差距保持为正，生成质量通常较好。
+  - **异常**：$\bar{f}_{\text{fake}} \geq \bar{f}_{\text{real}}$，说明 Critic 未能有效区分真假，可尝试增大 `n_critic`、`lambda_gp` 或训练轮数。
+  - 若生成视觉质量差但分数不低，多为 Critic 与生成器尚未对齐或训练不足，需继续训练并监控真实/生成均分。
+
+
+## 7. 总结
+
+- **动机**：GAN 的 JS 散度在支撑不重叠时梯度消失，训练不稳定；WGAN 改用 Wasserstein 距离，梯度性质更好。
+- **理论**：Wasserstein-1 的对偶形式给出 $\max_f \{\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(x_{\text{fake}})]\}$，其中 $f$ 为 1-Lipschitz；可用权重裁剪或梯度惩罚近似该约束。
+- **实现**：Critic 无 sigmoid；本项目采用 **WGAN-GP**：在真实/生成样本的随机插值上施加梯度惩罚 $\lambda(\|\nabla_{\hat{x}} f\|_2 - 1)^2$，无需权重裁剪，Critic 表达能力更强；Generator 最小化 $-\mathbb{E}[f(G(z))]$；优化器推荐 Adam $(0, 0.9)$。
+
+---
+
+## 参考文献
+
+1. Arjovsky, M., Chintala, S., & Bottou, L. (2017). Wasserstein generative adversarial networks. *International Conference on Machine Learning* (pp. 214–223).
+
+2. Gulrajani, I., Ahmed, F., Arjovsky, M., Dumoulin, V., & Courville, A. (2017). Improved training of Wasserstein GANs. *Advances in Neural Information Processing Systems*, 30.
+
+3. Arjovsky, M., & Bottou, L. (2017). Towards principled methods for training generative adversarial networks. *International Conference on Learning Representations*.
+
+4. Goodfellow, I., Pouget-Abadie, J., Mirza, M., Xu, B., Warde-Farley, D., Ozair, S., ... & Bengio, Y. (2014). Generative adversarial nets. *Advances in Neural Information Processing Systems*, 27.
+
+5. Kaiming He, Deep Generative Models.

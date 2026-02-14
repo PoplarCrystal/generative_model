@@ -1,0 +1,34 @@
+# 模型参数
+model:
+  img_size: 28  # 图像尺寸（MNIST 是 28x28）
+  in_channel: 1  # 输入通道数（MNIST 是灰度图）
+  noise_dim: 100  # 噪声向量维度
+  hidden_dim: 256  # 隐藏层维度
+
+# 训练参数
+training:
+  epochs: 50              # 增加轮数，WGAN 收敛较慢
+  learning_rate: 0.0001    # 1e-4，略高于论文 5e-5，加快收敛且更稳
+  batch_size: 64
+  n_critic: 5  # 每次训练生成器前训练 Critic 的次数（WGAN 建议 5）
+  lambda_gp: 10  # 梯度惩罚系数 (WGAN-GP)
+  optimizer: 'adam'  # WGAN-GP 推荐使用 Adam (beta1=0, beta2=0.9)
+
+# 执行控制标志
+flags:
+  train: false   # 是否训练模型
+  infer: true    # 是否执行推理：生成新图像
+
+# 模型文件
+model_file:
+  generator_name: ''   # 为空时自动生成 'generator_model.pth'
+  critic_name: ''      # 为空时自动生成 'critic_model.pth'
+
+# 数据参数
+data:
+  data_dir: '../../../data'  # 相对于代码文件的路径
+
+# 可视化参数
+visualization:
+  sample_size: 16
+  nrow: 4
