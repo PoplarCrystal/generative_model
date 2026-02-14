@@ -1,0 +1,33 @@
+# 模型参数（CAR-RNN）
+model:
+  input_dim: 1
+  hidden_dim: 256
+  num_layers: 2
+  dropout: 0.2
+  num_labels: 10  # MNIST 0-9
+  label_embed_dim: 5  # 与 hidden_dim 一致，可单独配置
+  seq_len: 784
+
+# 训练参数
+training:
+  epochs: 20
+  learning_rate: 0.001
+  batch_size: 128
+
+# 执行控制标志
+flags:
+  train: false
+  infer: true
+
+# 模型文件
+model_file:
+  model_name: 'car_rnn_model.pth'
+
+# 数据参数
+data:
+  data_dir: '../../../data'
+
+# 可视化参数
+visualization:
+  sample_size: 16
+  nrow: 4
