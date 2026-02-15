@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>深度学习AE篇04. CVAE: 从"无条件生成"到"条件生成"（理论篇）</title>
+  <title>AE系列篇04. CVAE: 从"无条件生成"到"条件生成"（理论篇）</title>
   <style>
     code{white-space: pre-wrap;}
     span.smallcaps{font-variant: small-caps;}
@@ -144,7 +144,7 @@
         </style>
 </head>
 <body>
-<h1 id="深度学习ae篇04.-cvae-从无条件生成到条件生成理论篇">深度学习AE篇04. CVAE: 从“无条件生成”到“条件生成”（理论篇）</h1>
+<h1 id="ae系列篇04.-cvae-从无条件生成到条件生成理论篇">AE系列篇04. CVAE: 从“无条件生成”到“条件生成”（理论篇）</h1>
 <h2 id="vae的问题与cvae的引入">1. VAE的问题与CVAE的引入</h2>
 <h3 id="vae的局限性">1.1 VAE的局限性</h3>
 <p>变分自编码器（VAE）是一种强大的生成模型，它通过学习数据的潜在表示（latent representation）来生成新样本。VAE通过正则化潜在空间，使得整个潜在空间都具有生成能力，可以从标准正态分布 <span class="math inline">\(\mathcal{N}(0, I)\)</span> 中采样潜在变量 <span class="math inline">\(z\)</span>，然后通过解码器生成新的数据样本。</p>
