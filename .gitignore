@@ -12,7 +12,6 @@ __pycache__/
 *.pt
 
 # 数据文件
-data/
 *.txt
 *.csv
 *.npy
@@ -21,6 +20,8 @@ data/
 # 允许提交 code/data 目录
 !code/data/
 !code/data/**
+# 允许提交 code 目录下的 txt 文件
+!code/**/*.txt
 
 # Jupyter Notebook
 .ipynb_checkpoints
