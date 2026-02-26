@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>机器学习篇-02.最大似然估计</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="机器学习篇-02.最大似然估计">机器学习篇-02.最大似然估计</h1>
+<h2 id="基于最大似然估计的生成模型">1. 基于最大似然估计的生成模型</h2>
+<h3 id="最大似然估计的基本原理">1.1 最大似然估计的基本原理</h3>
+<h4 id="似然函数">1.1.1 似然函数</h4>
+<p>假设有一个概率分布，其形状由参数 <span class="math inline">\(\theta\)</span> 决定。当参数为 <span class="math inline">\(\theta\)</span> 时，获得数据 <span class="math inline">\(x\)</span> 的概率密度为 <span class="math inline">\(p(x; \theta)\)</span>。</p>
+<p>对于正态分布，可以将参数视为 <span class="math inline">\(\theta = \{\mu, \sigma\}\)</span>。</p>
+<p><strong>样本的概率密度</strong></p>
+<p>假设我们有一个样本 <span class="math inline">\(\mathcal{D} = \{x_1, x_2, \ldots, x_N\}\)</span>，并且每个数据都是基于概率分布 <span class="math inline">\(p(x; \theta)\)</span> 独立生成的。此时，获得样本 <span class="math inline">\(\mathcal{D}\)</span> 的概率密度的数学式如下所示:</p>
+<p><span class="math display">\[p(\mathcal{D}; \theta) = p(x_1; \theta) \cdot p(x_2; \theta) \cdot \ldots \cdot p(x_N; \theta) = \prod_{i=1}^{N} p(x_i; \theta)\]</span></p>
+<p>由于假定每个数据是独立生成的，因此获得 <span class="math inline">\(N\)</span> 个数据的概率密度等于每个数据的概率密度的乘积。<span class="math inline">\(p(\mathcal{D}; \theta)\)</span> 表示当参数为 <span class="math inline">\(\theta\)</span> 时获得样本 <span class="math inline">\(\mathcal{D}\)</span> 的概率密度。</p>
+<p><strong>似然函数</strong></p>
+<p>这个 <span class="math inline">\(p(\mathcal{D}; \theta)\)</span> 也可以被看作以 <span class="math inline">\(\theta\)</span> 为参数的函数，其定义式如下所示:</p>
+<p><span class="math display">\[L(\theta) = p(\mathcal{D}; \theta)\]</span></p>
+<p>式子中的 <span class="math inline">\(L(\theta)\)</span> 称为<strong>似然（likelihood）</strong>或<strong>似然函数（likelihood function）</strong>。似然是以参数 <span class="math inline">\(\theta\)</span> 为参数的函数，表示在给定参数 <span class="math inline">\(\theta\)</span> 的情况下，样本 <span class="math inline">\(\mathcal{D}\)</span> 出现的概率密度。</p>
+<h4 id="最大似然估计">1.1.2 最大似然估计</h4>
+<p><strong>最大似然估计</strong>是一种找到使似然 <span class="math inline">\(p(\mathcal{D}; \theta)\)</span> 最大的参数 <span class="math inline">\(\theta\)</span> 的技术。如果使似然最大的参数是 <span class="math inline">\(\hat{\theta}\)</span>，那么当参数为 <span class="math inline">\(\hat{\theta}\)</span> 时，观测到样本的概率最大。也就是说，当参数为 <span class="math inline">\(\hat{\theta}\)</span> 时，模型最拟合样本。</p>
+<p><strong>对数似然</strong></p>
+<p>实际上，最大似然估计进行的是<strong>对数似然 <span class="math inline">\(\log p(\mathcal{D}; \theta)\)</span></strong> 的最大化，而不是直接最大化似然。这是因为:</p>
+<ol type="1">
+<li>取对数在计算上更方便</li>
+<li>对数函数是单调递增函数，因此使 <span class="math inline">\(p(\mathcal{D}; \theta)\)</span> 最大的 <span class="math inline">\(\theta\)</span> 值和使 <span class="math inline">\(\log p(\mathcal{D}; \theta)\)</span> 最大的 <span class="math inline">\(\theta\)</span> 值是相等的</li>
+<li>积的对数等于对数的和，简化计算</li>
+</ol>
+<p><span class="math display">\[\log(ab) = \log a + \log b\]</span></p>
+<p>因此:</p>
+<p><span class="math display">\[\log p(\mathcal{D}; \theta) = \log \left[\prod_{i=1}^{N} p(x_i; \theta)\right] = \sum_{i=1}^{N} \log p(x_i; \theta)\]</span></p>
+<h4 id="利用导数求最大值">1.1.3 利用导数求最大值</h4>
+<p>在求最大值时，导数非常重要。对于某些函数，最大值不一定在导数为 0 的地方。但对于 <span class="math inline">\(y = ax^2 + bx + c\)</span> 这样的二次函数，如果二次项系数为负值（<span class="math inline">\(a &lt; 0\)</span>），那么最大值就在导数为 0 的地方。</p>
+<p>因此，通过求解导数为 0 的方程可以求出取最大值的位置。这种方法称为“解析解”或“闭式（closed-form）求解”。</p>
+<h3 id="正态分布的最大似然估计">1.2 正态分布的最大似然估计</h3>
+<h4 id="正态分布的概率密度函数">1.2.1 正态分布的概率密度函数</h4>
+<p>正态分布的概率密度函数为:</p>
+<p><span class="math display">\[p(x; \mu, \sigma) = \frac{1}{\sqrt{2\pi} \cdot \sigma} \exp\left(-\frac{(x - \mu)^2}{2\sigma^2}\right)\]</span></p>
+<p>其中: - <span class="math inline">\(\mu\)</span> 是均值（mean） - <span class="math inline">\(\sigma\)</span> 是标准差（standard deviation）</p>
+<h4 id="正态分布的最大似然估计推导">1.2.2 正态分布的最大似然估计推导</h4>
+<p>对于 <span class="math inline">\(N\)</span> 个观测数据 <span class="math inline">\(\{x_1, x_2, \ldots, x_N\}\)</span>，对数似然函数为:</p>
+<p><span class="math display">\[\begin{aligned}
+\log p(\mathcal{D}; \mu, \sigma) &amp;= \sum_{i=1}^{N} \log p(x_i; \mu, \sigma) \\
+&amp;= \sum_{i=1}^{N} \log \left[\frac{1}{\sqrt{2\pi} \cdot \sigma} \exp\left(-\frac{(x_i - \mu)^2}{2\sigma^2}\right)\right] \\
+&amp;= -N \log(\sqrt{2\pi}) - N \log \sigma - \frac{1}{2\sigma^2} \sum_{i=1}^{N} (x_i - \mu)^2
+\end{aligned}\]</span></p>
+<p><strong>对 <span class="math inline">\(\mu\)</span> 求导并令其等于 0</strong>:</p>
+<p><span class="math display">\[\frac{\partial}{\partial \mu} \left[\log p(\mathcal{D}; \mu, \sigma)\right] = \frac{1}{\sigma^2} \sum_{i=1}^{N} (x_i - \mu) = 0\]</span></p>
+<p>解得:</p>
+<p><span class="math display">\[\hat{\mu} = \frac{1}{N} \sum_{i=1}^{N} x_i\]</span></p>
+<p><strong>对 <span class="math inline">\(\sigma\)</span> 求导并令其等于 0</strong>:</p>
+<p><span class="math display">\[\frac{\partial}{\partial \sigma} \left[\log p(\mathcal{D}; \mu, \sigma)\right] = -\frac{N}{\sigma} + \frac{1}{\sigma^3} \sum_{i=1}^{N} (x_i - \mu)^2 = 0\]</span></p>
+<p>解得:</p>
+<p><span class="math display">\[\hat{\sigma}^2 = \frac{1}{N} \sum_{i=1}^{N} (x_i - \hat{\mu})^2\]</span></p>
+<p><span class="math display">\[\hat{\sigma} = \sqrt{\frac{1}{N} \sum_{i=1}^{N} (x_i - \hat{\mu})^2}\]</span></p>
+<h4 id="结论">1.2.3 结论</h4>
+<p>对于正态分布，通过最大似然估计可以得到:</p>
+<ul>
+<li><p><strong>均值的最大似然估计</strong>:样本均值</p>
+<p><span class="math display">\[\hat{\mu} = \frac{1}{N} \sum_{i=1}^{N} x_i\]</span></p></li>
+<li><p><strong>标准差的最大似然估计</strong>:样本标准差</p>
+<p><span class="math display">\[\hat{\sigma} = \sqrt{\frac{1}{N} \sum_{i=1}^{N} (x_i - \hat{\mu})^2}\]</span></p></li>
+</ul>
+<p>这意味着，正态分布的最大似然估计就是样本的均值和标准差。这是一个非常直观的结果！</p>
+<hr />
+<h2 id="实践使用真实数据实现生成模型">2. 实践:使用真实数据实现生成模型</h2>
+<h3 id="读取身高数据集">2.1 读取身高数据集</h3>
+<p>本节将使用真实的观测数据来实现生成模型。所使用的数据集是 SOCR Data。该数据集包含了 1993 年中国香港 18 岁青少年的身高数据，共计 25,000 条记录。不过，这些数据本身是基于实际调查结果虚构的。</p>
+<p>为了方便使用，我们对这个身高数据集进行了整理，并将整理后的文件放在了code/ml/02文件夹下，文件名为 <code>height.txt</code>。</p>
+<p><strong>读取数据的代码示例</strong>:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="im">import</span> os</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>path <span class="op">=</span> os.path.join(os.path.dirname(<span class="va">__file__</span>), <span class="st">&#39;height.txt&#39;</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>xs <span class="op">=</span> np.loadtxt(path)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a><span class="bu">print</span>(xs.shape)  <span class="co"># (25000,)</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>plt.hist(xs, bins<span class="op">=</span><span class="st">&#39;auto&#39;</span>, density<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>plt.xlabel(<span class="st">&#39;Height [cm]&#39;</span>)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>plt.ylabel(<span class="st">&#39;Probability Density&#39;</span>)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a>plt.show()</span></code></pre></div>
+<p>通过读取得到的 <code>xs</code> 是包含 25,000 个元素的一维数组。如图1所示，观察直方图，我们发现它呈正态分布的形状。我们将身高的概率分布视为正态分布进行建模。</p>
+<p><img src="pic/ml/2-1.jpg" alt="图 2-1:身高数据集的直方图" style="width: 65%;"></p>
+<p><small><strong>图1</strong> 身高数据集的直方图</small></p>
+<h3 id="基于正态分布的参数估计">2.2 基于正态分布的参数估计</h3>
+<p>接下来我们实现基于正态分布的生成模型。我们需要执行以下任务:</p>
+<ol type="1">
+<li><strong>建模</strong>:假定身高数据呈正态分布。</li>
+<li><strong>参数估计</strong>:根据样本估计正态分布的参数。</li>
+</ol>
+<p>我们通过这两个任务来创建生成模型。我们已经完成了第一个任务——建模。接下来是第二个任务——参数估计。</p>
+<p><strong>计算样本的均值和标准差</strong>:</p>
+<p>根据最大似然估计的理论，我们只需要计算样本的均值和标准差:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a>mu <span class="op">=</span> np.mean(xs)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>sigma <span class="op">=</span> np.std(xs)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a><span class="bu">print</span>(mu)    <span class="co"># 172.78250853667997</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a><span class="bu">print</span>(sigma) <span class="co"># 4.830167473396299</span></span></code></pre></div>
+<p>样本数据的均值可以通过 <code>np.mean()</code> 求得，标准差可以通过 <code>np.std()</code> 求得。上面的运行结果显示均值为 172.7…，标准差为 4.8…。这个均值和标准差是最拟合样本的参数。</p>
+<p><strong>可视化结果</strong>:</p>
+<p>下面我们在之前的直方图上再画一张正态分布的图形:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="kw">def</span> normal(x, mu<span class="op">=</span><span class="dv">0</span>, sigma<span class="op">=</span><span class="dv">1</span>):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;正态分布的概率密度函数&quot;&quot;&quot;</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>    y <span class="op">=</span> <span class="dv">1</span> <span class="op">/</span> (np.sqrt(<span class="dv">2</span> <span class="op">*</span> np.pi) <span class="op">*</span> sigma) <span class="op">*</span> np.exp(<span class="op">-</span>(x <span class="op">-</span> mu)<span class="op">**</span><span class="dv">2</span> <span class="op">/</span> (<span class="dv">2</span> <span class="op">*</span> sigma<span class="op">**</span><span class="dv">2</span>))</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a>    <span class="cf">return</span> y</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a>x <span class="op">=</span> np.linspace(<span class="dv">150</span>, <span class="dv">190</span>, <span class="dv">1000</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true"></a>y <span class="op">=</span> normal(x, mu, sigma)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true"></a>plt.hist(xs, bins<span class="op">=</span><span class="st">&#39;auto&#39;</span>, density<span class="op">=</span><span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.7</span>, label<span class="op">=</span><span class="st">&#39;Data&#39;</span>)</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true"></a>plt.plot(x, y, <span class="st">&#39;r-&#39;</span>, linewidth<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">&#39;Fitted Normal Distribution&#39;</span>)</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true"></a>plt.xlabel(<span class="st">&#39;Height [cm]&#39;</span>)</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true"></a>plt.ylabel(<span class="st">&#39;Probability Density&#39;</span>)</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true"></a>plt.legend()</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true"></a>plt.show()</span></code></pre></div>
+<p>从图2中可以看出，直方图与正态分布是相匹配的。</p>
+<p><img src="pic/ml/2-2.jpg" alt="图 2-2:身高数据集的直方图与正态分布" style="width: 65%;"></p>
+<p><small><strong>图2</strong> 身高数据集的直方图与正态分布</small></p>
+<hr />
+<h2 id="生成新数据采样">3. 生成新数据:采样</h2>
+<h3 id="从正态分布中采样">3.1 从正态分布中采样</h3>
+<p>一旦我们估计出了正态分布的参数（<span class="math inline">\(\hat{\mu}\)</span> 和 <span class="math inline">\(\hat{\sigma}\)</span>），就可以使用这些参数来生成新的数据样本。这个过程称为<strong>采样（Sampling）</strong>。</p>
+<p><strong>从正态分布中采样的代码</strong>:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a><span class="co"># 生成新的数据样本</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a>n_samples <span class="op">=</span> <span class="dv">1000</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a>new_samples <span class="op">=</span> np.random.normal(mu, sigma, size<span class="op">=</span>n_samples)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a><span class="co"># 可视化生成的数据</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a>plt.hist(new_samples, bins<span class="op">=</span><span class="st">&#39;auto&#39;</span>, density<span class="op">=</span><span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.7</span>, label<span class="op">=</span><span class="st">&#39;Generated Samples&#39;</span>)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a>plt.plot(x, y, <span class="st">&#39;r-&#39;</span>, linewidth<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">&#39;Fitted Normal Distribution&#39;</span>)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a>plt.xlabel(<span class="st">&#39;Height [cm]&#39;</span>)</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a>plt.ylabel(<span class="st">&#39;Probability Density&#39;</span>)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true"></a>plt.legend()</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true"></a>plt.show()</span></code></pre></div>
+<p>从图3中可以看出，两个分布在大体上是重合的。我们的生成模型能够生成符合观测数据特征的新数据。这些新生成的数据应该具有与原始数据相似的特征，因为它们来自同一个估计的概率分布。</p>
+<p><img src="pic/ml/2-3.jpg" alt="图 2-3:身高数据的直方图（蓝色为真实的数据，橙色为生成的数据）" style="width: 65%;"></p>
+<p><small><strong>图3</strong> 身高数据的直方图（蓝色为真实的数据，橙色为生成的数据）</small></p>
+<h3 id="采样的意义">3.2 采样的意义</h3>
+<p><strong>采样</strong>是生成模型的核心功能之一。通过采样，我们可以:</p>
+<ol type="1">
+<li><strong>生成新数据</strong>:创建与训练数据相似但全新的样本</li>
+<li><strong>数据增强</strong>:为机器学习任务生成额外的训练数据</li>
+<li><strong>探索数据分布</strong>:理解模型学习到的数据分布特征</li>
+<li><strong>模拟和预测</strong>:在给定条件下生成可能的数据</li>
+</ol>
+</body>
+</html>

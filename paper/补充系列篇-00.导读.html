@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>补充系列篇-00.导读</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+  </style>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="补充系列篇-00.导读">补充系列篇-00.导读</h1>
+<p>本篇将 <strong>AE、DM、GAN、AR</strong> 系列篇的内容串联起来，帮助读者建立整体框架，并了解各系列之间的逻辑关系与推荐阅读顺序。行文按 <strong>建模 → 训练 → 采样 → 改进</strong> 这条主线展开，读者可依自身基础按需跳读或顺序阅读。</p>
+<hr />
+<h2 id="生成模型是什么">1. 生成模型是什么？</h2>
+<h3 id="核心概念">1.1 核心概念</h3>
+<p>生成模型是一种<strong>学习并逼近真实数据背后概率分布</strong>的模型。其核心思路是: 从有限样本中估计 $ p_{}(x) $，构建可学习的模型分布 $ p_(x) $，从而能够<strong>采样生成</strong>新的、看似合理的数据（如图像、文本、蛋白质结构等）。</p>
+<p><strong>带概率建模的生成模型</strong>（Generative Models with Probabilistic Modeling）的典型流程:</p>
+<blockquote>
+<p>原始数据 → 真实数据分布 → 估计的数据分布 → 从估计分布中采样生成新数据</p>
+</blockquote>
+<p>各步骤含义如下:</p>
+<table>
+<thead>
+<tr class="header">
+<th>步骤</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>原始数据</strong></td>
+<td>观测到的有限样本（如一批猫的图片）</td>
+</tr>
+<tr class="even">
+<td><strong>→ 真实数据分布</strong></td>
+<td>用这些样本推断背后的真实概率分布 $ p_{}(x) $（我们并不知道它的形式）</td>
+</tr>
+<tr class="odd">
+<td><strong>→ 估计的数据分布</strong></td>
+<td>用模型学出一个近似分布 $ p_(x) $ 去逼近真实分布</td>
+</tr>
+<tr class="even">
+<td><strong>→ 从估计分布中采样生成新数据</strong></td>
+<td>从学到的 $ p_(x) $ 中采样，得到新的、类似真实数据但从未出现过的样本（如新的猫的图片）</td>
+</tr>
+</tbody>
+</table>
+<p>简言之: <strong>观测数据 → 推断分布 → 学习近似分布 → 利用近似分布生成新数据</strong>，这就是概率生成模型的核心逻辑。</p>
+<div data-align="center">
+<p><img src="pic/add/0.1.jpeg" width="65%"></p>
+</div>
+<p><small><strong>图1</strong> 学习过程: 使模型分布逼近数据分布</small></p>
+<div data-align="center">
+<p><img src="pic/add/0.2.jpeg" width="65%"></p>
+</div>
+<p><small><strong>图2</strong> 采样过程: 从学到的分布中生成新样本</small></p>
+<h3 id="完整流程-建模-训练-推理">1.2 完整流程: 建模 → 训练 → 推理</h3>
+<p>一个深度生成模型系统通常包含以下四个阶段:</p>
+<table>
+<thead>
+<tr class="header">
+<th>阶段</th>
+<th>英文</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>建模</strong></td>
+<td>Formulation</td>
+<td>将现实问题转化为 $ p(x y) $；将复杂分布分解为可处理的子问题（如扩散过程、自回归因子分解）</td>
+</tr>
+<tr class="even">
+<td><strong>表示</strong></td>
+<td>Representation</td>
+<td>用深度网络（Transformer、UNet、MLP）参数化映射或条件分布</td>
+</tr>
+<tr class="odd">
+<td><strong>训练</strong></td>
+<td>Objective + Optimization</td>
+<td>定义目标函数（ELBO、对抗损失、去噪得分匹配等）衡量分布差距；用梯度下降优化网络参数</td>
+</tr>
+<tr class="even">
+<td><strong>推理</strong></td>
+<td>Inference</td>
+<td><strong>Sampler</strong>: 从模型中采样生成新样本</td>
+</tr>
+</tbody>
+</table>
+<p>简要展开:</p>
+<ol type="1">
+<li><strong>收集观测数据</strong>: 我们无法直接获知 $ p_{}(x) $，只能通过有限样本（图像、文本、蛋白质结构等）来近似它。</li>
+<li><strong>构建可学习分布</strong>: 用参数化模型（如神经网络）拟合真实分布，最小化 $ p_(x) $ 与 $ p_{}(x) $ 之间的某种“距离”（如 KL 散度、Wasserstein 距离等）。</li>
+<li><strong>生成新样本</strong>: 训练完成后，从 $ p_(x) $ 中采样，生成新的、看似合理的数据。</li>
+</ol>
+<h3 id="深度生成模型-两个层面的学习">1.3 深度生成模型: 两个层面的学习</h3>
+<p><strong>核心思想</strong>: 深度学习 = 表征学习（Representation Learning）</p>
+<table>
+<colgroup>
+<col style="width: 27%" />
+<col style="width: 27%" />
+<col style="width: 45%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>层面</th>
+<th>内容</th>
+<th>典型应用</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>实例表征</strong> (instance-level)</td>
+<td>将原始数据 $ x $ 映射到特征空间（如 CNN 提取图像特征）</td>
+<td>判别任务（分类），最小化预测误差</td>
+</tr>
+<tr class="even">
+<td><strong>分布表征</strong> (distribution-level)</td>
+<td>将简单先验 $ z (0,I) $ 经神经网络变换为复杂数据分布 $ x = G(z) $</td>
+<td>生成任务，最小化 $ p_(x) $ 与 $ p_{}(x) $ 的差异；典型代表: VAE、GAN、Diffusion Models、自回归模型</td>
+</tr>
+</tbody>
+</table>
+<div data-align="center">
+<p><img src="pic/add/0.3.jpeg" width="65%"></p>
+</div>
+<p><small><strong>图3</strong> 深度生成模型的表征学习（实例表征，分布表征）</small></p>
+<h3 id="条件建模-px-y-视角">1.4 条件建模: $ p(x y) $ 视角</h3>
+<p>前述从 $ p_(x) $ 采样得到的生成是<strong>随机的</strong>，我们往往还需要<strong>有条件的生成</strong>——即根据用户意图（如文本提示、类别标签、属性约束等）来控制生成内容。这便引入了条件建模的视角。</p>
+<p>生成模型的本质是建模<strong>条件分布</strong> $ p(x y) $:</p>
+<table>
+<thead>
+<tr class="header">
+<th>变量</th>
+<th>含义</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>y</strong>（条件/意图）</td>
+<td>更抽象、信息量更少的输入</td>
+<td>文本提示（prompt）、约束（如蛋白质对称性）、标签（如“红狐狸”）、属性（如“微笑”“戴眼镜”）</td>
+</tr>
+<tr class="even">
+<td><strong>x</strong>（生成对象）</td>
+<td>更具体、信息量更丰富的输出</td>
+<td>图像、视频、3D 模型、蛋白质序列、传感器读数、实验数据等</td>
+</tr>
+</tbody>
+</table>
+<p><strong>典型应用场景</strong>:</p>
+<table>
+<thead>
+<tr class="header">
+<th>任务</th>
+<th>y（条件）</th>
+<th>x（生成结果）</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>文生图</td>
+<td>“泰迪熊在讲课”</td>
+<td>图像</td>
+</tr>
+<tr class="even">
+<td>蛋白质设计</td>
+<td>对称性约束</td>
+<td>3D 蛋白质结构</td>
+</tr>
+<tr class="odd">
+<td>图像分类（生成视角）</td>
+<td>输入图像</td>
+<td>类别概率 $ p( x) $</td>
+</tr>
+<tr class="even">
+<td>机器人控制</td>
+<td>视觉观测</td>
+<td>动作策略 $ p(a s) $</td>
+</tr>
+<tr class="odd">
+<td>图像描述</td>
+<td>输入图像</td>
+<td>自然语言句子</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="从概率建模开始-两条主线">2. 从概率建模开始: 两条主线</h2>
+<p>首先需要具备<strong>概率论与生成模型的基础</strong>，建议先阅读 <a href="机器学习篇-01.生成模型基础.md">机器学习篇-01.生成模型基础</a>。</p>
+<p>对联合分布 $ p(x) $ 的建模有两条经典路径:</p>
+<table>
+<thead>
+<tr class="header">
+<th>分解方式</th>
+<th>数学形式</th>
+<th>对应模型</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>条件概率分解</strong></td>
+<td>$ p(x) = p(x_1, x_2) = p(x_1),p(x_2 x_1) $</td>
+<td><strong>自回归模型（AR）</strong></td>
+</tr>
+<tr class="even">
+<td><strong>边缘概率分解</strong></td>
+<td>$ p(x) = p(x, z),dz = p(x z),p(z),dz $</td>
+<td><strong>潜变量模型（Latent Variable Model）</strong></td>
+</tr>
+</tbody>
+</table>
+<p>因此，从建模形式上看，生成模型可大致分为: <strong>自回归模型</strong> 与 <strong>潜变量模型</strong>。下面主要沿<strong>潜变量模型</strong>这条线展开；沿<strong>自回归模型</strong>这条线可参阅 <a href="AR系列篇-01.AR理论篇.md">AR系列篇-01.AR理论篇</a>。</p>
+<h3 id="潜变量模型中的两个核心问题">2.1 潜变量模型中的两个核心问题</h3>
+<div data-align="center">
+<p><img src="pic/add/0.4.jpeg" width="65%"></p>
+</div>
+<p><small><strong>图4</strong> 潜变量模型框架与待解决问题</small></p>
+<p>针对这些问题，可采取三种不同的思路，对应 AE/VAE、GAN、DM 三条分支。</p>
+<h3 id="方案一-引入提议分布与-elbo-vae">2.2 方案一: 引入提议分布与 ELBO → VAE</h3>
+<div data-align="center">
+<p><img src="pic/add/0.5.jpeg" width="65%"></p>
+</div>
+<p><small><strong>图5</strong> 从提议分布 q(z) 到 ELBO 与 VAE</small></p>
+<p><strong>建议阅读顺序</strong>:</p>
+<ul>
+<li><a href="机器学习篇-03.潜变量估计.md">机器学习篇-03.潜变量估计</a></li>
+<li><a href="机器学习篇-04.变分推断.md">机器学习篇-04.变分推断</a></li>
+<li><a href="AE系列篇-01.AE.md">AE系列篇-01.AE</a></li>
+<li><a href="AE系列篇-02.VAE理论篇.md">AE系列篇-02.VAE理论篇</a></li>
+</ul>
+<h3 id="方案二-引入判别器-gan">2.3 方案二: 引入判别器 → GAN</h3>
+<div data-align="center">
+<p><img src="pic/add/0.6.jpeg" width="65%"></p>
+</div>
+<p><small><strong>图6</strong> 在生成端引入判别模型得到 GAN</small></p>
+<p><strong>建议阅读</strong>:</p>
+<ul>
+<li><a href="GAN系列篇-01.GAN理论篇.md">GAN系列篇-01.GAN理论篇</a></li>
+<li><a href="补充系列篇-04.生成模型与判别模型.md">补充系列篇-04.生成模型与判别模型</a></li>
+</ul>
+<h3 id="方案三-自回归-潜变量-扩散模型dm">2.4 方案三: 自回归 + 潜变量 → 扩散模型（DM）</h3>
+<div data-align="center">
+<p><img src="pic/add/0.7.jpeg" width="65%"></p>
+</div>
+<p><small><strong>图7</strong> 从条件概率/分层 VAE 到扩散模型</small></p>
+<p><strong>建议阅读</strong>:</p>
+<ul>
+<li><a href="DM系列篇-01.DPM.md">DM系列篇-01.DPM</a></li>
+<li><a href="DM系列篇-02.不同形式的DPM.md">DM系列篇-02.不同形式的DPM</a></li>
+</ul>
+<hr />
+<h2 id="训练-从重构误差到正则化">3. 训练: 从重构误差到正则化</h2>
+<p>VAE、GAN、DDPM 的目标函数可以统一理解为: 在<strong>重构误差</strong>的基础上，施加不同形式的<strong>正则化</strong>（或等价的变体）。下图概括了三者的差异。</p>
+<div data-align="center">
+<p><img src="pic/add/0.8.jpeg" width="65%"></p>
+</div>
+<p><small><strong>图8</strong> VAE 的损失: 重构误差 + 潜变量正则化</small></p>
+<div data-align="center">
+<p><img src="pic/add/0.9.jpeg" width="65%"></p>
+</div>
+<p><small><strong>图9</strong> GAN 的损失: 重构误差的替代 + “博弈”正则化</small></p>
+<div data-align="center">
+<p><img src="pic/add/0.10.jpeg" width="65%"></p>
+</div>
+<p><small><strong>图10</strong> DDPM 的损失: 仅与去噪相关的“重建”项</small></p>
+<p>若想深入理解“为什么 KL 散度的方向不能反”“为什么潜变量常取正态分布”等，可参阅:</p>
+<ul>
+<li><a href="机器学习篇-02.最大似然估计.md">机器学习篇-02.最大似然估计</a></li>
+<li><a href="补充系列篇-01.Mode.md">补充系列篇-01.Mode</a></li>
+<li><a href="补充系列篇-02.Why正态分布.md">补充系列篇-02.Why正态分布</a></li>
+<li><a href="补充系列篇-03.潜变量的可解释性.md">补充系列篇-03.潜变量的可解释性</a></li>
+</ul>
+<hr />
+<h2 id="采样-从无条件到条件生成">4. 采样: 从无条件到条件生成</h2>
+<p>有了前面的理论铺垫，若希望<strong>动手实现</strong>并验证算法，可依次阅读各系列的代码篇（建议先读对应理论篇）:</p>
+<ul>
+<li><a href="AE系列篇-03.VAE代码篇.md">AE系列篇-03.VAE代码篇</a></li>
+<li><a href="DM系列篇-03.DDPM实现.md">DM系列篇-03.DDPM实现</a></li>
+<li><a href="DM系列篇-04.DPM三种实现对比.md">DM系列篇-04.DPM三种实现对比</a></li>
+<li><a href="GAN系列篇-02.GAN代码篇.md">GAN系列篇-02.GAN代码篇</a></li>
+<li><a href="AR系列篇-01.AR理论篇.md">AR系列篇-01.AR理论篇</a>、<a href="AR系列篇-02.AR代码篇.md">AR系列篇-02.AR代码篇</a></li>
+</ul>
+<p>实现后会发现:<strong>无条件</strong>生成的结果是随机的，无法按“类别”“文本”等条件控制输出。下一步自然过渡到<strong>条件生成</strong>: 从 Vanilla 版本扩展到 Conditional 版本。</p>
+<p><strong>条件生成相关阅读</strong>:</p>
+<ul>
+<li><a href="AE系列篇-04.CVAE理论篇.md">AE系列篇-04.CVAE理论篇</a></li>
+<li><a href="AE系列篇-05.CVAE代码篇.md">AE系列篇-05.CVAE代码篇</a></li>
+<li><a href="DM系列篇-05.CDDPM理论篇1.md">DM系列篇-05.CDDPM理论篇1</a>、<a href="DM系列篇-06.CDDPM理论篇2.md">DM系列篇-06.CDDPM理论篇2</a></li>
+<li><a href="DM系列篇-07.CDDPM实现篇1.md">DM系列篇-07.CDDPM实现篇1</a>、<a href="DM系列篇-08.CDDPM实现篇2.md">DM系列篇-08.CDDPM实现篇2</a></li>
+<li><a href="GAN系列篇-03.CGAN理论篇.md">GAN系列篇-03.CGAN理论篇</a></li>
+<li><a href="GAN系列篇-04.CGAN代码篇.md">GAN系列篇-04.CGAN代码篇</a></li>
+<li><a href="AR系列篇-03.CAR.md">AR系列篇-03.CAR</a></li>
+</ul>
+<p>至此，你已经建立起<strong>生成模型的基础知识体系</strong>。</p>
+<hr />
+<h2 id="生成模型的改进与进阶">5. 生成模型的改进与进阶</h2>
+<p>基础算法在实际中往往存在局限，需要针对性地改进:</p>
+<ul>
+<li><strong>VAE</strong>（连续潜变量难以表达离散、多模态）→ 离散化与矢量量化: <a href="AE系列篇-06.VAE的改进篇1-VQ-VAE.md">AE系列篇-06.VAE的改进篇1-VQ-VAE</a></li>
+<li><strong>DDPM</strong>（采样步数多、速度慢）→ 确定性采样与步数压缩: <a href="DM系列篇-09.DDPM的改进1-DDIM.md">DM系列篇-09.DDPM的改进1-DDIM</a></li>
+<li><strong>GAN</strong>（训练不稳定、梯度消失）→ 用 Wasserstein 距离替代 JS 散度: <a href="GAN系列篇-05.GAN的改进1-WGAN.md">GAN系列篇-05.GAN的改进1-WGAN</a></li>
+</ul>
+<p>在此基础上，可进一步过渡到近年广泛使用的<strong>条件扩散与潜空间扩散</strong>（如 LDM、CFG，也是 Stable Diffusion 等模型的基础）:</p>
+<ul>
+<li><a href="DM系列篇-06.CDDPM理论篇2.md">DM系列篇-06.CDDPM理论篇2</a></li>
+<li><a href="DM系列篇-07.CDDPM实现篇1.md">DM系列篇-07.CDDPM实现篇1</a>、<a href="DM系列篇-08.CDDPM实现篇2.md">DM系列篇-08.CDDPM实现篇2</a></li>
+<li><a href="DM系列篇-10.DDPM的改进2-LDM.md">DM系列篇-10.DDPM的改进2-LDM</a></li>
+</ul>
+<p>我们对上述内容做一总结: <strong>图11</strong> 概括了生成模型从基础到进阶的完整学习路径，便于读者按图索骥、按需选读。</p>
+<div data-align="center">
+<p><img src="pic/add/0.11.jpeg" width="65%"></p>
+</div>
+<p><small><strong>图11</strong> 生成模型学习路径</small></p>
+<hr />
+<p><strong>至此，你已经入门生成模型的主干内容。</strong> 后续可继续学习 <strong>FM（Flow Matching）</strong> 等扩展方向。</p>
+</body>
+</html>

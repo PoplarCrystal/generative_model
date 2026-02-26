@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-将AE系列篇的markdown文件转换为HTML格式
+将paper目录下的所有markdown文件转换为HTML格式
 支持数学公式渲染（LaTeX）
 """
 
@@ -334,12 +334,16 @@ def convert_md_to_html_pandoc(md_file, html_file, title):
         return False
 
 def main():
-    # 获取所有AE系列篇的markdown文件
-    base_dir = Path(__file__).parent
-    md_files = sorted(base_dir.glob('AE系列篇-*.md'))
+    # 获取paper目录下的所有markdown文件
+    base_dir = Path(__file__).parent / 'paper'
+    if not base_dir.exists():
+        print(f"错误: 找不到 paper 目录: {base_dir}")
+        return
+    
+    md_files = sorted(base_dir.glob('*.md'))
     
     if not md_files:
-        print("未找到AE系列篇的markdown文件")
+        print("未找到markdown文件")
         return
     
     print(f"找到 {len(md_files)} 个markdown文件")

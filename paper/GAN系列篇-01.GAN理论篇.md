@@ -33,7 +33,7 @@ GAN（Generative Adversarial Network，生成对抗网络）由三个关键词�
 *   对于高维复杂数据（如自然图像），像素之间存在强烈的依赖关系，这个假设显然不成立。这导致 VAE 生成的图像往往比较模糊，缺乏高频细节和锐利的纹理。
 
 <div align="center">
-<img src="pic/dl/gan/1.1.jpeg" width="70%">
+<img src="pic/gan/1.1.jpeg" width="70%">
 </div>
 
 <small>**图1** VAE 的架构图</small>
@@ -45,7 +45,7 @@ GAN（Generative Adversarial Network，生成对抗网络）由三个关键词�
 *   因此，GAN 通常能生成更清晰、更逼真的图像。
 
 <div align="center">
-<img src="pic/dl/gan/1.2.jpeg" width="70%">
+<img src="pic/gan/1.2.jpeg" width="70%">
 </div>
 
 <small>**图2** GAN 生成结果对比</small>
@@ -56,7 +56,7 @@ GAN（Generative Adversarial Network，生成对抗网络）由三个关键词�
 *   **GAN** 像是一个造假者，他有一个专门鉴定真伪的专家（判别器 D）在不断挑战他。造假者必须从整体风格、质感等宏观层面去模仿，才能骗过专家，因此他的作品往往更具"灵魂"。
 
 <div align="center">
-<img src="pic/dl/gan/1.4.jpeg" width="70%">
+<img src="pic/gan/1.4.jpeg" width="70%">
 </div>
 
 <small>**图3** VAE 和 GAN 的框架对比图</small>
@@ -70,20 +70,22 @@ GAN 的训练过程包含两个关键步骤:
 通过先验分布 $z \sim p(z)$ 采样噪声向量，送入生成网络 $G$，生成一个假图片 $x' = G(z)$，然后送入判别网络 $D$，被判别为假（输出接近 0）。
 
 <div align="center">
-<img src="pic/dl/gan/1.3.1.jpeg" width="70%">
+<img src="pic/gan/1.3.1.jpeg" width="70%">
 </div>
 
-<small>**图4-1** GAN 生成部分示意图</small>
+<small>**图4** GAN 生成部分示意图</small>
 
 **对抗部分:**
 
 从真实数据集 $x \sim p_{data}(x)$ 采样的真实图片，送入判别网络 $D$，被判别为真（输出接近 1）。
 
 <div align="center">
-<img src="pic/dl/gan/1.3.2.jpeg" width="70%">
+<img src="pic/gan/1.3.2.jpeg" width="70%">
 </div>
 
-<small>**图4-2** GAN 对抗部分示意图</small>
+<small>**图5** GAN 对抗部分示意图</small>
+
+---
 
 ## 2. GAN 的数学原理与理论结果
 
@@ -96,10 +98,10 @@ $$\min_G \max_D L(D, G) = \mathbb{E}_{x \sim p_{data}}[\log D(x)] + \mathbb{E}_{
 *   $\min_G$:生成器 G 希望最小化这个值。由于第二项是负的，所以 G 实际上是在最大化 $\mathbb{E}[\log D(G(z))]$，即努力让 D 认为它的假样本是真实的。
 
 <div align="center">
-<img src="pic/dl/gan/1.5.jpeg" width="70%">
+<img src="pic/gan/1.5.jpeg" width="70%">
 </div>
 
-<small>**图5** GAN 的 Loss 图</small>
+<small>**图6** GAN 的 Loss 图</small>
 
 接下来，我们看看在训练过程中这个目标函数是怎么发挥作用的。
 
@@ -115,10 +117,10 @@ $$\begin{aligned}
 即:此时目标函数（对抗网络）为一个分类器，于是可以使用 BCE（Binary Cross Entropy）来描述。
 
 <div align="center">
-<img src="pic/dl/gan/1.6.jpeg" width="70%">
+<img src="pic/gan/1.6.jpeg" width="70%">
 </div>
 
-<small>**图6** 冻结生成网络 G 的 Loss 图</small>
+<small>**图7** 冻结生成网络 G 的 Loss 图</small>
 
 ### 2.2 G-step
 
@@ -129,10 +131,12 @@ $$\min_G L(G) = \mathbb{E}_{z \sim p_z}[\log(1 - D(G(z)))] \tag{3}$$
 即:此时目标函数（生成网络）的目标是生成假图片，让对抗网络 $D$ 误以为真，于是可以使用最大似然估计来描述。
 
 <div align="center">
-<img src="pic/dl/gan/1.7.jpeg" width="70%">
+<img src="pic/gan/1.7.jpeg" width="70%">
 </div>
 
-<small>**图7** 冻结对抗网络 D 的 Loss 图</small>
+<small>**图8** 冻结对抗网络 D 的 Loss 图</small>
+
+---
 
 ## 3. GAN的详细推导
 
@@ -156,18 +160,18 @@ $$\min_G \max_D L(D, G)$$
 
 我们希望 $D(x)$ 能正确区分真假样本。对数似然为:
 
-$$\mathcal{L}(D) = \mathbb{E}_{x \sim p_{\text{data}}}[log D(x)] + \mathbb{E}_{x \sim p_g}[log (1 - D(x))]$$
+$$\mathcal{L}(D) = \mathbb{E}_{x \sim p_{\text{data}}}[\log D(x)] + \mathbb{E}_{x \sim p_g}[\log (1 - D(x))]$$
 
 这正是标准的二分类交叉熵损失的负值（因为 MLE 要最大化似然）。
 
 因此，**判别器的目标是最大化该式**。
 
-而生成器希望让判别器犯错，即让 $D(G(z))$ 接近 1，等价于最小化 $\mathbb{E}_z[log(1 - D(G(z)))]$。
+而生成器希望让判别器犯错，即让 $D(G(z))$ 接近 1，等价于最小化 $\mathbb{E}_z[\log(1 - D(G(z)))]$。
 
 于是，整个博弈的目标函数为:
 
 $$
-\min_G \max_D L(D, G) = \mathbb{E}_{x \sim p_{\text{data}}}[log D(x)] + \mathbb{E}_{z \sim p_z}[log (1 - D(G(z)))]
+\min_G \max_D L(D, G) = \mathbb{E}_{x \sim p_{\text{data}}}[\log D(x)] + \mathbb{E}_{z \sim p_z}[\log (1 - D(G(z)))]
 $$
 
 这就是 GAN 的原始损失函数（minimax 形式）。
@@ -179,11 +183,11 @@ $$
 
 将期望写成积分形式:
 
-$$L(D, G) = \int_x p_{\text{data}}(x) log D(x) \, dx + \int_x p_g(x) log (1 - D(x)) \, dx$$
+$$L(D, G) = \int_x p_{\text{data}}(x) \\log D(x) \, dx + \int_x p_g(x) \\log (1 - D(x)) \, dx$$
 
 由于积分是对每个 $x$ 独立的，我们可以对每个 $x$ 单独最大化被积函数:
 
-$$f(D) = p_{\text{data}}(x) log D + p_g(x) log (1 - D)$$
+$$f(D) = p_{\text{data}}(x) \log D + p_g(x) \log (1 - D)$$
 
 对 $D$ 求导（注意 $D = D(x)$ 是标量）:
 
@@ -204,17 +208,17 @@ D^*(x) = \frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_g(x)}
 > **✅ 结论1**:对于任意给定的生成网络 $G$，其最优的对抗网络 $D$ 为公式(4)。
 
 <div align="center">
-<img src="pic/dl/gan/1.8.jpeg" width="70%">
+<img src="pic/gan/1.8.jpeg" width="70%">
 </div>
 
-<small>**图8** 最优判别器示意图</small>
+<small>**图9** 最优判别器示意图</small>
 
 
 ### 3.3 将 $D^*$ 代入 $L(D, G)$，得到散度形式
 
 将 $D^*(x)$ 代回目标函数:
 
-$$L(D^*, G) = \mathbb{E}_{p_{\text{data}}} \left[ log \frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_g(x)} \right] + \mathbb{E}_{p_g} \left[ log \frac{p_g(x)}{p_{\text{data}}(x) + p_g(x)} \right]$$
+$$L(D^*, G) = \mathbb{E}_{p_{\text{data}}} \left[ \log \frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_g(x)} \right] + \mathbb{E}_{p_g} \left[ \log \frac{p_g(x)}{p_{\text{data}}(x) + p_g(x)} \right]$$
 
 我们引入中间分布:
 
@@ -228,23 +232,23 @@ $$\frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_g(x)} = \frac{1}{2} \cdot \fr
 因此，
 
 $$\begin{aligned}
-L(D^*, G) &= \mathbb{E}_{p_{\text{data}}} \left[ log \left( \frac{1}{2} \cdot \frac{p_{\text{data}}}{m} \right) \right] + \mathbb{E}_{p_g} \left[ log \left( \frac{1}{2} \cdot \frac{p_g}{m} \right) \right] \\
-&= \mathbb{E}_{p_{\text{data}}} \left[ log \frac{p_{\text{data}}}{m} - log 2 \right] + \mathbb{E}_{p_g} \left[ log \frac{p_g}{m} - log 2 \right] \\
-&= \underbrace{\int p_{\text{data}} log \frac{p_{\text{data}}}{m} dx}_{\text{KL}(p_{\text{data}} || m)} + \underbrace{\int p_g log \frac{p_g}{m} dx}_{\text{KL}(p_g || m)} - 2 log 2 \\
-&= 2 \cdot \underbrace{ \left( \frac{1}{2} \text{KL}(p_{\text{data}} || m) + \frac{1}{2} \text{KL}(p_g || m) \right) }_{\text{JS}(p_{\text{data}} || p_g)} - 2 log 2
+L(D^*, G) &= \mathbb{E}_{p_{\text{data}}} \left[ \log \left( \frac{1}{2} \cdot \frac{p_{\text{data}}}{m} \right) \right] + \mathbb{E}_{p_g} \left[ \log \left( \frac{1}{2} \cdot \frac{p_g}{m} \right) \right] \\
+&= \mathbb{E}_{p_{\text{data}}} \left[ \log \frac{p_{\text{data}}}{m} - \log 2 \right] + \mathbb{E}_{p_g} \left[ \log \frac{p_g}{m} - \log 2 \right] \\
+&= \underbrace{\int p_{\text{data}} \log \frac{p_{\text{data}}}{m} dx}_{\text{KL}(p_{\text{data}} || m)} + \underbrace{\int p_g \log \frac{p_g}{m} dx}_{\text{KL}(p_g || m)} - 2 \log 2 \\
+&= 2 \cdot \underbrace{ \left( \frac{1}{2} \text{KL}(p_{\text{data}} || m) + \frac{1}{2} \text{KL}(p_g || m) \right) }_{\text{JS}(p_{\text{data}} || p_g)} - 2 \log 2
 \end{aligned}$$
 
 即:
 
-$$L(D^*, G) = 2 \cdot \text{JS}(p_{\text{data}} || p_g) - 2 log 2  \tag{5}$$
+$$L(D^*, G) = 2 \cdot \text{JS}(p_{\text{data}} || p_g) - 2 \log 2  \tag{5}$$
 
 > **✅ 结论2**:在最优判别器 $D^*$ 的情况下，GAN 的目标函数为公式(5)，即 GAN 优化目标为 JS 散度。
 
 <div align="center">
-<img src="pic/dl/gan/1.9.jpeg" width="70%">
+<img src="pic/gan/1.9.jpeg" width="70%">
 </div>
 
-<small>**图9** JS 散度示意图</small>
+<small>**图10** JS 散度示意图</small>
 
 其中 **Jensen-Shannon 散度（JS 散度）** 定义为:
 
@@ -253,16 +257,16 @@ $$\text{JS}(P || Q) = \frac{1}{2} \text{KL}\left(P \,||\, \frac{P+Q}{2}\right) +
 **JS 散度的特点:**
 
 *   $D_{JS}$ 是对称的，$D_{KL}$ 不是对称的
-*   $D_{JS}$ 是有边界的 $[0, log 2]$，$D_{KL}$ 没有边界 $[0, +\infty)$
+*   $D_{JS}$ 是有边界的 $[0, \log 2]$，$D_{KL}$ 没有边界 $[0, +\infty)$
 *   $D_{JS}$ 更加稳定
 
 ### 3.4 求最优生成器 $G^*$
 
 现在我们最小化 $L(D^*, G)$ 关于 $G$（即关于 $p_g$）:
 
-$$\min_G L(D^*, G) = \min_{p_g} \left[ 2 \cdot \text{JS}(p_{\text{data}} || p_g) - 2 log 2 \right]$$
+$$\min_G L(D^*, G) = \min_{p_g} \left[ 2 \cdot \text{JS}(p_{\text{data}} || p_g) - 2 \log 2 \right]$$
 
-由于 $-2 log 2$ 是常数，等价于:
+由于 $-2 \log 2$ 是常数，等价于:
 
 $$\min_{p_g} \text{JS}(p_{\text{data}} || p_g)$$
 
@@ -276,23 +280,25 @@ $$D^*(x) = \frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_{\text{data}}(x)} = 
 
 即:
 
-$$L(D^*, G^*) = 2 \cdot 0 - 2 log 2 = -2 log 2 \tag{6}$$
+$$L(D^*, G^*) = 2 \cdot 0 - 2 \log 2 = -2 \log 2 \tag{6}$$
 
 > **✅ 结论3**:全局最优解在 $p_g = p_{\text{data}}$ 时得到，结果为公式(6)。
 
 <div align="center">
-<img src="pic/dl/gan/1.10.jpeg" width="70%">
+<img src="pic/gan/1.10.jpeg" width="70%">
 </div>
 
-<small>**图10** 最优生成器的Loss:展示了当 $p_g = p_{\text{data}}$ 时，GAN达到全局最优，损失函数值为 $-2 \log 2$</small>
+<small>**图11** 最优生成器的Loss:展示了当 $p_g = p_{\text{data}}$ 时，GAN达到全局最优，损失函数值为 $-2 \log 2$</small>
 
 最终，我们将三个结论汇总在一起，如图11所示:
 
 <div align="center">
-<img src="pic/dl/gan/1.11.jpeg" width="70%">
+<img src="pic/gan/1.11.jpeg" width="70%">
 </div>
 
-<small>**图11** GAN 三个重要的理论总结</small>
+<small>**图12** GAN 三个重要的理论总结</small>
+
+---
 
 
 ## 📚 参考

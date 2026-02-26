@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>DM系列篇-03.DDPM实现（代码篇）</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="dm系列篇-03.ddpm实现代码篇">DM系列篇-03.DDPM实现（代码篇）</h1>
+<p>接下来进行DDPM的实现。DDPM能够通过学习去噪过程来生成高质量的图像。</p>
+<hr />
+<h2 id="实现的策略">1. 实现的策略</h2>
+<p>根据理论篇的内容可知，DDPM的优化目标可以简化为预测噪声的均方误差:</p>
+<p><span class="math display">\[\text{Loss}(\mathbf{x}_0; \theta) = \|\hat{\epsilon}_\theta(\mathbf{x}_t, t) - \epsilon\|_2^2\]</span></p>
+<p>其中:</p>
+<ul>
+<li><span class="math inline">\(\mathbf{x}_0\)</span> 是原始图像</li>
+<li><span class="math inline">\(\mathbf{x}_t\)</span> 是通过前向扩散过程添加噪声后的图像</li>
+<li><span class="math inline">\(t\)</span> 是随机采样的时间步</li>
+<li><span class="math inline">\(\epsilon\)</span> 是添加的真实噪声</li>
+<li><span class="math inline">\(\hat{\epsilon}_\theta(\mathbf{x}_t, t)\)</span> 是神经网络预测的噪声</li>
+</ul>
+<p>DDPM的目标是最小化预测噪声和真实噪声之间的平方误差。在神经网络的训练过程中，我们使用MSE损失函数:</p>
+<p><span class="math display">\[\text{LOSS} = \text{MSE}(\hat{\epsilon}_\theta(\mathbf{x}_t, t), \epsilon)\]</span></p>
+<p>这种损失函数非常简洁，模型只需要学习预测噪声，而不需要直接预测原始图像，这使得训练更加稳定和高效。</p>
+<hr />
+<h2 id="预测网络的代码实现">2. 预测网络的代码实现</h2>
+<h3 id="预测网络设计思路">2.1 预测网络设计思路</h3>
+<p>按照之前的思路，我们设计的神经网络应该如图1所示，于是就变成了N个相同结构的神经网络。</p>
+<div data-align="center">
+<p><img src="pic/dm/dm/3.1.png" alt="N个相同结构的神经网络" style="width: 65%;"></p>
+</div>
+<p><small><strong>图1</strong> N个相同结构的神经网络</small></p>
+<p>我们之前发现整个denoise过程的网络结构完全是一样的，于是灵光一闪:我们不如增加一个输入“时刻t”，用于记录denoise的时刻，这样就不需要N个相同的神经网络了，于是网络就变成了图2所示的结构。</p>
+<div data-align="center">
+<p><img src="pic/dm/dm/3.2.jpeg" alt="带时间步输入的神经网络" style="width: 65%;"></p>
+</div>
+<p><small><strong>图2</strong> 带时间步输入的神经网络</small></p>
+<h3 id="u-net网络定义">2.2 U-Net网络定义</h3>
+<p>DDPM使用U-Net架构来预测噪声。U-Net是一种语义分割网络，其网络结构如图3所示。U-Net的名称源于网络结构的形状，因为它与字母“U”的形状相似。</p>
+<div data-align="center">
+<p><img src="pic/dm/dm/3.3.jpeg" alt="U-Net的网络结构" style="width: 65%;"></p>
+</div>
+<p><small><strong>图3</strong> U-Net的网络结构</small></p>
+<p>U-Net的处理过程分为前半部分的“缩小阶段”和后半部分的“扩大阶段”。在前半部分的缩小阶段中，在卷积层进行处理的同时，特征图会逐渐缩小。缩小特征图的层称为“下采样层”（down-sampling layer）。在后半部分的扩大阶段中，在卷积层进行特征抽取的同时，特征图会逐渐扩大，这与前半部分正好相反。扩大特征图的层称为“上采样层”（up-sampling layer）。</p>
+<p>U-Net的重要特征是<strong>跳跃连接</strong>（skip connection）。这是一种在网络的缩小阶段和扩大阶段之间直接传递特征图的机制。这种跳跃连接使得U-Net能够捕捉对象整体的特征，同时使用更精细的空间位置信息进行处理。在DDPM中，跳跃连接帮助模型在去噪过程中保留图像的细节信息，这对于生成高质量的图像至关重要。</p>
+<p>在我们的任务中，我们简化了U-Net的结构，如图4所示。</p>
+<div data-align="center">
+<p><img src="pic/dm/dm/3.4.jpeg" alt="新U-Net的网络结构" style="width: 65%;"></p>
+</div>
+<p><small><strong>图4</strong> 新U-Net的网络结构</small></p>
+<h3 id="正弦位置编码">2.3 正弦位置编码</h3>
+<p>接下来，我们需要思考，“时刻t”参数如何添加到U-Net网络，很显然直接添加固然不行，于是我们想到了在CVAE中我们添加条件（label）的处理方式，即增加一个Embedding网络，这里我们类似操作，使用Transformer模型常用的正弦位置编码，如图5所示，对比图4，我们发现其中的ConvBlock类新增了正弦位置编码信息v作为输入。</p>
+<div data-align="center">
+<p><img src="pic/dm/dm/3.5.jpeg" alt="加入正弦位置编码的U-Net" style="width: 65%;"></p>
+</div>
+<p><small><strong>图5</strong> 加入正弦位置编码的U-Net</small></p>
+<p>正弦位置编码因在论文“Attention Is All You Need”的Transformer模型中使用而闻名。正弦位置编码的意思是“使用正弦波（sin波）对位置信息进行编码”。位置信息是指序列数据中每个元素出现的位置。例如，在自然语言处理任务中，单词出现的位置就相当于位置信息。扩散模型的时刻 <span class="math inline">\(t\)</span> 也是位置信息。</p>
+<p>正弦位置编码可以将整数 <span class="math inline">\(t\)</span> 变换为向量。如果变换后的向量 <span class="math inline">\(v\)</span> 的维度为 <span class="math inline">\(D\)</span>，则其第 <span class="math inline">\(i\)</span> 个元素的数学式如下所示:</p>
+<p><span class="math display">\[v_i = \begin{cases}
+\sin\left(\frac{t}{10000^{i/D}}\right) &amp; \text{（$i$ 为偶数时）} \\
+\cos\left(\frac{t}{10000^{(i-1)/D}}\right) &amp; \text{（$i$ 为奇数时）}
+\end{cases}\]</span></p>
+<p>上面的正弦位置编码不以绝对值来编码位置信息，而是通过具有循环特性的 <span class="math inline">\(\sin\)</span> 函数和 <span class="math inline">\(\cos\)</span> 函数来编码位置信息。这样一来，位置信息中的相对差异和循环模式就能清晰地显示出来，使模型能够更有效地学习序列数据中的相对位置关系。</p>
+<p>正弦编码的代码如下所示:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="kw">def</span> _pos_encoding(time_idx, output_dim, device<span class="op">=</span><span class="st">&#39;cpu&#39;</span>):</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;位置编码的单个时间步实现&quot;&quot;&quot;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>    t, D <span class="op">=</span> time_idx, output_dim</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>    v <span class="op">=</span> torch.zeros(D, device<span class="op">=</span>device)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>    i <span class="op">=</span> torch.arange(<span class="dv">0</span>, D, device<span class="op">=</span>device)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>    div_term <span class="op">=</span> torch.exp(i <span class="op">/</span> D <span class="op">*</span> math.log(<span class="dv">10000</span>))</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>    v[<span class="dv">0</span>::<span class="dv">2</span>] <span class="op">=</span> torch.sin(t <span class="op">/</span> div_term[<span class="dv">0</span>::<span class="dv">2</span>])</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>    v[<span class="dv">1</span>::<span class="dv">2</span>] <span class="op">=</span> torch.cos(t <span class="op">/</span> div_term[<span class="dv">1</span>::<span class="dv">2</span>])</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>    <span class="cf">return</span> v</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true"></a><span class="kw">def</span> pos_encoding(timesteps, output_dim, device<span class="op">=</span><span class="st">&#39;cpu&#39;</span>):</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;批量位置编码&quot;&quot;&quot;</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true"></a>    batch_size <span class="op">=</span> <span class="bu">len</span>(timesteps)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true"></a>    device <span class="op">=</span> timesteps.device</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true"></a>    v <span class="op">=</span> torch.zeros(batch_size, output_dim, device<span class="op">=</span>device)</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(batch_size):</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true"></a>        v[i] <span class="op">=</span> _pos_encoding(timesteps[i], output_dim, device)</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true"></a>    <span class="cf">return</span> v</span></code></pre></div>
+<h3 id="unet的实现">2.4 UNet的实现</h3>
+<p>我们展开图5，查看新的ConvBlock内部的信息，特别是变量的维度，如图5所示。</p>
+<div data-align="center">
+<p><img src="pic/dm/dm/3.6.jpeg" alt="ConvBlock内部信息" style="width: 65%;"></p>
+</div>
+<p><small><strong>图6</strong> ConvBlock内部信息</small></p>
+<p>从图6中可以看到，<span class="math inline">\(x\)</span> 的形状为 <span class="math inline">\((N, C, H, W)\)</span>，<span class="math inline">\(v\)</span> 的形状为 <span class="math inline">\((N, D)\)</span>。<span class="math inline">\(v\)</span> 被MLP（多层感知机，这里指由全连接层组成的神经网络）变换为 <span class="math inline">\((N, C)\)</span> 的形状，然后再被变换为 <span class="math inline">\((N, C, 1, 1)\)</span> 的形状。通过这个变形，广播机制得以应用于随后的加法运算中。新的ConvBlock的实现如下所示。</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="kw">class</span> ConvBlock(nn.Module):</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;带时间嵌入的卷积块&quot;&quot;&quot;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, in_ch, out_ch, time_embed_dim):</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>        <span class="va">self</span>.convs <span class="op">=</span> nn.Sequential(</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a>            nn.Conv2d(in_ch, out_ch, <span class="dv">3</span>, padding<span class="op">=</span><span class="dv">1</span>),</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>            nn.BatchNorm2d(out_ch),</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a>            nn.ReLU(),</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a>            nn.Conv2d(out_ch, out_ch, <span class="dv">3</span>, padding<span class="op">=</span><span class="dv">1</span>),</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a>            nn.BatchNorm2d(out_ch),</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a>            nn.ReLU()</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true"></a>        )</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true"></a>        <span class="va">self</span>.mlp <span class="op">=</span> nn.Sequential(</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true"></a>            nn.Linear(time_embed_dim, in_ch),</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true"></a>            nn.ReLU(),</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true"></a>            nn.Linear(in_ch, in_ch)</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true"></a>        )</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true"></a></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, x, v):</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true"></a>        N, C, _, _ <span class="op">=</span> x.shape</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true"></a>        v <span class="op">=</span> <span class="va">self</span>.mlp(v)</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true"></a>        v <span class="op">=</span> v.view(N, C, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true"></a>        y <span class="op">=</span> <span class="va">self</span>.convs(x <span class="op">+</span> v)</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true"></a>        <span class="cf">return</span> y</span></code></pre></div>
+<p>其中参数 <code>time_embed_dim</code> 是通过正弦位置编码变换后的向量的维度。名为 <code>self.mlp</code> 的全连接层可以将维度为 <code>time_embed_dim</code> 的向量变换为维度为 <code>in_ch</code> 的向量。</p>
+<p>最后使用这个新的ConvBlock类来实现UNet类。</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="kw">class</span> UNet(nn.Module):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;U-Net 架构用于预测噪声&quot;&quot;&quot;</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, in_ch<span class="op">=</span><span class="dv">1</span>, time_embed_dim<span class="op">=</span><span class="dv">100</span>):</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a>        <span class="va">self</span>.time_embed_dim <span class="op">=</span> time_embed_dim</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true"></a>        <span class="co"># 编码器（下采样）</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true"></a>        <span class="va">self</span>.down1 <span class="op">=</span> ConvBlock(in_ch, <span class="dv">64</span>, time_embed_dim)</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true"></a>        <span class="va">self</span>.down2 <span class="op">=</span> ConvBlock(<span class="dv">64</span>, <span class="dv">128</span>, time_embed_dim)</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true"></a>        <span class="va">self</span>.bot1 <span class="op">=</span> ConvBlock(<span class="dv">128</span>, <span class="dv">256</span>, time_embed_dim)</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true"></a>        </span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true"></a>        <span class="co"># 解码器（上采样）</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true"></a>        <span class="va">self</span>.up2 <span class="op">=</span> ConvBlock(<span class="dv">128</span> <span class="op">+</span> <span class="dv">256</span>, <span class="dv">128</span>, time_embed_dim)</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true"></a>        <span class="va">self</span>.up1 <span class="op">=</span> ConvBlock(<span class="dv">128</span> <span class="op">+</span> <span class="dv">64</span>, <span class="dv">64</span>, time_embed_dim)</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true"></a>        <span class="va">self</span>.out <span class="op">=</span> nn.Conv2d(<span class="dv">64</span>, in_ch, <span class="dv">1</span>)</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true"></a></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true"></a>        <span class="va">self</span>.maxpool <span class="op">=</span> nn.MaxPool2d(<span class="dv">2</span>)</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true"></a>        <span class="va">self</span>.upsample <span class="op">=</span> nn.Upsample(scale_factor<span class="op">=</span><span class="dv">2</span>, mode<span class="op">=</span><span class="st">&#39;bilinear&#39;</span>)</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true"></a></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, x, timesteps):</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true"></a>        <span class="co"># 时间步位置编码</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true"></a>        v <span class="op">=</span> pos_encoding(timesteps, <span class="va">self</span>.time_embed_dim, x.device)</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true"></a></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true"></a>        <span class="co"># 编码器路径</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true"></a>        x1 <span class="op">=</span> <span class="va">self</span>.down1(x, v)</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true"></a>        x <span class="op">=</span> <span class="va">self</span>.maxpool(x1)</span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true"></a>        x2 <span class="op">=</span> <span class="va">self</span>.down2(x, v)</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true"></a>        x <span class="op">=</span> <span class="va">self</span>.maxpool(x2)</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true"></a></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true"></a>        <span class="co"># 瓶颈层</span></span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true"></a>        x <span class="op">=</span> <span class="va">self</span>.bot1(x, v)</span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true"></a></span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true"></a>        <span class="co"># 解码器路径（带跳跃连接）</span></span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true"></a>        x <span class="op">=</span> <span class="va">self</span>.upsample(x)</span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true"></a>        x <span class="op">=</span> torch.cat([x, x2], dim<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true"></a>        x <span class="op">=</span> <span class="va">self</span>.up2(x, v)</span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true"></a>        x <span class="op">=</span> <span class="va">self</span>.upsample(x)</span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true"></a>        x <span class="op">=</span> torch.cat([x, x1], dim<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true"></a>        x <span class="op">=</span> <span class="va">self</span>.up1(x, v)</span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true"></a>        x <span class="op">=</span> <span class="va">self</span>.out(x)</span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true"></a>        <span class="cf">return</span> x</span></code></pre></div>
+<p><strong>关键特性</strong>: 1. <strong>时间嵌入</strong>:通过位置编码将时间步 <span class="math inline">\(t\)</span> 嵌入到网络中，使模型能够区分不同时间步的噪声水平 2. <strong>U-Net结构</strong>:编码器-解码器架构，通过跳跃连接保留细节信息 3. <strong>时间条件</strong>:每个卷积块都接收时间嵌入，使网络能够根据时间步调整去噪策略</p>
+<hr />
+<h2 id="ddpm的代码实现">3. DDPM的代码实现</h2>
+<p>我们定义<code>Diffuser</code> 类管理前向扩散过程和反向去噪过程:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a><span class="kw">class</span> Diffuser:</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;扩散过程管理器&quot;&quot;&quot;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, num_timesteps<span class="op">=</span><span class="dv">1000</span>, beta_start<span class="op">=</span><span class="fl">0.0001</span>, beta_end<span class="op">=</span><span class="fl">0.02</span>, device<span class="op">=</span><span class="st">&#39;cpu&#39;</span>):</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a>        <span class="va">self</span>.num_timesteps <span class="op">=</span> num_timesteps</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a>        <span class="va">self</span>.device <span class="op">=</span> device</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a>        <span class="co"># 线性调度:beta从beta_start线性增长到beta_end</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a>        <span class="va">self</span>.betas <span class="op">=</span> torch.linspace(beta_start, beta_end, num_timesteps, device<span class="op">=</span>device)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a>        <span class="va">self</span>.alphas <span class="op">=</span> <span class="dv">1</span> <span class="op">-</span> <span class="va">self</span>.betas</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a>        <span class="va">self</span>.alpha_bars <span class="op">=</span> torch.cumprod(<span class="va">self</span>.alphas, dim<span class="op">=</span><span class="dv">0</span>)  <span class="co"># 累积乘积</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true"></a>    <span class="kw">def</span> diffusion(<span class="va">self</span>, x_0, t):</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true"></a>        <span class="co">&quot;&quot;&quot;前向扩散过程:向图像添加噪声&quot;&quot;&quot;</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true"></a>        <span class="co"># 根据公式:x_t = sqrt(alpha_bar_t) * x_0 + sqrt(1 - alpha_bar_t) * epsilon</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true"></a>        t_idx <span class="op">=</span> t <span class="op">-</span> <span class="dv">1</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true"></a>        alpha_bar <span class="op">=</span> <span class="va">self</span>.alpha_bars[t_idx].view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true"></a>        </span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true"></a>        noise <span class="op">=</span> torch.randn_like(x_0, device<span class="op">=</span><span class="va">self</span>.device)</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true"></a>        x_t <span class="op">=</span> torch.sqrt(alpha_bar) <span class="op">*</span> x_0 <span class="op">+</span> torch.sqrt(<span class="dv">1</span> <span class="op">-</span> alpha_bar) <span class="op">*</span> noise</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true"></a>        <span class="cf">return</span> x_t, noise</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true"></a></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true"></a>    <span class="kw">def</span> denoise(<span class="va">self</span>, model, x, t):</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true"></a>        <span class="co">&quot;&quot;&quot;反向去噪过程:从噪声中恢复图像&quot;&quot;&quot;</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true"></a>        t_idx <span class="op">=</span> t <span class="op">-</span> <span class="dv">1</span></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true"></a>        alpha <span class="op">=</span> <span class="va">self</span>.alphas[t_idx].view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true"></a>        alpha_bar <span class="op">=</span> <span class="va">self</span>.alpha_bars[t_idx].view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true"></a>        alpha_bar_prev <span class="op">=</span> <span class="va">self</span>.alpha_bars[t_idx<span class="op">-</span><span class="dv">1</span>].view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true"></a></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true"></a>        <span class="co"># 模型预测噪声</span></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true"></a>        model.<span class="bu">eval</span>()</span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true"></a>        <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true"></a>            eps <span class="op">=</span> model(x, t)</span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true"></a>        model.train()</span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true"></a></span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true"></a>        <span class="co"># 计算去噪后的均值</span></span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true"></a>        mu <span class="op">=</span> (x <span class="op">-</span> ((<span class="dv">1</span><span class="op">-</span>alpha) <span class="op">/</span> torch.sqrt(<span class="dv">1</span><span class="op">-</span>alpha_bar)) <span class="op">*</span> eps) <span class="op">/</span> torch.sqrt(alpha)</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true"></a>        </span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true"></a>        <span class="co"># 计算方差</span></span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true"></a>        std <span class="op">=</span> torch.sqrt((<span class="dv">1</span><span class="op">-</span>alpha) <span class="op">*</span> (<span class="dv">1</span><span class="op">-</span>alpha_bar_prev) <span class="op">/</span> (<span class="dv">1</span><span class="op">-</span>alpha_bar))</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true"></a>        </span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true"></a>        <span class="co"># 采样（在t=1时不添加噪声）</span></span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true"></a>        noise <span class="op">=</span> torch.randn_like(x, device<span class="op">=</span><span class="va">self</span>.device)</span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true"></a>        noise[t <span class="op">==</span> <span class="dv">1</span>] <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true"></a>        </span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true"></a>        <span class="cf">return</span> mu <span class="op">+</span> noise <span class="op">*</span> std</span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true"></a></span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true"></a>    <span class="kw">def</span> sample(<span class="va">self</span>, model, x_shape):</span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true"></a>        <span class="co">&quot;&quot;&quot;从随机噪声生成图像&quot;&quot;&quot;</span></span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true"></a>        batch_size <span class="op">=</span> x_shape[<span class="dv">0</span>]</span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true"></a>        x <span class="op">=</span> torch.randn(x_shape, device<span class="op">=</span><span class="va">self</span>.device)</span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true"></a></span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true"></a>        <span class="co"># 从T步逐步去噪到1步</span></span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true"></a>        <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="va">self</span>.num_timesteps, <span class="dv">0</span>, <span class="op">-</span><span class="dv">1</span>):</span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true"></a>            t <span class="op">=</span> torch.tensor([i] <span class="op">*</span> batch_size, device<span class="op">=</span><span class="va">self</span>.device, dtype<span class="op">=</span>torch.<span class="bu">long</span>)</span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true"></a>            x <span class="op">=</span> <span class="va">self</span>.denoise(model, x, t)</span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true"></a></span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true"></a>        <span class="cf">return</span> x</span></code></pre></div>
+<p><strong>关键方法</strong>: 1. <strong><code>diffusion</code></strong>:前向过程，根据公式41添加噪声 2. <strong><code>denoise</code></strong>:反向过程，使用模型预测的噪声进行去噪 3. <strong><code>sample</code></strong>:完整的生成过程，从纯噪声逐步去噪生成图像</p>
+<h3 id="diffusion过程">3.1 Diffusion过程</h3>
+<h4 id="基于-qx_tx_0-采样">基于 <span class="math inline">\(q(x_t|x_0)\)</span> 采样</h4>
+<p>接下来实现基于 <span class="math inline">\(q(x_t|x_0)\)</span> 采样的处理。<span class="math inline">\(q(x_t|x_0)\)</span> 可以用解析的方式表示，如下所示。</p>
+<p><strong>超参数的关系式</strong>:</p>
+<p><span class="math display">\[\alpha_t = 1 - \beta_t\]</span></p>
+<p><span class="math display">\[\bar{\alpha}_t = \prod_{i=1}^{t} \alpha_i\]</span></p>
+<p><strong>概率分布</strong>:<span class="math inline">\(q(x_t|x_0)\)</span></p>
+<p><span class="math display">\[q(x_t|x_0) = \mathcal{N}(x_t; \sqrt{\bar{\alpha}_t} x_0, (1 - \bar{\alpha}_t) I)\]</span></p>
+<p><strong>基于 <span class="math inline">\(q(x_t|x_0)\)</span> 采样</strong>:</p>
+<p><span class="math display">\[\epsilon \sim \mathcal{N}(0, I)\]</span></p>
+<p><span class="math display">\[x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon\]</span></p>
+<p>代码非常简单，如下所示:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a> <span class="kw">def</span> diffusion(<span class="va">self</span>, x_0, t):</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;前向扩散过程:向图像添加噪声&quot;&quot;&quot;</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true"></a>    <span class="co"># 根据公式:x_t = sqrt(alpha_bar_t) * x_0 + sqrt(1 - alpha_bar_t) * epsilon</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true"></a>    t_idx <span class="op">=</span> t <span class="op">-</span> <span class="dv">1</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true"></a>    alpha_bar <span class="op">=</span> <span class="va">self</span>.alpha_bars[t_idx].view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true"></a>    </span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true"></a>    noise <span class="op">=</span> torch.randn_like(x_0, device<span class="op">=</span><span class="va">self</span>.device)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true"></a>    x_t <span class="op">=</span> torch.sqrt(alpha_bar) <span class="op">*</span> x_0 <span class="op">+</span> torch.sqrt(<span class="dv">1</span> <span class="op">-</span> alpha_bar) <span class="op">*</span> noise</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true"></a>    <span class="cf">return</span> x_t, noise</span></code></pre></div>
+<h3 id="denoise过程">3.2 Denoise过程</h3>
+<p>扩散模型的数据生成过程可以用以下数学公式表示。</p>
+<p><strong>扩散模型的数据生成方法</strong>:</p>
+<ol type="1">
+<li><p><strong>初始化</strong>:从标准高斯分布采样初始噪声 <span class="math display">\[x_T \sim \mathcal{N}(0, I)\]</span></p></li>
+<li><p><strong>逐步去噪</strong>:对于 <span class="math inline">\(t = T, T-1, \ldots, 1\)</span>，执行以下步骤:</p>
+<ul>
+<li><p>采样随机噪声（在 <span class="math inline">\(t=1\)</span> 时设为0）: <span class="math display">\[\epsilon \sim \mathcal{N}(0, I), \quad \text{若} \ t = 1 \ \text{则} \ \epsilon = 0\]</span></p></li>
+<li><p>计算方差: <span class="math display">\[\sigma_t = \sqrt{\frac{(1 - \alpha_t)(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t}}\]</span></p></li>
+<li><p>计算去噪后的图像: <span class="math display">\[x_{t-1} = \frac{1}{\sqrt{\alpha_t}} \left(x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar{\alpha}_t}} \hat{\epsilon}_\theta(x_t, t)\right) + \sigma_t \epsilon\]</span></p></li>
+</ul></li>
+<li><p><strong>返回结果</strong>:最终得到生成的图像 <span class="math inline">\(x_0\)</span>。</p></li>
+</ol>
+<p>代码如下所示，注意到其中蕴含与VAE类似的“重参数化技巧”</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true"></a><span class="kw">def</span> denoise(<span class="va">self</span>, model, x, t):</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;反向去噪过程:从噪声中恢复图像&quot;&quot;&quot;</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true"></a>    t_idx <span class="op">=</span> t <span class="op">-</span> <span class="dv">1</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true"></a>    alpha <span class="op">=</span> <span class="va">self</span>.alphas[t_idx].view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true"></a>    alpha_bar <span class="op">=</span> <span class="va">self</span>.alpha_bars[t_idx].view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true"></a>    alpha_bar_prev <span class="op">=</span> <span class="va">self</span>.alpha_bars[t_idx<span class="op">-</span><span class="dv">1</span>].view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true"></a></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true"></a>    <span class="co"># 模型预测噪声</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true"></a>    model.<span class="bu">eval</span>()</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true"></a>    <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true"></a>        eps <span class="op">=</span> model(x, t)</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true"></a>    model.train()</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true"></a></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true"></a>    <span class="co"># 计算去噪后的均值</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true"></a>    mu <span class="op">=</span> (x <span class="op">-</span> ((<span class="dv">1</span><span class="op">-</span>alpha) <span class="op">/</span> torch.sqrt(<span class="dv">1</span><span class="op">-</span>alpha_bar)) <span class="op">*</span> eps) <span class="op">/</span> torch.sqrt(alpha)</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true"></a>    </span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true"></a>    <span class="co"># 计算方差</span></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true"></a>    std <span class="op">=</span> torch.sqrt((<span class="dv">1</span><span class="op">-</span>alpha) <span class="op">*</span> (<span class="dv">1</span><span class="op">-</span>alpha_bar_prev) <span class="op">/</span> (<span class="dv">1</span><span class="op">-</span>alpha_bar))</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true"></a>    </span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true"></a>    <span class="co"># 采样（在t=1时不添加噪声）</span></span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true"></a>    noise <span class="op">=</span> torch.randn_like(x, device<span class="op">=</span><span class="va">self</span>.device)</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true"></a>    noise[t <span class="op">==</span> <span class="dv">1</span>] <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true"></a>    </span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true"></a>    <span class="cf">return</span> mu <span class="op">+</span> noise <span class="op">*</span> std</span></code></pre></div>
+<h3 id="训练流程">3.3 训练流程</h3>
+<p>训练过程的核心代码:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true"></a><span class="kw">def</span> train_step(model, diffuser, x_0, optimizer):</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;单步训练&quot;&quot;&quot;</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true"></a>    <span class="co"># 1. 随机采样时间步</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true"></a>    t <span class="op">=</span> torch.randint(<span class="dv">1</span>, num_timesteps<span class="op">+</span><span class="dv">1</span>, (<span class="bu">len</span>(x_0),), device<span class="op">=</span>device)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true"></a>    </span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true"></a>    <span class="co"># 2. 前向扩散:添加噪声</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true"></a>    x_t, noise <span class="op">=</span> diffuser.diffusion(x_0, t)</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true"></a>    </span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true"></a>    <span class="co"># 3. 模型预测噪声</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true"></a>    noise_pred <span class="op">=</span> model(x_t, t)</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true"></a>    </span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true"></a>    <span class="co"># 4. 计算MSE损失</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true"></a>    loss <span class="op">=</span> F.mse_loss(noise, noise_pred)</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true"></a>    </span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true"></a>    <span class="co"># 5. 反向传播</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true"></a>    loss.backward()</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true"></a>    optimizer.step()</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true"></a>    </span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true"></a>    <span class="cf">return</span> loss.item()</span></code></pre></div>
+<p><strong>训练流程说明</strong>: 1. <strong>随机采样时间步</strong>:每个batch随机采样不同的时间步 <span class="math inline">\(t \in [1, T]\)</span> 2. <strong>前向扩散</strong>:根据采样时间步向原始图像添加噪声 3. <strong>预测噪声</strong>:模型接收噪声图像和时间步，预测添加的噪声 4. <strong>计算损失</strong>:MSE损失，最小化预测噪声和真实噪声的差异 5. <strong>反向传播</strong>:更新模型参数</p>
+<hr />
+<h2 id="生成能力展示">4. 生成能力展示</h2>
+<h3 id="推理1生成新图像">4.1 推理1:生成新图像</h3>
+<p>代码中的生成过程展示了DDPM的<strong>生成能力</strong>:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true"></a><span class="co"># 模型推理 - 生成新图像</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true"></a><span class="cf">if</span> infer:</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true"></a>    model.<span class="bu">eval</span>()</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true"></a>    <span class="bu">print</span>(<span class="st">&#39;</span><span class="ch">\n</span><span class="st">开始生成图像...&#39;</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true"></a>    </span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true"></a>    <span class="co"># 从纯噪声开始</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true"></a>    x_shape <span class="op">=</span> (sample_size, in_channel, img_size, img_size)</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true"></a>    images <span class="op">=</span> diffuser.sample(model, x_shape)</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true"></a>    </span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true"></a>    <span class="co"># 显示生成的图像</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true"></a>    show_images(images)</span></code></pre></div>
+<div data-align="center">
+<p><img src="pic/dm/dm/3.7.png" alt="生成的新图像" style="width: 65%;"></p>
+</div>
+<p><small><strong>图7</strong> 生成的新图像</small></p>
+<h3 id="推理2去噪过程可视化">4.2 推理2:去噪过程可视化</h3>
+<p>代码还展示了去噪过程的中间步骤:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true"></a><span class="co"># 显示去噪过程（16个中间步骤）</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true"></a>num <span class="op">=</span> num_timesteps <span class="op">/</span> <span class="dv">16</span>  <span class="co"># 每步的步长</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true"></a><span class="co"># 使用相同的噪声起点</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true"></a>torch.manual_seed(<span class="dv">42</span>)</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true"></a>noise <span class="op">=</span> torch.randn(x_shape, device<span class="op">=</span>device)</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true"></a></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true"></a><span class="co"># 在一次完整的去噪过程中，保存中间图像</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true"></a>_, intermediate_images, timestep_labels <span class="op">=</span> diffuser.sample_with_intermediate_steps(</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true"></a>    model, x_shape<span class="op">=</span>x_shape, step_interval<span class="op">=</span>num, noise<span class="op">=</span>noise</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true"></a>)</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true"></a></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true"></a><span class="co"># 显示去噪过程</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true"></a>show_denoising_process(intermediate_images, timestep_labels)</span></code></pre></div>
+<div data-align="center">
+<p><img src="pic/dm/dm/3.8.png" alt="去噪过程可视化" style="width: 65%;"></p>
+</div>
+<p><small><strong>图8</strong> 去噪过程可视化</small></p>
+<p><strong>可视化效果</strong>: - 展示了从纯噪声到清晰图像的渐进过程 - 可以看到模型如何逐步去除噪声 - 验证了去噪过程的连续性和稳定性</p>
+<hr />
+<h2 id="总结">4. 总结</h2>
+<p><strong>去噪扩散概率模型（DDPM）</strong> 通过以下关键创新实现了高质量的图像生成:</p>
+<ol type="1">
+<li><strong>前向扩散过程</strong>:通过逐步添加噪声，将数据转换为纯噪声</li>
+<li><strong>反向去噪过程</strong>:学习从噪声中恢复原始数据</li>
+<li><strong>噪声预测</strong>:模型只需预测噪声，而不需要直接预测原始图像，使训练更稳定</li>
+<li><strong>时间条件</strong>:通过时间嵌入，使模型能够根据不同的噪声水平调整去噪策略</li>
+<li><strong>U-Net架构</strong>:使用编码器-解码器结构，通过跳跃连接保留细节信息</li>
+</ol>
+<p>DDPM的实现相对简单，但效果显著，为理解和使用扩散模型提供了良好的起点。 DDPM的成功证明了<strong>逐步去噪</strong>是一种有效的生成模型策略，为后续的扩散模型变体（如DDIM、Stable Diffusion等）奠定了基础。</p>
+<hr />
+<h2 id="代码结构说明">5. 代码结构说明</h2>
+<h3 id="文件组织">5.1 文件组织</h3>
+<pre><code>code/dl/dm/ddpm/
+├── unet.py          # U-Net网络定义
+├── ddpm.py          # 扩散过程管理器
+├── train_infer.py   # 训练和推理主程序
+├── config.yaml      # 配置文件
+└── ddpm_model.pth  # 训练好的模型权重</code></pre>
+<h3 id="关键组件">5.2 关键组件</h3>
+<ol type="1">
+<li><strong>UNet</strong> (<code>unet.py</code>):噪声预测网络
+<ul>
+<li>时间嵌入:将时间步编码为向量</li>
+<li>编码器-解码器结构:U-Net架构</li>
+<li>跳跃连接:保留细节信息</li>
+</ul></li>
+<li><strong>Diffuser</strong> (<code>ddpm.py</code>):扩散过程管理
+<ul>
+<li><code>diffusion</code>:前向扩散过程</li>
+<li><code>denoise</code>:单步去噪过程</li>
+<li><code>sample</code>:完整生成过程</li>
+</ul></li>
+<li><strong>训练脚本</strong> (<code>train_infer.py</code>):主程序
+<ul>
+<li>数据加载:MNIST数据集</li>
+<li>训练循环:MSE损失优化</li>
+<li>推理生成:图像生成和可视化</li>
+</ul></li>
+</ol>
+<h3 id="配置参数">5.3 配置参数</h3>
+<p>通过 <code>config.yaml</code> 可以灵活配置:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true"></a><span class="fu">model</span><span class="kw">:</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true"></a><span class="at">  </span><span class="fu">img_size</span><span class="kw">:</span><span class="at"> </span><span class="dv">28</span><span class="co">          # 图像尺寸</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true"></a><span class="at">  </span><span class="fu">in_channel</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span><span class="co">         # 输入通道数</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true"></a><span class="at">  </span><span class="fu">time_embed_dim</span><span class="kw">:</span><span class="at"> </span><span class="dv">128</span><span class="co">   # 时间嵌入维度</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true"></a></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true"></a><span class="fu">diffusion</span><span class="kw">:</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true"></a><span class="at">  </span><span class="fu">num_timesteps</span><span class="kw">:</span><span class="at"> </span><span class="dv">1000</span><span class="co">   # 扩散步数</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true"></a><span class="at">  </span><span class="fu">beta_start</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.0001</span><span class="co">    # beta起始值</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true"></a><span class="at">  </span><span class="fu">beta_end</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.02</span><span class="co">        # beta结束值</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true"></a></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true"></a><span class="fu">training</span><span class="kw">:</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true"></a><span class="at">  </span><span class="fu">epochs</span><span class="kw">:</span><span class="at"> </span><span class="dv">30</span><span class="co">            # 训练轮数</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true"></a><span class="at">  </span><span class="fu">learning_rate</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.001</span><span class="co">  # 学习率</span></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true"></a><span class="at">  </span><span class="fu">batch_size</span><span class="kw">:</span><span class="at"> </span><span class="dv">32</span><span class="co">       # 批次大小</span></span></code></pre></div>
+</body>
+</html>

@@ -13,8 +13,9 @@
     div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
     ul.task-list{list-style: none;}
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
-  <script>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
         window.MathJax = {
             tex: {
                 inlineMath: [['$', '$'], ['\\(', '\\)']],
@@ -143,8 +144,9 @@
         </style>
 </head>
 <body>
-<h1 id="补充系列篇02.-为什么生成模型常使用正态分布">补充系列篇02. 为什么生成模型常使用正态分布</h1>
+<h1 id="补充系列篇-02.why正态分布-为什么生成模型常使用正态分布">补充系列篇-02.Why正态分布: 为什么生成模型常使用正态分布</h1>
 <p>在生成模型中，我们经常看到使用标准正态分布 <span class="math inline">\(\mathcal{N}(0, I)\)</span> 作为先验分布。这并非偶然，而是基于正态分布独特的数学性质。本文重点介绍正态分布的两个核心性质:<strong>加法法则</strong>和<strong>乘法法则（共轭性）</strong>。 如果你对推导不感兴趣，请直接看最后的总结部分。</p>
+<hr />
 <h2 id="加法法则正态分布的和仍然是正态分布">1. 加法法则:正态分布的和仍然是正态分布</h2>
 <h3 id="定理陈述">1.1 定理陈述</h3>
 <p><strong>定理</strong>:设 <span class="math inline">\(X_1 \sim \mathcal{N}(\mu_1, \sigma_1^2)\)</span> 和 <span class="math inline">\(X_2 \sim \mathcal{N}(\mu_2, \sigma_2^2)\)</span> 是两个独立的一维正态分布随机变量，则它们的和 <span class="math inline">\(Y = X_1 + X_2\)</span> 也服从正态分布:</p>
@@ -231,17 +233,13 @@ p_Y(y) &amp;= \frac{1}{2\pi\sigma_1\sigma_2} \exp\left(-\frac{(y - (\mu_1 + \mu_
 &amp;= \exp\left(i\mathbf{t}^T(\boldsymbol{\mu}_1 + \boldsymbol{\mu}_2) - \frac{1}{2}\mathbf{t}^T(\Sigma_1 + \Sigma_2)\mathbf{t}\right)
 \end{aligned}\]</span></p>
 <p>因此: <span class="math display">\[\mathbf{Y} \sim \mathcal{N}(\boldsymbol{\mu}_1 + \boldsymbol{\mu}_2, \Sigma_1 + \Sigma_2)\]</span></p>
+<hr />
 <h2 id="乘法法则正态分布的共轭性">2. 乘法法则:正态分布的共轭性</h2>
 <h3 id="共轭先验的概念">2.1 共轭先验的概念</h3>
 <p>在贝叶斯推断中，如果先验分布和似然函数属于同一分布族，且后验分布也属于同一分布族，则称该先验为<strong>共轭先验</strong>（Conjugate Prior）。</p>
 <p><strong>正态分布是正态似然的共轭先验</strong>:如果先验 <span class="math inline">\(p(X)\)</span> 和似然 <span class="math inline">\(p(Y|X)\)</span> 都是正态分布，则后验 <span class="math inline">\(p(X|Y)\)</span> 也是正态分布。</p>
 <h3 id="一维情况的证明">2.2 一维情况的证明</h3>
-<p><strong>设定</strong>:</p>
-<ul>
-<li>先验:<span class="math inline">\(X \sim \mathcal{N}(\mu_X, \sigma_X^2)\)</span></li>
-<li>似然:<span class="math inline">\(Y|X \sim \mathcal{N}(X, \sigma_Y^2)\)</span>（已知 <span class="math inline">\(\sigma_Y^2\)</span>）</li>
-<li>观测:<span class="math inline">\(Y = y\)</span>（单个观测值）</li>
-</ul>
+<p><strong>设定</strong>: - 先验:<span class="math inline">\(X \sim \mathcal{N}(\mu_X, \sigma_X^2)\)</span> - 似然:<span class="math inline">\(Y|X \sim \mathcal{N}(X, \sigma_Y^2)\)</span>（已知 <span class="math inline">\(\sigma_Y^2\)</span>） - 观测:<span class="math inline">\(Y = y\)</span>（单个观测值）</p>
 <p><strong>后验分布</strong>:</p>
 <p>根据贝叶斯定理: <span class="math display">\[p(X|Y=y) \propto p(X) \cdot p(Y=y|X)\]</span></p>
 <p>其中 <span class="math inline">\(\propto\)</span> 表示“正比于”，即忽略归一化常数。</p>
@@ -288,18 +286,9 @@ p(X|Y=y) &amp;\propto p(X) \cdot p(Y=y|X) \\
 \frac{1}{\sigma_{X|Y}^2} &amp;= \frac{1}{\sigma_X^2} + \frac{1}{\sigma_Y^2} \\
 \mu_{X|Y} &amp;= \sigma_{X|Y}^2 \left(\frac{\mu_X}{\sigma_X^2} + \frac{y}{\sigma_Y^2}\right)
 \end{aligned}\]</span></p>
-<p><strong>后验参数的直观解释</strong>:</p>
-<ul>
-<li><span class="math inline">\(\frac{1}{\sigma_{X|Y}^2} = \frac{1}{\sigma_X^2} + \frac{1}{\sigma_Y^2}\)</span>:后验精度 = 先验精度 + 似然精度</li>
-<li><span class="math inline">\(\mu_{X|Y}\)</span>:后验均值是先验均值 <span class="math inline">\(\mu_X\)</span> 和观测值 <span class="math inline">\(y\)</span> 的加权平均，权重与各自的精度成正比</li>
-</ul>
+<p><strong>后验参数的直观解释</strong>: - <span class="math inline">\(\frac{1}{\sigma_{X|Y}^2} = \frac{1}{\sigma_X^2} + \frac{1}{\sigma_Y^2}\)</span>:后验精度 = 先验精度 + 似然精度 - <span class="math inline">\(\mu_{X|Y}\)</span>:后验均值是先验均值 <span class="math inline">\(\mu_X\)</span> 和观测值 <span class="math inline">\(y\)</span> 的加权平均，权重与各自的精度成正比</p>
 <h3 id="多维情况的证明">2.3 多维情况的证明</h3>
-<p><strong>设定</strong>:</p>
-<ul>
-<li>先验:<span class="math inline">\(\mathbf{X} \sim \mathcal{N}(\boldsymbol{\mu}_X, \Sigma_X)\)</span></li>
-<li>似然:<span class="math inline">\(\mathbf{Y}|\mathbf{X} \sim \mathcal{N}(\mathbf{X}, \Sigma_Y)\)</span>（已知 <span class="math inline">\(\Sigma_Y\)</span>）</li>
-<li>观测:<span class="math inline">\(\mathbf{Y} = \mathbf{y}\)</span>（单个观测向量）</li>
-</ul>
+<p><strong>设定</strong>: - 先验:<span class="math inline">\(\mathbf{X} \sim \mathcal{N}(\boldsymbol{\mu}_X, \Sigma_X)\)</span> - 似然:<span class="math inline">\(\mathbf{Y}|\mathbf{X} \sim \mathcal{N}(\mathbf{X}, \Sigma_Y)\)</span>（已知 <span class="math inline">\(\Sigma_Y\)</span>） - 观测:<span class="math inline">\(\mathbf{Y} = \mathbf{y}\)</span>（单个观测向量）</p>
 <p><strong>后验分布</strong>:</p>
 <p>根据贝叶斯定理: <span class="math display">\[p(\mathbf{X}|\mathbf{Y}=\mathbf{y}) \propto p(\mathbf{X}) \cdot p(\mathbf{Y}=\mathbf{y}|\mathbf{X})\]</span></p>
 <p>先验分布: <span class="math display">\[p(\mathbf{X}) \propto \exp\left(-\frac{1}{2}(\mathbf{X} - \boldsymbol{\mu}_X)^T\Sigma_X^{-1}(\mathbf{X} - \boldsymbol{\mu}_X)\right)\]</span></p>
@@ -329,6 +318,7 @@ p(X|Y=y) &amp;\propto p(X) \cdot p(Y=y|X) \\
 \boldsymbol{\mu}_{X|Y} &amp;= \Sigma_{X|Y}(\Sigma_X^{-1}\boldsymbol{\mu}_X + \Sigma_Y^{-1}\mathbf{y})
 \end{aligned}\]</span></p>
 <p>这与一维情况的形式完全对应。</p>
+<hr />
 <h2 id="总结">3. 总结</h2>
 <p>本文详细证明了正态分布的两个核心性质:<strong>加法法则</strong>和<strong>乘法法则（共轭性）</strong>。</p>
 <h3 id="加法法则">3.1 加法法则</h3>

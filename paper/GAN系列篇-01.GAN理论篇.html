@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>GAN系列篇-01.GAN理论篇: 从"对抗训练"到"生成模型"</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="gan系列篇-01.gan理论篇-从对抗训练到生成模型">GAN系列篇-01.GAN理论篇: 从“对抗训练”到“生成模型”</h1>
+<h2 id="gan的概述">1. GAN的概述</h2>
+<h3 id="gan-是什么">1.1 GAN 是什么？</h3>
+<p>GAN（Generative Adversarial Network，生成对抗网络）由三个关键词组成:</p>
+<ul>
+<li><strong>Generative</strong>（生成式）:目标是学习真实数据 <span class="math inline">\(p_{data}(x)\)</span> 的分布，并能从中采样生成新的、逼真的数据。</li>
+<li><strong>Adversarial</strong>（对抗式）:通过引入一个“对手”（判别器 D）来训练生成器（G），形成一种博弈关系。</li>
+<li><strong>Networks</strong>（网络）:生成器 G 和判别器 D 都由神经网络实现，通过反向传播和随机梯度下降 (SGD) 进行优化。</li>
+</ul>
+<p><strong>核心机制:</strong></p>
+<ol type="1">
+<li><strong>生成器</strong>（Generator, G）:接收一个简单的随机噪声向量 <span class="math inline">\(z\)</span>（通常来自标准正态分布或均匀分布），并将其映射为一个看起来像真实数据的样本 <span class="math inline">\(x&#39; = G(z)\)</span>。它的目标是“以假乱真”。</li>
+<li><strong>判别器</strong>（Discriminator, D）:接收一个数据样本（可能是真实的 <span class="math inline">\(x \sim p_{data}\)</span>，也可能是生成的 <span class="math inline">\(x&#39; = G(z)\)</span>），并输出一个概率值，表示该样本是真实数据的可能性。它的目标是“火眼金睛”，准确区分真假。</li>
+</ol>
+<p>这两个网络在训练过程中相互对抗、共同进化:</p>
+<ul>
+<li><strong>D 的训练</strong>:在 G 固定的情况下，D 被训练得越来越好，能更准确地分辨出 G 生成的假样本。</li>
+<li><strong>G 的训练</strong>:在 D 固定的情况下，G 被训练得越来越好，能生成让当前 D 误判为真实的假样本。</li>
+</ul>
+<p>这个过程就是一个<strong>极小-极大</strong>（min-max）的优化问题。</p>
+<h3 id="与-vae-的对比为什么需要-gan">1.2 与 VAE 的对比:为什么需要 GAN？</h3>
+<p>为了更好地理解 GAN 的动机，我们先回顾一下变分自编码器 (VAE) 的局限性。</p>
+<p><strong>VAE 的局限性:</strong></p>
+<ul>
+<li>VAE 使用重构损失（如 L2 或交叉熵）。这种损失函数隐含了一个很强的假设:数据的各个维度（例如图像的每个像素）是独立同分布的。</li>
+<li>对于高维复杂数据（如自然图像），像素之间存在强烈的依赖关系，这个假设显然不成立。这导致 VAE 生成的图像往往比较模糊，缺乏高频细节和锐利的纹理。</li>
+</ul>
+<div data-align="center">
+<p><img src="pic/gan/1.1.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图1</strong> VAE 的架构图</small></p>
+<p><strong>GAN 的优势:</strong></p>
+<ul>
+<li>GAN 不直接计算逐像素的误差，而是通过判别器 D 来学习一个整体的、感知层面的损失函数。</li>
+<li>判别器 D 作为一个可学习的“裁判”，能够捕捉到数据分布中复杂的、全局的结构和模式。只要生成的图像在整体上“看起来真实”，即使某些像素点有偏差，D 也可能给出高分。</li>
+<li>因此，GAN 通常能生成更清晰、更逼真的图像。</li>
+</ul>
+<div data-align="center">
+<p><img src="pic/gan/1.2.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图2</strong> GAN 生成结果对比</small></p>
+<p><strong>形象比喻:</strong></p>
+<ul>
+<li><strong>VAE</strong> 像是一个临摹者，老师（重构损失）会逐笔指出他画错了哪里（哪个像素不对），但他可能只学会了模仿局部，而没掌握整体神韵。</li>
+<li><strong>GAN</strong> 像是一个造假者，他有一个专门鉴定真伪的专家（判别器 D）在不断挑战他。造假者必须从整体风格、质感等宏观层面去模仿，才能骗过专家，因此他的作品往往更具“灵魂”。</li>
+</ul>
+<div data-align="center">
+<p><img src="pic/gan/1.4.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图3</strong> VAE 和 GAN 的框架对比图</small></p>
+<h3 id="gan-的网络设计图">1.3 GAN 的网络设计图</h3>
+<p>GAN 的训练过程包含两个关键步骤:</p>
+<p><strong>生成部分:</strong></p>
+<p>通过先验分布 <span class="math inline">\(z \sim p(z)\)</span> 采样噪声向量，送入生成网络 <span class="math inline">\(G\)</span>，生成一个假图片 <span class="math inline">\(x&#39; = G(z)\)</span>，然后送入判别网络 <span class="math inline">\(D\)</span>，被判别为假（输出接近 0）。</p>
+<div data-align="center">
+<p><img src="pic/gan/1.3.1.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图4</strong> GAN 生成部分示意图</small></p>
+<p><strong>对抗部分:</strong></p>
+<p>从真实数据集 <span class="math inline">\(x \sim p_{data}(x)\)</span> 采样的真实图片，送入判别网络 <span class="math inline">\(D\)</span>，被判别为真（输出接近 1）。</p>
+<div data-align="center">
+<p><img src="pic/gan/1.3.2.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图5</strong> GAN 对抗部分示意图</small></p>
+<hr />
+<h2 id="gan-的数学原理与理论结果">2. GAN 的数学原理与理论结果</h2>
+<p>这里先给出论文（Goodfellow et al., 2014）中 GAN 的经典目标函数:</p>
+<p><span class="math display">\[\min_G \max_D L(D, G) = \mathbb{E}_{x \sim p_{data}}[\log D(x)] + \mathbb{E}_{z \sim p_z}[\log(1 - D(G(z)))] \tag{1}\]</span></p>
+<p>这个公式完美体现了 min-max 博弈: * <span class="math inline">\(\max_D\)</span>:判别器 D 希望最大化这个值。它希望对真实数据 <span class="math inline">\(x\)</span> 输出接近 1（<span class="math inline">\(\log D(x)\)</span> 趋近于 0），对生成数据 <span class="math inline">\(G(z)\)</span> 输出接近 0（<span class="math inline">\(\log(1-D(G(z)))\)</span> 也趋近于 0）。 * <span class="math inline">\(\min_G\)</span>:生成器 G 希望最小化这个值。由于第二项是负的，所以 G 实际上是在最大化 <span class="math inline">\(\mathbb{E}[\log D(G(z))]\)</span>，即努力让 D 认为它的假样本是真实的。</p>
+<div data-align="center">
+<p><img src="pic/gan/1.5.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图6</strong> GAN 的 Loss 图</small></p>
+<p>接下来，我们看看在训练过程中这个目标函数是怎么发挥作用的。</p>
+<h3 id="d-step">2.1 D-step</h3>
+<p>在这个过程中，我们冻结生成网络 <span class="math inline">\(G\)</span>，优化对抗网络 <span class="math inline">\(D\)</span>，于是公式(1)就变成了</p>
+<p><span class="math display">\[\begin{aligned}
+\max_D L(D) &amp;= \mathbb{E}_{x \sim p_{data}}[\log D(x)] + \mathbb{E}_{z \sim p_z}[\log(1 - D(G(z)))] \\
+&amp;= \mathbb{E}_{x \sim p_{data}}[\log D(x)] + \mathbb{E}_{x \sim p_g}[\log(1 - D(x))]
+\end{aligned} \tag{2}\]</span></p>
+<p>即:此时目标函数（对抗网络）为一个分类器，于是可以使用 BCE（Binary Cross Entropy）来描述。</p>
+<div data-align="center">
+<p><img src="pic/gan/1.6.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图7</strong> 冻结生成网络 G 的 Loss 图</small></p>
+<h3 id="g-step">2.2 G-step</h3>
+<p>在这个过程中，我们冻结对抗网络 <span class="math inline">\(D\)</span>，优化生成网络 <span class="math inline">\(G\)</span>，于是公式(1)就变成了</p>
+<p><span class="math display">\[\min_G L(G) = \mathbb{E}_{z \sim p_z}[\log(1 - D(G(z)))] \tag{3}\]</span></p>
+<p>即:此时目标函数（生成网络）的目标是生成假图片，让对抗网络 <span class="math inline">\(D\)</span> 误以为真，于是可以使用最大似然估计来描述。</p>
+<div data-align="center">
+<p><img src="pic/gan/1.7.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图8</strong> 冻结对抗网络 D 的 Loss 图</small></p>
+<hr />
+<h2 id="gan的详细推导">3. GAN的详细推导</h2>
+<p>给定真实数据分布 <span class="math inline">\(p_{\text{data}}(x)\)</span>，我们希望训练一个生成器 <span class="math inline">\(G\)</span>，使其诱导的分布 <span class="math inline">\(p_g(x)\)</span> 尽可能接近 <span class="math inline">\(p_{\text{data}}(x)\)</span>。</p>
+<p>GAN 通过引入一个判别器 <span class="math inline">\(D\)</span>，将这个问题转化为一个极小极大博弈（minimax game）:</p>
+<p><span class="math display">\[\min_G \max_D L(D, G)\]</span></p>
+<p>通过详细的推导，我们可以得到三个有用的结论。</p>
+<h3 id="构建二分类问题-推导损失函数">3.1 构建二分类问题 → 推导损失函数</h3>
+<p>设定</p>
+<ul>
+<li><strong>真实样本</strong>:<span class="math inline">\(x \sim p_{\text{data}}(x)\)</span>，标签为 1</li>
+<li><strong>生成样本</strong>:<span class="math inline">\(x = G(z), z \sim p_z(z)\)</span>，其分布记为 <span class="math inline">\(p_g(x)\)</span>，标签为 0</li>
+<li><strong>判别器</strong>:<span class="math inline">\(D(x) \in [0,1]\)</span> 输出“<span class="math inline">\(x\)</span> 是真实样本”的概率</li>
+</ul>
+<p>使用最大似然估计（MLE）</p>
+<p>我们希望 <span class="math inline">\(D(x)\)</span> 能正确区分真假样本。对数似然为:</p>
+<p><span class="math display">\[\mathcal{L}(D) = \mathbb{E}_{x \sim p_{\text{data}}}[\log D(x)] + \mathbb{E}_{x \sim p_g}[\log (1 - D(x))]\]</span></p>
+<p>这正是标准的二分类交叉熵损失的负值（因为 MLE 要最大化似然）。</p>
+<p>因此，<strong>判别器的目标是最大化该式</strong>。</p>
+<p>而生成器希望让判别器犯错，即让 <span class="math inline">\(D(G(z))\)</span> 接近 1，等价于最小化 <span class="math inline">\(\mathbb{E}_z[\log(1 - D(G(z)))]\)</span>。</p>
+<p>于是，整个博弈的目标函数为:</p>
+<p><span class="math display">\[
+\min_G \max_D L(D, G) = \mathbb{E}_{x \sim p_{\text{data}}}[\log D(x)] + \mathbb{E}_{z \sim p_z}[\log (1 - D(G(z)))]
+\]</span></p>
+<p>这就是 GAN 的原始损失函数（minimax 形式）。</p>
+<h3 id="求最优判别器-dx固定-g">3.2 求最优判别器 <span class="math inline">\(D^*(x)\)</span>（固定 <span class="math inline">\(G\)</span>）</h3>
+<p>我们现在固定生成器 <span class="math inline">\(G\)</span>（即固定 <span class="math inline">\(p_g\)</span>），求使 <span class="math inline">\(L(D, G)\)</span> 最大的判别器 <span class="math inline">\(D^*\)</span>。</p>
+<p>将期望写成积分形式:</p>
+<p><span class="math display">\[L(D, G) = \int_x p_{\text{data}}(x) \\log D(x) \, dx + \int_x p_g(x) \\log (1 - D(x)) \, dx\]</span></p>
+<p>由于积分是对每个 <span class="math inline">\(x\)</span> 独立的，我们可以对每个 <span class="math inline">\(x\)</span> 单独最大化被积函数:</p>
+<p><span class="math display">\[f(D) = p_{\text{data}}(x) \log D + p_g(x) \log (1 - D)\]</span></p>
+<p>对 <span class="math inline">\(D\)</span> 求导（注意 <span class="math inline">\(D = D(x)\)</span> 是标量）:</p>
+<p><span class="math display">\[\frac{df}{dD} = \frac{p_{\text{data}}(x)}{D} - \frac{p_g(x)}{1 - D}\]</span></p>
+<p>令导数为 0:</p>
+<p><span class="math display">\[\frac{p_{\text{data}}(x)}{D} = \frac{p_g(x)}{1 - D}\]</span> <span class="math display">\[\Rightarrow p_{\text{data}}(x)(1 - D) = p_g(x) D\]</span> <span class="math display">\[\Rightarrow p_{\text{data}}(x) = D \left( p_{\text{data}}(x) + p_g(x) \right)\]</span></p>
+<p>解得:</p>
+<p><span class="math display">\[
+D^*(x) = \frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_g(x)}
+ \tag{4}\]</span></p>
+<blockquote>
+<p><strong>✅ 结论1</strong>:对于任意给定的生成网络 <span class="math inline">\(G\)</span>，其最优的对抗网络 <span class="math inline">\(D\)</span> 为公式(4)。</p>
+</blockquote>
+<div data-align="center">
+<p><img src="pic/gan/1.8.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图9</strong> 最优判别器示意图</small></p>
+<h3 id="将-d-代入-ld-g得到散度形式">3.3 将 <span class="math inline">\(D^*\)</span> 代入 <span class="math inline">\(L(D, G)\)</span>，得到散度形式</h3>
+<p>将 <span class="math inline">\(D^*(x)\)</span> 代回目标函数:</p>
+<p><span class="math display">\[L(D^*, G) = \mathbb{E}_{p_{\text{data}}} \left[ \log \frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_g(x)} \right] + \mathbb{E}_{p_g} \left[ \log \frac{p_g(x)}{p_{\text{data}}(x) + p_g(x)} \right]\]</span></p>
+<p>我们引入中间分布:</p>
+<p><span class="math display">\[m(x) = \frac{p_{\text{data}}(x) + p_g(x)}{2}\]</span></p>
+<p>注意到:</p>
+<p><span class="math display">\[\frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_g(x)} = \frac{1}{2} \cdot \frac{p_{\text{data}}(x)}{m(x)}, \quad
+\frac{p_g(x)}{p_{\text{data}}(x) + p_g(x)} = \frac{1}{2} \cdot \frac{p_g(x)}{m(x)}\]</span></p>
+<p>因此，</p>
+<p><span class="math display">\[\begin{aligned}
+L(D^*, G) &amp;= \mathbb{E}_{p_{\text{data}}} \left[ \log \left( \frac{1}{2} \cdot \frac{p_{\text{data}}}{m} \right) \right] + \mathbb{E}_{p_g} \left[ \log \left( \frac{1}{2} \cdot \frac{p_g}{m} \right) \right] \\
+&amp;= \mathbb{E}_{p_{\text{data}}} \left[ \log \frac{p_{\text{data}}}{m} - \log 2 \right] + \mathbb{E}_{p_g} \left[ \log \frac{p_g}{m} - \log 2 \right] \\
+&amp;= \underbrace{\int p_{\text{data}} \log \frac{p_{\text{data}}}{m} dx}_{\text{KL}(p_{\text{data}} || m)} + \underbrace{\int p_g \log \frac{p_g}{m} dx}_{\text{KL}(p_g || m)} - 2 \log 2 \\
+&amp;= 2 \cdot \underbrace{ \left( \frac{1}{2} \text{KL}(p_{\text{data}} || m) + \frac{1}{2} \text{KL}(p_g || m) \right) }_{\text{JS}(p_{\text{data}} || p_g)} - 2 \log 2
+\end{aligned}\]</span></p>
+<p>即:</p>
+<p><span class="math display">\[L(D^*, G) = 2 \cdot \text{JS}(p_{\text{data}} || p_g) - 2 \log 2  \tag{5}\]</span></p>
+<blockquote>
+<p><strong>✅ 结论2</strong>:在最优判别器 <span class="math inline">\(D^*\)</span> 的情况下，GAN 的目标函数为公式(5)，即 GAN 优化目标为 JS 散度。</p>
+</blockquote>
+<div data-align="center">
+<p><img src="pic/gan/1.9.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图10</strong> JS 散度示意图</small></p>
+<p>其中 <strong>Jensen-Shannon 散度（JS 散度）</strong> 定义为:</p>
+<p><span class="math display">\[\text{JS}(P || Q) = \frac{1}{2} \text{KL}\left(P \,||\, \frac{P+Q}{2}\right) + \frac{1}{2} \text{KL}\left(Q \,||\, \frac{P+Q}{2}\right)\]</span></p>
+<p><strong>JS 散度的特点:</strong></p>
+<ul>
+<li><span class="math inline">\(D_{JS}\)</span> 是对称的，<span class="math inline">\(D_{KL}\)</span> 不是对称的</li>
+<li><span class="math inline">\(D_{JS}\)</span> 是有边界的 <span class="math inline">\([0, \log 2]\)</span>，<span class="math inline">\(D_{KL}\)</span> 没有边界 <span class="math inline">\([0, +\infty)\)</span></li>
+<li><span class="math inline">\(D_{JS}\)</span> 更加稳定</li>
+</ul>
+<h3 id="求最优生成器-g">3.4 求最优生成器 <span class="math inline">\(G^*\)</span></h3>
+<p>现在我们最小化 <span class="math inline">\(L(D^*, G)\)</span> 关于 <span class="math inline">\(G\)</span>（即关于 <span class="math inline">\(p_g\)</span>）:</p>
+<p><span class="math display">\[\min_G L(D^*, G) = \min_{p_g} \left[ 2 \cdot \text{JS}(p_{\text{data}} || p_g) - 2 \log 2 \right]\]</span></p>
+<p>由于 <span class="math inline">\(-2 \log 2\)</span> 是常数，等价于:</p>
+<p><span class="math display">\[\min_{p_g} \text{JS}(p_{\text{data}} || p_g)\]</span></p>
+<p>而 JS 散度具有以下性质: - <span class="math inline">\(\text{JS}(P || Q) \geq 0\)</span> - <span class="math inline">\(\text{JS}(P || Q) = 0\)</span> 当且仅当 <span class="math inline">\(P = Q\)</span>（几乎处处相等）</p>
+<p>因此，全局最小值在 <span class="math inline">\(p_g = p_{\text{data}}\)</span> 时取得，此时:</p>
+<p><span class="math display">\[D^*(x) = \frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_{\text{data}}(x)} = \frac{1}{2}\]</span></p>
+<p>即:</p>
+<p><span class="math display">\[L(D^*, G^*) = 2 \cdot 0 - 2 \log 2 = -2 \log 2 \tag{6}\]</span></p>
+<blockquote>
+<p><strong>✅ 结论3</strong>:全局最优解在 <span class="math inline">\(p_g = p_{\text{data}}\)</span> 时得到，结果为公式(6)。</p>
+</blockquote>
+<div data-align="center">
+<p><img src="pic/gan/1.10.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图11</strong> 最优生成器的Loss:展示了当 <span class="math inline">\(p_g = p_{\text{data}}\)</span> 时，GAN达到全局最优，损失函数值为 <span class="math inline">\(-2 \log 2\)</span></small></p>
+<p>最终，我们将三个结论汇总在一起，如图11所示:</p>
+<div data-align="center">
+<p><img src="pic/gan/1.11.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图12</strong> GAN 三个重要的理论总结</small></p>
+<hr />
+<h2 id="参考">📚 参考</h2>
+<ul>
+<li>Goodfellow et al., <em>Generative Adversarial Nets</em>, NeurIPS 2014.</li>
+<li>Arjovsky &amp; Bottou, <em>Towards Principled Methods for Training Generative Adversarial Networks</em>, 2017.</li>
+<li>Kaiming He, Deep Generative Models.</li>
+</ul>
+</body>
+</html>

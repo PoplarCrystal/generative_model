@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>DM系列篇-09.DDPM的改进1: DDIM</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="dm系列篇-09.ddpm的改进1-ddim">DM系列篇-09.DDPM的改进1: DDIM</h1>
+<p>在DDPM中，生成一张图像通常需要1000步去噪过程，这使得采样速度较慢。<strong>DDIM（Denoising Diffusion Implicit Models）</strong>是DDPM的一个重要改进，它可以在保持生成质量的同时，大幅减少采样步数，实现加速采样。本章将详细介绍DDIM的基本原理和实现方法。</p>
+<hr />
+<h2 id="ddim的动机">1. DDIM的动机</h2>
+<h3 id="ddpm的局限性">1.1 DDPM的局限性</h3>
+<p>DDPM虽然能够生成高质量的图像，但存在以下问题:</p>
+<ol type="1">
+<li><strong>采样步数多</strong>:需要执行完整的1000步去噪过程才能生成一张图像</li>
+<li><strong>采样过程固定</strong>:必须在训练时设定的时间步序列上进行采样，无法灵活调整</li>
+<li><strong>随机性不可控</strong>:每一步都引入随机噪声，难以实现确定性采样</li>
+</ol>
+<h3 id="ddim的改进目标">1.2 DDIM的改进目标</h3>
+<p>DDIM旨在解决上述问题:</p>
+<ul>
+<li><strong>加速采样</strong>:用更少的步数（如50步）生成质量相当的图像</li>
+<li><strong>灵活采样</strong>:可以在推理时选择与训练不同的步长</li>
+<li><strong>确定性采样</strong>:通过参数控制，可以实现确定性采样，支持精确重建（DDIM反转）</li>
+</ul>
+<div data-align="center">
+<p><img src="pic/dm/ddim/9.1.jpeg" alt="DDPM架构图" style="width: 65%;"></p>
+</div>
+<p><small><strong>图1</strong> DDPM架构图:展示了DDPM的扩散过程，包括前向过程（逐步加噪）和逆向过程（逐步去噪）。DDPM使用马尔可夫链进行采样，每一步都依赖于前一步的状态，需要完整的1000步才能完成采样。</small></p>
+<div data-align="center">
+<p><img src="pic/dm/ddim/9.2.jpeg" alt="DDIM架构图" style="width: 65%;"></p>
+</div>
+<p><small><strong>图2</strong> DDIM架构图:展示了DDIM的扩散过程架构。与DDPM不同的是，DDIM通过重新参数化扩散过程，实现了非马尔可夫的前向过程。核心优势是可以跳过中间步骤进行加速采样（如从1000步减少到50步），并通过eta参数控制确定性或随机性。当eta=0时，采样过程完全确定，支持DDIM反转。</small></p>
+<hr />
+<h2 id="ddim的理论基础">2. DDIM的理论基础</h2>
+<h3 id="前向过程的重新思考">2.1 前向过程的重新思考</h3>
+<p>在DDPM中，前向过程定义为:</p>
+<p><span class="math display">\[q(x_t|x_{t-1}) = \mathcal{N}(x_t; \sqrt{1-\beta_t}x_{t-1}, \beta_t I)\]</span></p>
+<p>这使得我们可以在任意时间步直接采样:</p>
+<p><span class="math display">\[q(x_t|x_0) = \mathcal{N}(x_t; \sqrt{\bar{\alpha}_t}x_0, (1-\bar{\alpha}_t)I)\]</span></p>
+<p>其中 <span class="math inline">\(\bar{\alpha}_t = \prod_{s=1}^{t}\alpha_s\)</span>，<span class="math inline">\(\alpha_t = 1 - \beta_t\)</span>。</p>
+<p><strong>关键观察</strong>:DDIM发现，前向过程并不需要是马尔可夫的。我们可以定义一个非马尔可夫的前向过程，它仍然能够匹配相同的边际分布 <span class="math inline">\(q(x_t|x_0)\)</span>。</p>
+<h3 id="非马尔可夫前向过程">2.2 非马尔可夫前向过程</h3>
+<p>DDIM定义了一个更一般的前向过程，它通过以下方式采样:</p>
+<p><span class="math display">\[q_\sigma(x_{1:T}|x_0) = q_\sigma(x_T|x_0)\prod_{t=2}^{T}q_\sigma(x_{t-1}|x_t, x_0)\]</span></p>
+<p>其中:</p>
+<p><span class="math display">\[q_\sigma(x_{t-1}|x_t, x_0) = \mathcal{N}(x_{t-1}; \sqrt{\bar{\alpha}_{t-1}}x_0 + \sqrt{1-\bar{\alpha}_{t-1}-\sigma_t^2}\cdot\frac{x_t-\sqrt{\bar{\alpha}_t}x_0}{\sqrt{1-\bar{\alpha}_t}}, \sigma_t^2 I)\]</span></p>
+<p>这里 <span class="math inline">\(\sigma_t\)</span> 是一个可调参数，控制随机性。当 <span class="math inline">\(\sigma_t = 0\)</span> 时，过程变为确定性（DDIM）；当 <span class="math inline">\(\sigma_t = \sqrt{(1-\bar{\alpha}_{t-1})/(1-\bar{\alpha}_t)}\cdot\sqrt{1-\bar{\alpha}_t/\bar{\alpha}_{t-1}}\)</span> 时，过程等价于DDPM。</p>
+<p><strong>具体地，采样公式为</strong>:</p>
+<p><span class="math display">\[x_{t-1} = \sqrt{\bar{\alpha}_{t-1}}x_0 + \sqrt{1-\bar{\alpha}_{t-1}-\sigma_t^2}\cdot\frac{x_t-\sqrt{\bar{\alpha}_t}x_0}{\sqrt{1-\bar{\alpha}_t}} + \sigma_t \epsilon_t \tag{9.0}\]</span></p>
+<p>其中 <span class="math inline">\(\epsilon_t \sim \mathcal{N}(0, I)\)</span>。</p>
+<p><strong>关键特性</strong>:</p>
+<p>在这个新的定义中: 1. <strong>前向过程没有了马尔可夫的假设</strong>:<span class="math inline">\(q_\sigma(x_{t-1}|x_t, x_0)\)</span> 同时依赖于 <span class="math inline">\(x_t\)</span> 和 <span class="math inline">\(x_0\)</span>，而不仅仅是 <span class="math inline">\(x_t\)</span>（或 <span class="math inline">\(x_{t-1}\)</span>） 2. <strong>逆向转换核不满足马尔可夫链的定义</strong>:在逆向过程中，<span class="math inline">\(x_{t-1}\)</span> 的生成不仅依赖于上一个状态 <span class="math inline">\(x_t\)</span>，还依赖于初始状态 <span class="math inline">\(x_0\)</span>（通过预测 <span class="math inline">\(\hat{x}_0\)</span> 实现） 3. <strong>因此称之为非马尔可夫扩散过程</strong>:这是DDIM的核心创新之一</p>
+<p><strong>重要优势</strong>:</p>
+<ul>
+<li><strong>可以直接使用已训练好的 DDPM 模型</strong>:无需重新训练新模型，因为DDIM与DDPM使用相同的训练目标（预测噪声 <span class="math inline">\(\epsilon_\theta(x_t, t)\)</span>），只是采样方式不同</li>
+</ul>
+<h3 id="ddim采样公式">2.3 DDIM采样公式</h3>
+<p>基于上述观察，DDIM提出了一个更灵活的采样策略。首先，我们从 <span class="math inline">\(x_t\)</span> 预测 <span class="math inline">\(x_0\)</span>:</p>
+<p><span class="math display">\[\hat{x}_0 = \frac{x_t - \sqrt{1-\bar{\alpha}_t}\epsilon_\theta(x_t, t)}{\sqrt{\bar{\alpha}_t}} \tag{9.1}\]</span></p>
+<p>然后，我们使用预测的 <span class="math inline">\(\hat{x}_0\)</span> 来采样 <span class="math inline">\(x_{t-1}\)</span>:</p>
+<p><span class="math display">\[x_{t-1} = \sqrt{\bar{\alpha}_{t-1}}\hat{x}_0 + \sqrt{1-\bar{\alpha}_{t-1}-\sigma_t^2}\cdot\epsilon_\theta(x_t, t) + \sigma_t z_t \tag{9.2}\]</span></p>
+<p>其中 <span class="math inline">\(z_t \sim \mathcal{N}(0, I)\)</span> 是随机噪声。</p>
+<p><strong>简化形式</strong>:</p>
+<p>将公式(9.1)代入公式(9.2)，我们得到DDIM采样公式:</p>
+<p><span class="math display">\[x_{t-1} = \sqrt{\bar{\alpha}_{t-1}}\frac{x_t - \sqrt{1-\bar{\alpha}_t}\epsilon_\theta(x_t, t)}{\sqrt{\bar{\alpha}_t}} + \sqrt{1-\bar{\alpha}_{t-1}-\sigma_t^2}\cdot\epsilon_\theta(x_t, t) + \sigma_t z_t \tag{9.3}\]</span></p>
+<h3 id="eta参数化">2.4 eta参数化</h3>
+<p>为了更方便地控制随机性，DDIM引入了 <span class="math inline">\(\eta\)</span> 参数（eta）:</p>
+<p><span class="math display">\[\sigma_t = \eta \sqrt{\frac{1-\bar{\alpha}_{t-1}}{1-\bar{\alpha}_t}}\sqrt{1-\frac{\bar{\alpha}_t}{\bar{\alpha}_{t-1}}} \tag{9.4}\]</span></p>
+<p>当 <span class="math inline">\(\eta = 0\)</span> 时，<span class="math inline">\(\sigma_t = 0\)</span>，采样过程变为完全确定性（DDIM）: <span class="math display">\[x_{t-1} = \sqrt{\bar{\alpha}_{t-1}}\frac{x_t - \sqrt{1-\bar{\alpha}_t}\epsilon_\theta(x_t, t)}{\sqrt{\bar{\alpha}_t}} + \sqrt{1-\bar{\alpha}_{t-1}}\cdot\epsilon_\theta(x_t, t)\]</span></p>
+<p>当 <span class="math inline">\(\eta = 1\)</span> 时，采样过程等价于DDPM的随机采样。</p>
+<p><strong>DDIM采样公式（eta参数化）</strong>:</p>
+<p><span class="math display">\[x_{t-1} = \sqrt{\bar{\alpha}_{t-1}}\hat{x}_0 + c_1 \cdot \epsilon + c_2 \cdot \epsilon_\theta(x_t, t) \tag{9.5}\]</span></p>
+<p>其中:</p>
+<ul>
+<li><span class="math inline">\(\epsilon \sim \mathcal{N}(0, I)\)</span> - 随机噪声变量</li>
+<li><span class="math inline">\(c_1 = \eta \sqrt{\frac{1-\bar{\alpha}_{t-1}}{1-\bar{\alpha}_t}}\sqrt{1-\frac{\bar{\alpha}_t}{\bar{\alpha}_{t-1}}}\)</span> - 随机噪声的系数</li>
+<li><span class="math inline">\(c_2 = \sqrt{1-\bar{\alpha}_{t-1}-c_1^2}\)</span> - 预测噪声的系数</li>
+<li><span class="math inline">\(\hat{x}_0 = \frac{x_t - \sqrt{1-\bar{\alpha}_t}\epsilon_\theta(x_t, t)}{\sqrt{\bar{\alpha}_t}}\)</span> - 从 <span class="math inline">\(x_t\)</span> 预测的 <span class="math inline">\(x_0\)</span></li>
+</ul>
+<h3 id="ddim采样过程详解">2.5 DDIM采样过程详解</h3>
+<p>DDIM采样过程可以概括为以下几个步骤，从 <span class="math inline">\(x_t\)</span> 采样得到 <span class="math inline">\(x_{t-k}\)</span>:</p>
+<blockquote>
+<p><strong>DDIM采样步骤</strong>:</p>
+<p><strong>步骤1:</strong> 输入当前时间步的噪声图像</p>
+<p>输入:<span class="math inline">\(x_t\)</span>（当前时间步 <span class="math inline">\(t\)</span> 的噪声图像）</p>
+<p><strong>步骤2:</strong> 使用U-Net模型预测噪声</p>
+<p><span class="math display">\[\epsilon_\theta(x_t, t) = \text{U-Net}(x_t, t)\]</span></p>
+<p><strong>步骤3:</strong> 从预测的噪声计算预测的原始图像</p>
+<p><span class="math display">\[\hat{x}_0 = \frac{x_t - \sqrt{1-\bar{\alpha}_t}\epsilon_\theta(x_t, t)}{\sqrt{\bar{\alpha}_t}}\]</span></p>
+<p><strong>步骤4:</strong> 根据eta参数选择采样方式，计算 <span class="math inline">\(x_{t-k}\)</span></p>
+<p><strong>情况1:eta=0（确定性采样）</strong></p>
+<p><span class="math display">\[x_{t-k} = \sqrt{\bar{\alpha}_{t-k}}\hat{x}_0 + \sqrt{1-\bar{\alpha}_{t-k}}\cdot\epsilon_\theta(x_t, t)\]</span></p>
+<ul>
+<li>无随机噪声，完全确定</li>
+<li>相同输入总是产生相同输出</li>
+<li>支持DDIM反转</li>
+</ul>
+<p><strong>情况2:eta&gt;0（随机采样）</strong></p>
+<p><span class="math display">\[x_{t-k} = \sqrt{\bar{\alpha}_{t-k}}\hat{x}_0 + c_1 \cdot \epsilon + c_2 \cdot \epsilon_\theta(x_t, t)\]</span></p>
+<p>其中: - <span class="math inline">\(\epsilon \sim \mathcal{N}(0, I)\)</span> - 随机噪声变量 - <span class="math inline">\(c_1 = \eta \sqrt{\frac{1-\bar{\alpha}_{t-k}}{1-\bar{\alpha}_t}}\sqrt{1-\frac{\bar{\alpha}_t}{\bar{\alpha}_{t-k}}}\)</span> - 随机噪声系数 - <span class="math inline">\(c_2 = \sqrt{1-\bar{\alpha}_{t-k}-c_1^2}\)</span> - 预测噪声系数</p>
+<ul>
+<li>包含随机噪声，增加生成多样性</li>
+<li>当 <span class="math inline">\(\eta=1\)</span> 时，等价于DDPM的随机采样</li>
+</ul>
+</blockquote>
+<p><strong>关键优势</strong>:</p>
+<ul>
+<li>✓ <strong>可以直接从 <span class="math inline">\(x_t\)</span> 跳到 <span class="math inline">\(x_{t-k}\)</span>，无需计算中间步骤</strong>:这是DDIM加速采样的核心原理</li>
+<li>✓ <strong>通过 eta 参数控制随机性</strong>:<span class="math inline">\(\eta=0\)</span> 为确定性，<span class="math inline">\(\eta=1\)</span> 等价于DDPM</li>
+<li>✓ <strong>支持DDIM反转</strong>:当 <span class="math inline">\(\eta=0\)</span> 时，可以实现精确的图像重建和编辑</li>
+</ul>
+<hr />
+<h2 id="ddim的关键特性">3. DDIM的关键特性</h2>
+<h3 id="加速采样">3.1 加速采样</h3>
+<p>DDIM的核心优势是可以使用子序列进行采样。假设训练时使用1000步，我们可以选择每20步采样一次（即步长skip=20），这样只需要50步就能完成采样:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="co"># 训练时:t = 1, 2, 3, ..., 1000</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="co"># 采样时:t = 0, 20, 40, ..., 980 (50步)</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>skip <span class="op">=</span> num_timesteps <span class="op">//</span> ddim_steps</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>seq <span class="op">=</span> <span class="bu">list</span>(<span class="bu">range</span>(<span class="dv">0</span>, num_timesteps, skip))</span></code></pre></div>
+<p><strong>关键原理</strong>:由于DDIM采样公式中，每个时间步的更新只依赖于当前的 <span class="math inline">\(x_t\)</span> 和模型预测 <span class="math inline">\(\epsilon_\theta(x_t, t)\)</span>，而不依赖于前向过程的马尔可夫链，因此可以跳过中间的时间步。</p>
+<h3 id="确定性采样">3.2 确定性采样</h3>
+<p>当 <span class="math inline">\(\eta = 0\)</span> 时，DDIM采样变为完全确定性的:</p>
+<p><span class="math display">\[x_{t-1} = \sqrt{\bar{\alpha}_{t-1}}\frac{x_t - \sqrt{1-\bar{\alpha}_t}\epsilon_\theta(x_t, t)}{\sqrt{\bar{\alpha}_t}} + \sqrt{1-\bar{\alpha}_{t-1}}\cdot\epsilon_\theta(x_t, t) \tag{9.6}\]</span></p>
+<p>这意味着: - 给定相同的初始噪声 <span class="math inline">\(x_T\)</span>，总是生成相同的图像 - 可以实现精确的图像重建（DDIM反转）</p>
+<h3 id="ddim反转">3.3 DDIM反转</h3>
+<p>DDIM反转是指将一张真实图像 <span class="math inline">\(x_0\)</span> 转换为对应的噪声 <span class="math inline">\(x_T\)</span>，然后可以从这个噪声精确重建原始图像。</p>
+<p><strong>反转过程</strong>:</p>
+<p>对于DDIM（<span class="math inline">\(\eta=0\)</span>），反转过程很简单:</p>
+<p><span class="math display">\[x_{t+1} = \sqrt{\bar{\alpha}_{t+1}}\hat{x}_0 + \sqrt{1-\bar{\alpha}_{t+1}}\cdot\epsilon_\theta(x_t, t)\]</span></p>
+<p>其中 <span class="math inline">\(\hat{x}_0 = \frac{x_t - \sqrt{1-\bar{\alpha}_t}\epsilon_\theta(x_t, t)}{\sqrt{\bar{\alpha}_t}}\)</span>。</p>
+<p>通过反向运行这个过程，可以从 <span class="math inline">\(x_0\)</span> 得到 <span class="math inline">\(x_T\)</span>。</p>
+<hr />
+<h2 id="ddim与ddpm的对比">4. DDIM与DDPM的对比</h2>
+<h3 id="采样公式对比">4.1 采样公式对比</h3>
+<p><strong>DDPM采样公式</strong>:</p>
+<p><span class="math display">\[x_{t-1} = \frac{1}{\sqrt{\alpha_t}}\left(x_t - \frac{\beta_t}{\sqrt{1-\bar{\alpha}_t}}\epsilon_\theta(x_t, t)\right) + \sigma_t z_t\]</span></p>
+<p>其中 <span class="math inline">\(\sigma_t = \sqrt{\frac{(1-\bar{\alpha}_{t-1})\beta_t}{1-\bar{\alpha}_t}}\)</span>，<span class="math inline">\(z_t \sim \mathcal{N}(0, I)\)</span>。</p>
+<p><strong>DDIM采样公式（<span class="math inline">\(\eta=0\)</span>）</strong>:</p>
+<p><span class="math display">\[x_{t-1} = \sqrt{\bar{\alpha}_{t-1}}\frac{x_t - \sqrt{1-\bar{\alpha}_t}\epsilon_\theta(x_t, t)}{\sqrt{\bar{\alpha}_t}} + \sqrt{1-\bar{\alpha}_{t-1}}\cdot\epsilon_\theta(x_t, t)\]</span></p>
+<h3 id="主要区别">4.2 主要区别</h3>
+<table>
+<thead>
+<tr class="header">
+<th>特性</th>
+<th>DDPM</th>
+<th>DDIM</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>采样步数</strong></td>
+<td>必须使用训练时的全部步数（如1000步）</td>
+<td>可以使用更少的步数（如50步）</td>
+</tr>
+<tr class="even">
+<td><strong>随机性</strong></td>
+<td>每一步都有随机噪声（马尔可夫链）</td>
+<td>可以通过 <span class="math inline">\(\eta\)</span> 控制，<span class="math inline">\(\eta=0\)</span> 时为确定性</td>
+</tr>
+<tr class="odd">
+<td><strong>确定性</strong></td>
+<td>否</td>
+<td>是（<span class="math inline">\(\eta=0\)</span> 时）</td>
+</tr>
+<tr class="even">
+<td><strong>反转能力</strong></td>
+<td>不支持精确反转</td>
+<td>支持DDIM反转</td>
+</tr>
+<tr class="odd">
+<td><strong>灵活性</strong></td>
+<td>采样过程固定</td>
+<td>可以灵活选择采样步数</td>
+</tr>
+</tbody>
+</table>
+<h3 id="训练方式">4.3 训练方式</h3>
+<p><strong>重要</strong>:DDIM与DDPM使用<strong>相同的训练方式</strong>！</p>
+<ul>
+<li>训练损失函数相同:<span class="math inline">\(\mathcal{L} = \mathbb{E}_{t,x_0,\epsilon}\left[\|\epsilon - \epsilon_\theta(x_t, t)\|^2\right]\)</span></li>
+<li>网络架构相同:都使用相同的U-Net结构</li>
+<li>训练过程相同:前向过程、损失计算、优化过程完全相同</li>
+</ul>
+<p>这意味着:<strong>一个训练好的DDPM模型可以直接用于DDIM采样，无需重新训练！</strong></p>
+<hr />
+<h2 id="代码实现">5. 代码实现</h2>
+<h3 id="ddimdiffuser类的设计">5.1 DDIMDiffuser类的设计</h3>
+<p>我们创建一个<code>DDIMDiffuser</code>类来实现DDIM采样:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="kw">class</span> DDIMDiffuser:</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;DDIM 扩散过程管理器 - 支持加速采样&quot;&quot;&quot;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, num_timesteps<span class="op">=</span><span class="dv">1000</span>, beta_start<span class="op">=</span><span class="fl">0.0001</span>, beta_end<span class="op">=</span><span class="fl">0.02</span>, </span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>                 device<span class="op">=</span><span class="st">&#39;cpu&#39;</span>, eta<span class="op">=</span><span class="fl">0.0</span>):</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>        <span class="co">&quot;&quot;&quot;</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a><span class="co">        Args:</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a><span class="co">            num_timesteps: 训练时的扩散步数（通常是1000）</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a><span class="co">            beta_start: beta 起始值</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a><span class="co">            beta_end: beta 结束值</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a><span class="co">            device: 设备</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a><span class="co">            eta: DDIM 采样参数，0.0 是完全确定性，1.0 是 DDPM</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true"></a><span class="co">        &quot;&quot;&quot;</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true"></a>        <span class="va">self</span>.num_timesteps <span class="op">=</span> num_timesteps</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true"></a>        <span class="va">self</span>.device <span class="op">=</span> device</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true"></a>        <span class="va">self</span>.eta <span class="op">=</span> eta</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true"></a>        </span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true"></a>        <span class="co"># 计算 alpha 和 alpha_bar（与 DDPM 相同）</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true"></a>        <span class="va">self</span>.betas <span class="op">=</span> torch.linspace(beta_start, beta_end, num_timesteps, device<span class="op">=</span>device)</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true"></a>        <span class="va">self</span>.alphas <span class="op">=</span> <span class="dv">1</span> <span class="op">-</span> <span class="va">self</span>.betas</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true"></a>        <span class="va">self</span>.alpha_bars <span class="op">=</span> torch.cumprod(<span class="va">self</span>.alphas, dim<span class="op">=</span><span class="dv">0</span>)</span></code></pre></div>
+<p><strong>关键点</strong>: - <code>eta</code> 参数控制随机性（0.0为确定性DDIM，1.0为DDPM） - <code>alpha_bars</code> 的计算与DDPM完全相同</p>
+<h3 id="预测x_0">5.2 预测x_0</h3>
+<p>从 <span class="math inline">\(x_t\)</span> 预测 <span class="math inline">\(x_0\)</span> 是DDIM的关键步骤:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="kw">def</span> predict_x0_from_xt(<span class="va">self</span>, model, x_t, t):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a><span class="co">    从 x_t 预测 x_0</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a><span class="co">    </span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a><span class="co">    Args:</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a><span class="co">        model: UNet 模型</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true"></a><span class="co">        x_t: 时间步 t 的图像</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true"></a><span class="co">        t: 时间步 tensor（0-based，从0到num_timesteps-1）</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true"></a><span class="co">    Returns:</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true"></a><span class="co">        pred_x0: 预测的原始图像</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true"></a><span class="co">        pred_eps: 预测的噪声</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true"></a><span class="co">    &quot;&quot;&quot;</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true"></a>    batch_size <span class="op">=</span> x_t.size(<span class="dv">0</span>)</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true"></a>    </span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true"></a>    <span class="co"># 计算 alpha_bar</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true"></a>    t_idx <span class="op">=</span> t.<span class="bu">long</span>()</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true"></a>    at <span class="op">=</span> <span class="va">self</span>.alpha_bars[t_idx].view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true"></a>    </span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true"></a>    <span class="co"># 模型预测噪声（注意:我们的模型使用1-based时间步）</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true"></a>    t_1based <span class="op">=</span> t <span class="op">+</span> <span class="dv">1</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true"></a>    model.<span class="bu">eval</span>()</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true"></a>    <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true"></a>        pred_eps <span class="op">=</span> model(x_t, t_1based.<span class="bu">long</span>())</span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true"></a>    model.train()</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true"></a>    </span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true"></a>    <span class="co"># 从预测的噪声恢复 x_0</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true"></a>    <span class="co"># x0 = (xt - eps * sqrt(1 - alpha_bar)) / sqrt(alpha_bar)</span></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true"></a>    pred_x0 <span class="op">=</span> (x_t <span class="op">-</span> pred_eps <span class="op">*</span> (<span class="dv">1</span> <span class="op">-</span> at).sqrt()) <span class="op">/</span> at.sqrt()</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true"></a>    </span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true"></a>    <span class="cf">return</span> pred_x0, pred_eps</span></code></pre></div>
+<p><strong>公式对应</strong>: <span class="math display">\[\hat{x}_0 = \frac{x_t - \sqrt{1-\bar{\alpha}_t}\epsilon_\theta(x_t, t)}{\sqrt{\bar{\alpha}_t}}\]</span></p>
+<h3 id="ddim单步采样">5.3 DDIM单步采样</h3>
+<p>DDIM单步采样实现公式(9.5):</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a><span class="kw">def</span> ddim_step(<span class="va">self</span>, model, x_t, t, t_prev):</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a><span class="co">    DDIM 单步采样:从 x_t 采样 x_{t_prev}</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a><span class="co">    </span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a><span class="co">    Args:</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a><span class="co">        model: UNet 模型</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a><span class="co">        x_t: 时间步 t 的图像</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a><span class="co">        t: 当前时间步 tensor（0-based）</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a><span class="co">        t_prev: 前一个时间步 tensor（0-based，-1 表示结束）</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true"></a><span class="co">    Returns:</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true"></a><span class="co">        x_prev: 采样得到的 x_{t_prev}</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true"></a><span class="co">    &quot;&quot;&quot;</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true"></a>    <span class="co"># 预测 x_0</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true"></a>    pred_x0, pred_eps <span class="op">=</span> <span class="va">self</span>.predict_x0_from_xt(model, x_t, t)</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true"></a>    </span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true"></a>    <span class="co"># 如果 t_prev = -1，表示采样结束，直接返回 pred_x0</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true"></a>    <span class="cf">if</span> (t_prev <span class="op">&lt;</span> <span class="dv">0</span>).<span class="bu">all</span>():</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true"></a>        <span class="cf">return</span> pred_x0</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true"></a>    </span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true"></a>    <span class="co"># 计算 alpha_bar</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true"></a>    t_idx <span class="op">=</span> t.<span class="bu">long</span>()</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true"></a>    at <span class="op">=</span> <span class="va">self</span>.alpha_bars[t_idx].view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true"></a>    t_prev_idx <span class="op">=</span> t_prev.<span class="bu">long</span>()</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true"></a>    at_next <span class="op">=</span> <span class="va">self</span>.alpha_bars[t_prev_idx].view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true"></a>    </span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true"></a>    <span class="co"># 计算 c1 和 c2</span></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true"></a>    <span class="co"># c1 = eta * sqrt((1 - at/at_next) * (1 - at_next) / (1 - at))</span></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true"></a>    c1 <span class="op">=</span> <span class="va">self</span>.eta <span class="op">*</span> ((<span class="dv">1</span> <span class="op">-</span> at <span class="op">/</span> at_next) <span class="op">*</span> (<span class="dv">1</span> <span class="op">-</span> at_next) <span class="op">/</span> (<span class="dv">1</span> <span class="op">-</span> at)).sqrt()</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true"></a>    <span class="co"># c2 = sqrt((1 - at_next) - c1^2)</span></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true"></a>    c2 <span class="op">=</span> ((<span class="dv">1</span> <span class="op">-</span> at_next) <span class="op">-</span> c1 <span class="op">**</span> <span class="dv">2</span>).sqrt()</span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true"></a>    </span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true"></a>    <span class="co"># DDIM 采样公式</span></span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true"></a>    <span class="co"># x_{t_prev} = sqrt(alpha_bar_{t_prev}) * x0 + c1 * noise + c2 * eps</span></span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true"></a>    <span class="cf">if</span> <span class="va">self</span>.eta <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true"></a>        noise <span class="op">=</span> torch.randn_like(x_t)</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true"></a>    <span class="cf">else</span>:</span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true"></a>        noise <span class="op">=</span> torch.zeros_like(x_t)  <span class="co"># 确定性采样</span></span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true"></a>    x_prev <span class="op">=</span> at_next.sqrt() <span class="op">*</span> pred_x0 <span class="op">+</span> c1 <span class="op">*</span> noise <span class="op">+</span> c2 <span class="op">*</span> pred_eps</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true"></a>    </span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true"></a>    <span class="cf">return</span> x_prev</span></code></pre></div>
+<p><strong>关键实现细节</strong>: 1. 当 <code>t_prev &lt; 0</code> 时，表示采样结束，直接返回预测的 <span class="math inline">\(x_0\)</span> 2. <code>c1</code> 和 <code>c2</code> 的计算确保采样过程的一致性 3. 当 <code>eta=0</code> 时，使用零噪声（确定性采样）</p>
+<h3 id="ddim采样循环">5.4 DDIM采样循环</h3>
+<p>DDIM采样支持使用子序列进行加速:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a><span class="kw">def</span> sample(<span class="va">self</span>, model, x_shape, ddim_steps<span class="op">=</span><span class="dv">50</span>):</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true"></a><span class="co">    DDIM 采样:从随机噪声生成图像（加速采样）</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true"></a><span class="co">    </span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true"></a><span class="co">    Args:</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true"></a><span class="co">        model: UNet 模型</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true"></a><span class="co">        x_shape: 生成图像的形状 (batch_size, channels, height, width)</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true"></a><span class="co">        ddim_steps: DDIM 采样步数（通常远小于 num_timesteps）</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true"></a><span class="co">    Returns:</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true"></a><span class="co">        images: PIL 图像列表</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true"></a><span class="co">    &quot;&quot;&quot;</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true"></a>    batch_size <span class="op">=</span> x_shape[<span class="dv">0</span>]</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true"></a>    x <span class="op">=</span> torch.randn(x_shape, device<span class="op">=</span><span class="va">self</span>.device)</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true"></a>    </span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true"></a>    <span class="co"># 生成采样时间步序列（均匀间隔）</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true"></a>    <span class="co"># 例如:如果 num_timesteps=1000, ddim_steps=50</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true"></a>    <span class="co"># 则采样时间步为 [0, 20, 40, ..., 980]（共50步）</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true"></a>    skip <span class="op">=</span> <span class="va">self</span>.num_timesteps <span class="op">//</span> ddim_steps</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true"></a>    seq <span class="op">=</span> <span class="bu">list</span>(<span class="bu">range</span>(<span class="dv">0</span>, <span class="va">self</span>.num_timesteps, skip))  <span class="co"># [0, 20, 40, ..., 980]</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true"></a>    seq_next <span class="op">=</span> [<span class="op">-</span><span class="dv">1</span>] <span class="op">+</span> <span class="bu">list</span>(seq[:<span class="op">-</span><span class="dv">1</span>])  <span class="co"># [-1, 0, 20, 40, ..., 960]</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true"></a>    </span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true"></a>    <span class="co"># DDIM 采样循环</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true"></a>    <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true"></a>        <span class="cf">for</span> i, j <span class="kw">in</span> <span class="bu">zip</span>(<span class="bu">reversed</span>(seq), <span class="bu">reversed</span>(seq_next)):</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true"></a>            t <span class="op">=</span> torch.ones(batch_size, device<span class="op">=</span><span class="va">self</span>.device) <span class="op">*</span> i  <span class="co"># 当前时间步</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true"></a>            next_t <span class="op">=</span> torch.ones(batch_size, device<span class="op">=</span><span class="va">self</span>.device) <span class="op">*</span> j  <span class="co"># 下一个时间步</span></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true"></a>            x <span class="op">=</span> <span class="va">self</span>.ddim_step(model, x, t, next_t)</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true"></a>    </span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true"></a>    <span class="co"># 确保最终图像在合理范围内</span></span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true"></a>    x <span class="op">=</span> torch.clamp(x, <span class="fl">0.0</span>, <span class="fl">1.0</span>)</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true"></a>    </span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true"></a>    <span class="co"># 转换为 PIL 图像</span></span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true"></a>    images <span class="op">=</span> [<span class="va">self</span>.reverse_to_img(x[i]) <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(batch_size)]</span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true"></a>    <span class="cf">return</span> images</span></code></pre></div>
+<p><strong>采样序列生成</strong>: - 如果 <code>num_timesteps=1000</code>，<code>ddim_steps=50</code>，则 <code>skip=20</code> - 采样序列:<code>[0, 20, 40, ..., 980]</code>（共50步） - 下一时间步序列:<code>[-1, 0, 20, 40, ..., 960]</code>（用于计算）</p>
+<p><strong>反向循环</strong>: - 从最大时间步开始，逐步减小到0 - 最后一个时间步 <code>next_t=-1</code>，表示采样结束</p>
+<h3 id="完整代码示例">5.5 完整代码示例</h3>
+<p>完整的DDIM实现代码:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true"></a><span class="im">import</span> torch</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true"></a><span class="im">from</span> torchvision <span class="im">import</span> transforms</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true"></a></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true"></a><span class="kw">def</span> compute_alpha(beta, t):</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;计算 alpha_bar&quot;&quot;&quot;</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true"></a>    beta <span class="op">=</span> torch.cat([torch.zeros(<span class="dv">1</span>).to(beta.device), beta], dim<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true"></a>    a <span class="op">=</span> (<span class="dv">1</span> <span class="op">-</span> beta).cumprod(dim<span class="op">=</span><span class="dv">0</span>).index_select(<span class="dv">0</span>, t <span class="op">+</span> <span class="dv">1</span>).view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true"></a>    <span class="cf">return</span> a</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true"></a></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true"></a></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true"></a><span class="kw">class</span> DDIMDiffuser:</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;DDIM 扩散过程管理器 - 支持加速采样&quot;&quot;&quot;</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, num_timesteps<span class="op">=</span><span class="dv">1000</span>, beta_start<span class="op">=</span><span class="fl">0.0001</span>, beta_end<span class="op">=</span><span class="fl">0.02</span>, </span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true"></a>                 device<span class="op">=</span><span class="st">&#39;cpu&#39;</span>, eta<span class="op">=</span><span class="fl">0.0</span>):</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true"></a>        <span class="va">self</span>.num_timesteps <span class="op">=</span> num_timesteps</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true"></a>        <span class="va">self</span>.device <span class="op">=</span> device</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true"></a>        <span class="va">self</span>.eta <span class="op">=</span> eta</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true"></a>        </span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true"></a>        <span class="va">self</span>.betas <span class="op">=</span> torch.linspace(beta_start, beta_end, num_timesteps, device<span class="op">=</span>device)</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true"></a>        <span class="va">self</span>.alphas <span class="op">=</span> <span class="dv">1</span> <span class="op">-</span> <span class="va">self</span>.betas</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true"></a>        <span class="va">self</span>.alpha_bars <span class="op">=</span> torch.cumprod(<span class="va">self</span>.alphas, dim<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true"></a></span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true"></a>    <span class="kw">def</span> predict_x0_from_xt(<span class="va">self</span>, model, x_t, t):</span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true"></a>        <span class="co">&quot;&quot;&quot;从 x_t 预测 x_0&quot;&quot;&quot;</span></span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true"></a>        t_idx <span class="op">=</span> t.<span class="bu">long</span>()</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true"></a>        at <span class="op">=</span> <span class="va">self</span>.alpha_bars[t_idx].view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true"></a>        </span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true"></a>        t_1based <span class="op">=</span> t <span class="op">+</span> <span class="dv">1</span></span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true"></a>        model.<span class="bu">eval</span>()</span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true"></a>        <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true"></a>            pred_eps <span class="op">=</span> model(x_t, t_1based.<span class="bu">long</span>())</span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true"></a>        model.train()</span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true"></a>        </span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true"></a>        pred_x0 <span class="op">=</span> (x_t <span class="op">-</span> pred_eps <span class="op">*</span> (<span class="dv">1</span> <span class="op">-</span> at).sqrt()) <span class="op">/</span> at.sqrt()</span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true"></a>        <span class="cf">return</span> pred_x0, pred_eps</span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true"></a></span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true"></a>    <span class="kw">def</span> ddim_step(<span class="va">self</span>, model, x_t, t, t_prev):</span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true"></a>        <span class="co">&quot;&quot;&quot;DDIM 单步采样&quot;&quot;&quot;</span></span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true"></a>        pred_x0, pred_eps <span class="op">=</span> <span class="va">self</span>.predict_x0_from_xt(model, x_t, t)</span>
+<span id="cb6-41"><a href="#cb6-41" aria-hidden="true"></a>        </span>
+<span id="cb6-42"><a href="#cb6-42" aria-hidden="true"></a>        <span class="cf">if</span> (t_prev <span class="op">&lt;</span> <span class="dv">0</span>).<span class="bu">all</span>():</span>
+<span id="cb6-43"><a href="#cb6-43" aria-hidden="true"></a>            <span class="cf">return</span> pred_x0</span>
+<span id="cb6-44"><a href="#cb6-44" aria-hidden="true"></a>        </span>
+<span id="cb6-45"><a href="#cb6-45" aria-hidden="true"></a>        t_idx <span class="op">=</span> t.<span class="bu">long</span>()</span>
+<span id="cb6-46"><a href="#cb6-46" aria-hidden="true"></a>        at <span class="op">=</span> <span class="va">self</span>.alpha_bars[t_idx].view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb6-47"><a href="#cb6-47" aria-hidden="true"></a>        t_prev_idx <span class="op">=</span> t_prev.<span class="bu">long</span>()</span>
+<span id="cb6-48"><a href="#cb6-48" aria-hidden="true"></a>        at_next <span class="op">=</span> <span class="va">self</span>.alpha_bars[t_prev_idx].view(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb6-49"><a href="#cb6-49" aria-hidden="true"></a>        </span>
+<span id="cb6-50"><a href="#cb6-50" aria-hidden="true"></a>        c1 <span class="op">=</span> <span class="va">self</span>.eta <span class="op">*</span> ((<span class="dv">1</span> <span class="op">-</span> at <span class="op">/</span> at_next) <span class="op">*</span> (<span class="dv">1</span> <span class="op">-</span> at_next) <span class="op">/</span> (<span class="dv">1</span> <span class="op">-</span> at)).sqrt()</span>
+<span id="cb6-51"><a href="#cb6-51" aria-hidden="true"></a>        c2 <span class="op">=</span> ((<span class="dv">1</span> <span class="op">-</span> at_next) <span class="op">-</span> c1 <span class="op">**</span> <span class="dv">2</span>).sqrt()</span>
+<span id="cb6-52"><a href="#cb6-52" aria-hidden="true"></a>        </span>
+<span id="cb6-53"><a href="#cb6-53" aria-hidden="true"></a>        <span class="cf">if</span> <span class="va">self</span>.eta <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb6-54"><a href="#cb6-54" aria-hidden="true"></a>            noise <span class="op">=</span> torch.randn_like(x_t)</span>
+<span id="cb6-55"><a href="#cb6-55" aria-hidden="true"></a>        <span class="cf">else</span>:</span>
+<span id="cb6-56"><a href="#cb6-56" aria-hidden="true"></a>            noise <span class="op">=</span> torch.zeros_like(x_t)</span>
+<span id="cb6-57"><a href="#cb6-57" aria-hidden="true"></a>        x_prev <span class="op">=</span> at_next.sqrt() <span class="op">*</span> pred_x0 <span class="op">+</span> c1 <span class="op">*</span> noise <span class="op">+</span> c2 <span class="op">*</span> pred_eps</span>
+<span id="cb6-58"><a href="#cb6-58" aria-hidden="true"></a>        </span>
+<span id="cb6-59"><a href="#cb6-59" aria-hidden="true"></a>        <span class="cf">return</span> x_prev</span>
+<span id="cb6-60"><a href="#cb6-60" aria-hidden="true"></a></span>
+<span id="cb6-61"><a href="#cb6-61" aria-hidden="true"></a>    <span class="kw">def</span> sample(<span class="va">self</span>, model, x_shape, ddim_steps<span class="op">=</span><span class="dv">50</span>):</span>
+<span id="cb6-62"><a href="#cb6-62" aria-hidden="true"></a>        <span class="co">&quot;&quot;&quot;DDIM 采样&quot;&quot;&quot;</span></span>
+<span id="cb6-63"><a href="#cb6-63" aria-hidden="true"></a>        batch_size <span class="op">=</span> x_shape[<span class="dv">0</span>]</span>
+<span id="cb6-64"><a href="#cb6-64" aria-hidden="true"></a>        x <span class="op">=</span> torch.randn(x_shape, device<span class="op">=</span><span class="va">self</span>.device)</span>
+<span id="cb6-65"><a href="#cb6-65" aria-hidden="true"></a>        </span>
+<span id="cb6-66"><a href="#cb6-66" aria-hidden="true"></a>        skip <span class="op">=</span> <span class="va">self</span>.num_timesteps <span class="op">//</span> ddim_steps</span>
+<span id="cb6-67"><a href="#cb6-67" aria-hidden="true"></a>        seq <span class="op">=</span> <span class="bu">list</span>(<span class="bu">range</span>(<span class="dv">0</span>, <span class="va">self</span>.num_timesteps, skip))</span>
+<span id="cb6-68"><a href="#cb6-68" aria-hidden="true"></a>        seq_next <span class="op">=</span> [<span class="op">-</span><span class="dv">1</span>] <span class="op">+</span> <span class="bu">list</span>(seq[:<span class="op">-</span><span class="dv">1</span>])</span>
+<span id="cb6-69"><a href="#cb6-69" aria-hidden="true"></a>        </span>
+<span id="cb6-70"><a href="#cb6-70" aria-hidden="true"></a>        <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb6-71"><a href="#cb6-71" aria-hidden="true"></a>            <span class="cf">for</span> i, j <span class="kw">in</span> <span class="bu">zip</span>(<span class="bu">reversed</span>(seq), <span class="bu">reversed</span>(seq_next)):</span>
+<span id="cb6-72"><a href="#cb6-72" aria-hidden="true"></a>                t <span class="op">=</span> torch.ones(batch_size, device<span class="op">=</span><span class="va">self</span>.device) <span class="op">*</span> i</span>
+<span id="cb6-73"><a href="#cb6-73" aria-hidden="true"></a>                next_t <span class="op">=</span> torch.ones(batch_size, device<span class="op">=</span><span class="va">self</span>.device) <span class="op">*</span> j</span>
+<span id="cb6-74"><a href="#cb6-74" aria-hidden="true"></a>                x <span class="op">=</span> <span class="va">self</span>.ddim_step(model, x, t, next_t)</span>
+<span id="cb6-75"><a href="#cb6-75" aria-hidden="true"></a>        </span>
+<span id="cb6-76"><a href="#cb6-76" aria-hidden="true"></a>        x <span class="op">=</span> torch.clamp(x, <span class="fl">0.0</span>, <span class="fl">1.0</span>)</span>
+<span id="cb6-77"><a href="#cb6-77" aria-hidden="true"></a>        images <span class="op">=</span> [<span class="va">self</span>.reverse_to_img(x[i]) <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(batch_size)]</span>
+<span id="cb6-78"><a href="#cb6-78" aria-hidden="true"></a>        <span class="cf">return</span> images</span>
+<span id="cb6-79"><a href="#cb6-79" aria-hidden="true"></a></span>
+<span id="cb6-80"><a href="#cb6-80" aria-hidden="true"></a>    <span class="kw">def</span> reverse_to_img(<span class="va">self</span>, x):</span>
+<span id="cb6-81"><a href="#cb6-81" aria-hidden="true"></a>        <span class="co">&quot;&quot;&quot;将张量转换为 PIL 图像&quot;&quot;&quot;</span></span>
+<span id="cb6-82"><a href="#cb6-82" aria-hidden="true"></a>        x <span class="op">=</span> torch.clamp(x, <span class="fl">0.0</span>, <span class="fl">1.0</span>)</span>
+<span id="cb6-83"><a href="#cb6-83" aria-hidden="true"></a>        x <span class="op">=</span> x <span class="op">*</span> <span class="dv">255</span></span>
+<span id="cb6-84"><a href="#cb6-84" aria-hidden="true"></a>        x <span class="op">=</span> x.clamp(<span class="dv">0</span>, <span class="dv">255</span>)</span>
+<span id="cb6-85"><a href="#cb6-85" aria-hidden="true"></a>        x <span class="op">=</span> x.to(torch.uint8)</span>
+<span id="cb6-86"><a href="#cb6-86" aria-hidden="true"></a>        x <span class="op">=</span> x.cpu()</span>
+<span id="cb6-87"><a href="#cb6-87" aria-hidden="true"></a>        to_pil <span class="op">=</span> transforms.ToPILImage()</span>
+<span id="cb6-88"><a href="#cb6-88" aria-hidden="true"></a>        <span class="cf">return</span> to_pil(x)</span></code></pre></div>
+<hr />
+<h2 id="ddim的优势与应用">6. DDIM的优势与应用</h2>
+<h3 id="加速采样-1">6.1 加速采样</h3>
+<p>DDIM的主要优势是<strong>大幅加速采样过程</strong>:</p>
+<ul>
+<li><strong>DDPM</strong>:需要1000步才能生成一张图像</li>
+<li><strong>DDIM（50步）</strong>:只需50步即可生成质量相当的图像，<strong>加速20倍</strong></li>
+</ul>
+<p>实验表明，使用50步DDIM采样生成的图像质量与1000步DDPM相当，在某些数据集上甚至略优。</p>
+<h3 id="确定性采样-1">6.2 确定性采样</h3>
+<p>当 <span class="math inline">\(\eta=0\)</span> 时，DDIM提供确定性采样:</p>
+<ul>
+<li>相同的初始噪声总是生成相同的图像</li>
+<li>便于调试和复现实验</li>
+<li>支持精确的图像编辑</li>
+</ul>
+<h3 id="ddim反转-1">6.3 DDIM反转</h3>
+<p>DDIM反转使得以下应用成为可能:</p>
+<ol type="1">
+<li><strong>图像编辑</strong>:将图像转换为噪声，然后在条件引导下重新生成</li>
+<li><strong>图像插值</strong>:在两个图像之间进行平滑插值</li>
+<li><strong>语义编辑</strong>:在保持整体结构的同时修改图像的语义内容</li>
+</ol>
+<h3 id="实际应用场景">6.4 实际应用场景</h3>
+<p>DDIM在实际应用中非常受欢迎:</p>
+<ul>
+<li><strong>Stable Diffusion</strong>:默认使用DDIM采样器（50步）</li>
+<li><strong>图像生成服务</strong>:需要快速生成的应用场景</li>
+<li><strong>实时应用</strong>:对采样速度有要求的交互式应用</li>
+</ul>
+<hr />
+<h2 id="实验结果对比">7. 实验结果对比</h2>
+<h3 id="ddpm-vs-ddim-采样效果对比">7.1 DDPM vs DDIM 采样效果对比</h3>
+<p>我们对比了DDPM（1000步）和DDIM（50步）的采样效果:</p>
+<div data-align="center">
+<p><img src="pic/dm/ddim/9.3.png" alt="DDPM 1000步采样结果" style="width: 65%;"></p>
+</div>
+<p><small><strong>图3</strong> DDPM 1000步采样结果</small></p>
+<div data-align="center">
+<p><img src="pic/dm/ddim/9.4.png" alt="DDIM 50步采样结果" style="width: 65%;"></p>
+</div>
+<p><small><strong>图4</strong> DDIM 50步采样结果</small></p>
+<h3 id="对比分析">7.2 对比分析</h3>
+<p><strong>采样质量对比</strong>:</p>
+<table>
+<thead>
+<tr class="header">
+<th>采样方法</th>
+<th>采样步数</th>
+<th>生成质量</th>
+<th>采样时间</th>
+<th>优势</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>DDPM</strong></td>
+<td>1000步</td>
+<td>高质量</td>
+<td>~30s</td>
+<td>生成质量稳定，细节丰富</td>
+</tr>
+<tr class="even">
+<td><strong>DDIM</strong></td>
+<td>50步</td>
+<td>高质量</td>
+<td>~1.5s</td>
+<td>速度提升20倍，质量相当</td>
+</tr>
+</tbody>
+</table>
+<p><strong>关键观察</strong>:</p>
+<ol type="1">
+<li><strong>生成质量</strong>:DDIM（50步）生成的图像质量与DDPM（1000步）相当，在视觉上难以区分</li>
+<li><strong>采样速度</strong>:DDIM仅需50步即可完成采样，速度提升约20倍</li>
+<li><strong>计算效率</strong>:DDIM大幅降低了推理成本，使得扩散模型在实际应用中更加实用</li>
+<li><strong>细节表现</strong>:两种方法在细节表现上都非常出色，DDIM在保持质量的同时实现了显著加速</li>
+</ol>
+<p><strong>结论</strong>:DDIM通过重新参数化扩散过程，实现了在不损失生成质量的前提下大幅加速采样，这是DDPM的一个重要改进。</p>
+<hr />
+<h2 id="总结">8. 总结</h2>
+<p>DDIM是DDPM的重要改进，通过重新参数化扩散过程，实现了以下核心优势与特性:</p>
+<h3 id="核心优势">8.1 核心优势</h3>
+<ol type="1">
+<li><strong>加速采样</strong>:用更少的步数（如50步）生成质量相当的图像</li>
+<li><strong>确定性采样</strong>:通过 <span class="math inline">\(\eta=0\)</span> 实现确定性，便于调试和应用</li>
+<li><strong>灵活采样</strong>:可以在推理时选择任意步数，不受训练步数限制</li>
+<li><strong>DDIM反转</strong>:支持精确的图像重建和编辑</li>
+</ol>
+<h3 id="关键特性">8.2 关键特性</h3>
+<ul>
+<li><strong>无需重新训练</strong>:使用与DDPM相同的训练方式，现有DDPM模型可直接使用</li>
+<li><strong>向后兼容</strong>:当 <span class="math inline">\(\eta=1.0\)</span> 时，等价于DDPM的随机采样</li>
+<li><strong>实现简单</strong>:只需要修改采样过程，训练代码完全不变</li>
+</ul>
+<h3 id="实际意义">8.3 实际意义</h3>
+<p>DDIM使得扩散模型在实际应用中更加实用:</p>
+<ul>
+<li><strong>降低计算成本</strong>:大幅减少推理时间</li>
+<li><strong>提高用户体验</strong>:在交互式应用中实现实时生成</li>
+<li><strong>扩展应用场景</strong>:支持图像编辑、插值等新功能</li>
+</ul>
+<p>DDIM的成功证明了<strong>采样过程的改进</strong>可以与模型架构改进同等重要，为后续的扩散模型研究（如DPM-Solver、Analytic-DPM等）奠定了重要基础。</p>
+<hr />
+<h2 id="参考">📚 参考</h2>
+<ul>
+<li>Song, J., Meng, C., &amp; Ermon, S. (2020). Denoising diffusion implicit models. <em>arXiv preprint arXiv:2010.02502</em>.</li>
+<li>Ho, J., Jain, A., &amp; Abbeel, P. (2020). Denoising diffusion probabilistic models. <em>Advances in Neural Information Processing Systems</em>, 33, 6840-6851.</li>
+<li>https://www.zhangzhenhu.com/aigc/ddim.html</li>
+<li>Understanding Diffusion Models: A Unified Perspective. <em>arXiv preprint arXiv:2208.11970</em>.</li>
+<li>深度学习入门5：生成模型</li>
+</ul>
+</body>
+</html>

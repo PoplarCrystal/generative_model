@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>GAN系列篇-05.GAN的改进1: WGAN</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="gan系列篇-05.gan的改进1-wgan">GAN系列篇-05.GAN的改进1: WGAN</h1>
+<p>原始 GAN 通过判别器与生成器的极小极大博弈，等价于最小化真实分布与生成分布之间的 JS 散度。当两分布支撑集不重叠时，JS 散度常为常数，导致梯度消失、训练不稳定。WGAN（Wasserstein GAN）用 Wasserstein 距离替代 JS 散度，并引入 Critic（评论家）与权重裁剪或梯度惩罚，使损失具有更好的梯度性质，训练更稳定。本章介绍 WGAN 的动机、理论基础、目标函数与实现要点。</p>
+<hr />
+<h2 id="wgan-的动机">1. WGAN 的动机</h2>
+<h3 id="gan-的局限性">1.1 GAN 的局限性</h3>
+<p>原始 GAN 的目标函数为:</p>
+<p><span class="math display">\[\min_G \max_D \, \mathbb{E}_{x \sim p_{\text{data}}}[\log D(x)] + \mathbb{E}_{z \sim p_z}[\log(1 - D(G(z)))] \tag{1}\]</span></p>
+<p>在最优判别器 <span class="math inline">\(D^*\)</span> 下，该目标等价于最小化真实分布 <span class="math inline">\(p_{\text{data}}\)</span> 与生成分布 <span class="math inline">\(p_g\)</span> 的 <strong>Jensen-Shannon 散度</strong>:</p>
+<p><span class="math display">\[\min_G \, 2\cdot\text{JS}(p_{\text{data}} \| p_g) - 2\log 2 \tag{2}\]</span></p>
+<p><strong>JS 散度的局限</strong>:</p>
+<ol type="1">
+<li><strong>支撑集不重叠时梯度消失</strong>:当 <span class="math inline">\(p_{\text{data}}\)</span> 与 <span class="math inline">\(p_g\)</span> 的支撑集在高维空间中不重叠（例如两个低维流形），JS 散度恒为 <span class="math inline">\(\log 2\)</span>，对 <span class="math inline">\(G\)</span> 的梯度为 0，生成器无法得到有效更新。</li>
+<li><strong>判别器饱和</strong>:判别器很容易将真实与生成样本完全分开（<span class="math inline">\(D(x_{\text{real}}) \approx 1\)</span>，<span class="math inline">\(D(G(z)) \approx 0\)</span>），此时 <span class="math inline">\(\log(1-D(G(z)))\)</span> 梯度很小，生成器训练困难。</li>
+<li><strong>模式崩塌与训练不稳定</strong>:实践中常出现模式崩塌、震荡，难以调参。</li>
+</ol>
+<p>因此需要一种<strong>即使分布不重叠仍能提供有效梯度</strong>的度量，并对应更稳定的训练目标。</p>
+<div data-align="center">
+<p><img src="pic/gan/5.1.jpeg" alt="JS散度在支撑集不重叠时恒为常数" style="width: 65%;"></p>
+</div>
+<p><small><strong>图1</strong> 当 <span class="math inline">\(p_{\text{data}}\)</span> 与 <span class="math inline">\(p_g\)</span> 不重叠时，JS 散度恒为 <span class="math inline">\(\log 2\)</span>。</small></p>
+<div data-align="center">
+<p><img src="pic/gan/5.2.jpeg" alt="JS散度在delta函数下的情形" style="width: 65%;"></p>
+</div>
+<p><small><strong>图2</strong> 当 <span class="math inline">\(p_{\text{data}}\)</span> 与 <span class="math inline">\(p_g\)</span> 为 delta 函数时，JS 散度的情形。</small></p>
+<h3 id="wgan-的改进目标">1.2 WGAN 的改进目标</h3>
+<p>WGAN（Arjovsky et al., 2017）做了以下改进:</p>
+<ul>
+<li><strong>用 Wasserstein 距离替代 JS 散度</strong>:Wasserstein-1 距离（Earth-Mover 距离）在分布不重叠时仍可提供有效梯度，且与生成质量更相关。</li>
+<li><strong>用 Critic 替代 Discriminator</strong>:不再输出“真/假”概率，而是输出一个实数分数；在 1-Lipschitz 约束下，<span class="math inline">\(\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(G(z))]\)</span> 近似 Wasserstein 距离。</li>
+<li><strong>通过权重裁剪（或后续 WGAN-GP 的梯度惩罚）</strong> 近似满足 1-Lipschitz，使训练稳定、损失可解释。</li>
+</ul>
+<div data-align="center">
+<p><img src="pic/gan/5.3.jpeg" alt="JS散度与支撑集不重叠" style="width: 65%;"></p>
+</div>
+<p><small><strong>图3</strong> JS 散度在支撑集不重叠时恒为常数，导致梯度消失；Wasserstein 距离仍随分布变化而变化，可提供有效梯度。</small></p>
+<hr />
+<h2 id="wgan-的理论基础">2. WGAN 的理论基础</h2>
+<p>Wasserstein 距离（Wasserstein Distance），又称<strong>推土机距离</strong>（Earth Mover’s Distance, EMD），是一种衡量两个概率分布之间差异的度量方式。它在最优传输理论（Optimal Transport Theory）中具有核心地位，近年来因其在生成模型（如 WGAN）中的优异表现而广受关注。</p>
+<h3 id="一个小故事">2.0 一个小故事</h3>
+<p>想象你有两堆沙子，形状不同，但总质量相同。你想把其中一堆沙子重新堆成另一堆的形状。Wasserstein 距离就是完成这个任务所需的最小“工作量”——即（每单位沙子移动的距离）×（移动的沙子量）的总和。 - 如果两堆沙子很接近，只需轻微挪动 → Wasserstein 距离小。 - 如果两堆沙子相距很远或完全不重叠 → 需要大量搬运 → Wasserstein 距离大。</p>
+<p>这比“是否重叠”更精细，因此比 KL 散度、JS 散度更适合处理支撑集不重叠（support disjoint）的分布（这在高维空间中非常常见）。</p>
+<div data-align="center">
+<p><img src="pic/gan/5.4.jpeg" alt="Wasserstein距离推土机直观" style="width: 65%;"></p>
+</div>
+<p><small><strong>图4</strong> Wasserstein距离推土机直观</small></p>
+<div data-align="center">
+<p><img src="pic/gan/5.5.jpeg" alt="把P分布通过铲子变成Q分布" style="width: 65%;"></p>
+</div>
+<p><small><strong>图5</strong> 把 P 分布通过“铲子”变成 Q 分布所需要的步骤</small></p>
+<h3 id="wasserstein-1-距离">2.1 Wasserstein-1 距离</h3>
+<p><strong>定义</strong>:对两个概率分布 <span class="math inline">\(p_{\text{data}}\)</span> 与 <span class="math inline">\(p_g\)</span>，Wasserstein-1 距离（Kantorovich-Rubinstein 形式）为:</p>
+<p><span class="math display">\[W_1(p_{\text{data}}, p_g) = \inf_{\gamma \in \Pi(p_{\text{data}}, p_g)} \mathbb{E}_{(x,y)\sim\gamma}[\|x - y\|] \tag{3}\]</span></p>
+<p>其中 <span class="math inline">\(\Pi(p_{\text{data}}, p_g)\)</span> 为边际分布为 <span class="math inline">\(p_{\text{data}}\)</span> 与 <span class="math inline">\(p_g\)</span> 的所有联合分布。直观上，<span class="math inline">\(W_1\)</span> 表示把 <span class="math inline">\(p_g\)</span> 的“质量”搬到 <span class="math inline">\(p_{\text{data}}\)</span> 所需的最小平均移动距离。</p>
+<div data-align="center">
+<p><img src="pic/gan/5.6.jpeg" alt="1-D离散与连续Wasserstein-1距离" style="width: 65%;"></p>
+</div>
+<p><small><strong>图6</strong> 1-D 情况下离散与连续的 Wasserstein-1 距离计算公式。</small></p>
+<p><strong>对偶形式（Kantorovich-Rubinstein 对偶）</strong>:</p>
+<p><span class="math display">\[W_1(p_{\text{data}}, p_g) = \sup_{\|f\|_L \leq 1} \left\{ \mathbb{E}_{x \sim p_{\text{data}}}[f(x)] - \mathbb{E}_{x \sim p_g}[f(x)] \right\} \tag{6}\]</span></p>
+<p>其中 <span class="math inline">\(\|f\|_L \leq 1\)</span> 表示 <span class="math inline">\(f\)</span> 为 <strong>1-Lipschitz</strong>（即 <span class="math inline">\(|f(x)-f(y)| \leq \|x-y\|\)</span>）。因此，若我们用神经网络 <span class="math inline">\(f_w\)</span> 近似满足 1-Lipschitz 的 <span class="math inline">\(f\)</span>，则:</p>
+<p><span class="math display">\[\max_{w:\, f_w \text{ 1-Lipschitz}} \left\{ \mathbb{E}_{x \sim p_{\text{data}}}[f_w(x)] - \mathbb{E}_{z \sim p_z}[f_w(G(z))] \right\} \tag{7}\]</span></p>
+<p>在最优时等于 <span class="math inline">\(W_1(p_{\text{data}}, p_g)\)</span>。WGAN 即用该式训练 <strong>Critic</strong> <span class="math inline">\(f_w\)</span>，并同时最小化 <span class="math inline">\(W_1\)</span> 来训练生成器 <span class="math inline">\(G\)</span>。</p>
+<div data-align="center">
+<p><img src="pic/gan/5.7.jpeg" alt="使用神经网络近似1-Lipschitz" style="width: 65%;"></p>
+</div>
+<p><small><strong>图7</strong> 使用神经网络 <span class="math inline">\(f_w\)</span> 近似满足 1-Lipschitz 的 <span class="math inline">\(f\)</span>。</small></p>
+<h3 id="critic-与-1-lipschitz-约束">2.2 Critic 与 1-Lipschitz 约束</h3>
+<ul>
+<li><strong>Discriminator（GAN）</strong>:输出 <span class="math inline">\(D(x) \in [0,1]\)</span>，表示“样本为真”的概率，用 sigmoid；目标为二分类交叉熵。</li>
+<li><strong>Critic（WGAN）</strong>:输出 <span class="math inline">\(f(x) \in \mathbb{R}\)</span>，无界标量；在 1-Lipschitz 约束下，<span class="math inline">\(\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(x_{\text{fake}})]\)</span> 近似 <span class="math inline">\(W_1\)</span>。</li>
+</ul>
+<p>WGAN 论文通过 <strong>权重裁剪</strong> 近似 1-Lipschitz:将 Critic 的权重限制在 <span class="math inline">\([-w, w]\)</span>（如 <span class="math inline">\(w=0.01\)</span>）。这样 <span class="math inline">\(f\)</span> 的 Lipschitz 常数被界住，虽非严格为 1，但实践上能稳定训练。</p>
+<p><strong>WGAN-GP（Gradient Penalty）</strong>:Gulrajani et al. (2017) 用 <strong>梯度惩罚</strong> 替代权重裁剪，直接约束 Critic 在样本处的梯度范数接近 1。惩罚项为:</p>
+<p><span class="math display">\[\mathcal{L}_{GP} = \lambda \, \mathbb{E}_{\hat{x}}\left[ \left( \|\nabla_{\hat{x}} f(\hat{x})\|_2 - 1 \right)^2 \right] \tag{8}\]</span></p>
+<p>其中 <span class="math inline">\(\hat{x} = \varepsilon x_{\text{real}} + (1-\varepsilon) x_{\text{fake}}\)</span>，<span class="math inline">\(\varepsilon \sim U(0,1)\)</span>，即真实样本与生成样本的<strong>随机凸插值</strong>。Critic 总损失为:</p>
+<p><span class="math display">\[L_c = -\big(\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(x_{\text{fake}})]\big) + \mathcal{L}_{GP} \tag{9}\]</span></p>
+<p>这样无需裁剪权重，Critic 表达能力更强，且 1-Lipschitz 约束更贴近理论；<span class="math inline">\(\lambda\)</span> 常用 10。本项目实现采用 <strong>WGAN-GP</strong>。</p>
+<div data-align="center">
+<p><img src="pic/gan/5.8.jpeg" alt="权重裁剪示意" style="width: 65%;"></p>
+</div>
+<p><small><strong>图8</strong> 权重裁剪示意:Critic 权重限制在 <span class="math inline">\([-w, w]\)</span>（如 <span class="math inline">\(w=0.01\)</span>）。WGAN-GP 则用梯度惩罚替代裁剪。</small></p>
+<h3 id="目标函数小结">2.3 目标函数小结</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 66%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>角色</th>
+<th>目标（WGAN）</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Critic</strong></td>
+<td>最大化 <span class="math inline">\(\mathbb{E}_{x \sim p_{\text{data}}}[f(x)] - \mathbb{E}_{z \sim p_z}[f(G(z))]\)</span>，即估计 <span class="math inline">\(W_1\)</span></td>
+</tr>
+<tr class="even">
+<td><strong>Generator</strong></td>
+<td>最小化 <span class="math inline">\(W_1\)</span>，即最大化 <span class="math inline">\(\mathbb{E}_{z \sim p_z}[f(G(z))]\)</span>（让生成样本在 Critic 下得高分）</td>
+</tr>
+</tbody>
+</table>
+<p>因此训练时: - <strong>Critic</strong>:最小化 <span class="math inline">\(L_c = -\big(\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(G(z))]\big)\)</span>； - <strong>Generator</strong>:最小化 <span class="math inline">\(L_g = -\mathbb{E}[f(G(z))]\)</span>。</p>
+<hr />
+<h2 id="wgan-与-gan-的对比">3. WGAN 与 GAN 的对比</h2>
+<div data-align="center">
+<p><img src="pic/gan/5.9.jpeg" alt="WGAN与GAN对比" style="width: 65%;"></p>
+</div>
+<p><small><strong>图9</strong> WGAN 与原始 GAN 的对比</small></p>
+<div data-align="center">
+<p><img src="pic/gan/5.10.jpeg" alt="WGAN与GAN对比" style="width: 65%;"></p>
+</div>
+<p><small><strong>图10</strong> WGAN 与原始 GAN 的对比</small></p>
+<p>主要差异可概括为三点:</p>
+<ol type="1">
+<li><strong>约束</strong>:WGAN 增加了权重裁剪（或梯度惩罚）约束，使 Critic 满足 1-Lipschitz，保证梯度有效。</li>
+<li><strong>损失形式</strong>:WGAN 在 Loss 中移除了 Log，直接优化 Wasserstein 距离的近似，梯度更平滑。</li>
+<li><strong>角色定位</strong>:原始 GAN 的 Discriminator 像是一位<strong>鉴伪专家</strong>（Forgery Expert），只能做“真/假”二分类；WGAN 的 Critic 则更像<strong>艺术评论家</strong>（Art Critic）——不只说“好/坏”，而是给出连续的质量评分；其评分差异（真实样本得分高、生成样本得分低）直接构成优化目标，生成器通过拉高自己的分数来学习，Critic 的梯度则告诉它“往哪个方向改能更像真品”。</li>
+</ol>
+<table>
+<thead>
+<tr class="header">
+<th>特性</th>
+<th>GAN</th>
+<th>WGAN</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>度量</td>
+<td>JS 散度</td>
+<td>Wasserstein-1 距离</td>
+</tr>
+<tr class="even">
+<td>判别端</td>
+<td>Discriminator，输出概率 <span class="math inline">\([0,1]\)</span></td>
+<td>Critic，输出标量 <span class="math inline">\(\mathbb{R}\)</span></td>
+</tr>
+<tr class="odd">
+<td>最后一层</td>
+<td>Sigmoid</td>
+<td>无激活（线性）</td>
+</tr>
+<tr class="even">
+<td>约束</td>
+<td>无</td>
+<td>1-Lipschitz（权重裁剪或梯度惩罚）</td>
+</tr>
+<tr class="odd">
+<td>损失含义</td>
+<td>二分类交叉熵</td>
+<td><span class="math inline">\(W_1\)</span> 的近似，可解释为“距离”</td>
+</tr>
+<tr class="even">
+<td>梯度性质</td>
+<td>支撑不重叠时易梯度消失</td>
+<td>仍可提供有效梯度</td>
+</tr>
+<tr class="odd">
+<td>训练稳定性</td>
+<td>对超参敏感，易模式崩塌</td>
+<td>相对更稳定，损失可作监控</td>
+</tr>
+<tr class="even">
+<td>典型优化器</td>
+<td>Adam</td>
+<td>RMSprop（论文推荐）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="训练流程与实现要点">4. 训练流程与实现要点</h2>
+<h3 id="算法步骤">4.1 算法步骤</h3>
+<p><strong>WGAN（权重裁剪）</strong>:</p>
+<ol type="1">
+<li><strong>Critic 更新</strong>（每步 <span class="math inline">\(n_{\text{critic}}\)</span> 次）:计算 <span class="math inline">\(L_c = -\big(\mathbb{E}[f(x)] - \mathbb{E}[f(\tilde{x})]\big)\)</span>，更新后对 Critic 所有权重做 <span class="math inline">\(\theta \leftarrow \text{clip}(\theta, -w, w)\)</span>。</li>
+<li><strong>Generator 更新</strong>（每步 1 次）:最小化 <span class="math inline">\(L_g = -\mathbb{E}[f(G(z))]\)</span>。</li>
+</ol>
+<p><strong>WGAN-GP（梯度惩罚，本项目采用）</strong>:</p>
+<ol type="1">
+<li><strong>Critic 更新</strong>（每 batch 1 次）:计算 Wasserstein 项 <span class="math inline">\(-\big(\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(x_{\text{fake}})]\big)\)</span>，再在真实与生成样本的<strong>随机插值</strong> <span class="math inline">\(\hat{x}\)</span> 上计算梯度惩罚 <span class="math inline">\(\mathcal{L}_{GP} = \lambda \mathbb{E}[(\|\nabla_{\hat{x}} f(\hat{x})\|_2 - 1)^2]\)</span>，总损失 <span class="math inline">\(L_c = L_{W} + \mathcal{L}_{GP}\)</span>，反向传播更新 Critic（<strong>无权重裁剪</strong>）。</li>
+<li><strong>Generator 更新</strong>:每 <span class="math inline">\(n_{\text{critic}}\)</span> 个 batch 训练 1 次，最小化 <span class="math inline">\(L_g = -\mathbb{E}[f(G(z))]\)</span>。</li>
+</ol>
+<h3 id="实现细节">4.2 实现细节</h3>
+<ul>
+<li><strong>最后一层无 sigmoid</strong>:Critic 输出层为线性，输出任意实数。</li>
+<li><strong>WGAN（权重裁剪）</strong>:<span class="math inline">\(w\)</span> 常取 <span class="math inline">\(0.01\)</span>；优化器多用 RMSprop，学习率约 <span class="math inline">\(5\times 10^{-5}\)</span>。</li>
+<li><strong>WGAN-GP（梯度惩罚）</strong>:
+<ul>
+<li><strong>惩罚项</strong>:在 <span class="math inline">\(\hat{x} = \varepsilon x_{\text{real}} + (1-\varepsilon) x_{\text{fake}}\)</span>（<span class="math inline">\(\varepsilon \sim U(0,1)\)</span>）上计算 <span class="math inline">\(\|\nabla_{\hat{x}} f(\hat{x})\|_2\)</span>，惩罚 <span class="math inline">\(( \|\nabla_{\hat{x}} f\|_2 - 1 )^2\)</span>；<span class="math inline">\(\lambda\)</span> 常用 <strong>10</strong>。</li>
+<li><strong>优化器</strong>:推荐 <strong>Adam</strong>，<span class="math inline">\(\beta_1=0\)</span>、<span class="math inline">\(\beta_2=0.9\)</span>，学习率常用 <span class="math inline">\(1\times 10^{-4}\)</span>；无需权重裁剪。</li>
+</ul></li>
+<li><strong>不要对 Critic 使用 BatchNorm</strong>:会改变每层输入分布，不利于 1-Lipschitz；可用 LayerNorm 或不用归一化。</li>
+</ul>
+<h3 id="损失与指标">4.3 损失与指标</h3>
+<ul>
+<li><strong>Critic 损失</strong> <span class="math inline">\(L_c\)</span>:在训练良好时，<span class="math inline">\(-L_c\)</span>（即 <span class="math inline">\(\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(G(z))]\)</span>）可视为 <span class="math inline">\(W_1\)</span> 的估计，<strong>可作为训练进度与生成质量的参考</strong>（值越大说明分布越接近或 Critic 越强）。</li>
+<li>与 GAN 不同:GAN 的判别器输出接近 0.5 表示“无法区分”；WGAN 的 Critic 分数无固定阈值，<strong>分数越高越像真实分布</strong>，且损失曲线更有信息量。</li>
+</ul>
+<hr />
+<h2 id="代码实现要点">5. 代码实现要点</h2>
+<p>本项目在 <code>code/dl/gan/wgan/</code> 下实现了 <strong>WGAN-GP</strong>（梯度惩罚版）:</p>
+<ul>
+<li><strong><code>wgan.py</code></strong>:<code>Generator</code> 与 GAN 相同；<code>Critic</code> 与 Discriminator 结构类似，最后一层为 <code>nn.Linear(..., 1)</code>，无 sigmoid。</li>
+<li><strong><code>train_infer.py</code></strong>:每个 batch 先更新 Critic 一次（Wasserstein 项 + 梯度惩罚），再按 <code>n_critic</code> 每若干 batch 更新 Generator 一次；推理时展示真实/生成样本的 Critic 分数及插值效果。</li>
+<li><strong><code>config.yaml</code></strong>:可配置 <code>n_critic</code>、<code>lambda_gp</code>（梯度惩罚系数，默认 10）、<code>optimizer</code>（WGAN-GP 推荐 <code>adam</code>）、学习率等；<strong>无</strong> <code>weight_clip</code>。</li>
+</ul>
+<p><strong>梯度惩罚计算</strong>:在真实样本与生成样本的随机插值 <span class="math inline">\(\hat{x}\)</span> 上对 Critic 输出求梯度，惩罚梯度范数偏离 1。</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="kw">def</span> compute_gradient_penalty(critic, real_samples, fake_samples):</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>    alpha <span class="op">=</span> torch.rand(real_samples.size(<span class="dv">0</span>), <span class="dv">1</span>).to(device)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>    interpolates <span class="op">=</span> (alpha <span class="op">*</span> real_samples <span class="op">+</span> (<span class="dv">1</span> <span class="op">-</span> alpha) <span class="op">*</span> fake_samples).requires_grad_(<span class="va">True</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>    d_interpolates <span class="op">=</span> critic(interpolates)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>    gradients <span class="op">=</span> autograd.grad(</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>        outputs<span class="op">=</span>d_interpolates, inputs<span class="op">=</span>interpolates,</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>        grad_outputs<span class="op">=</span>torch.ones_like(d_interpolates), create_graph<span class="op">=</span><span class="va">True</span>, retain_graph<span class="op">=</span><span class="va">True</span>, only_inputs<span class="op">=</span><span class="va">True</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>    )[<span class="dv">0</span>]</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>    gradients <span class="op">=</span> gradients.view(gradients.size(<span class="dv">0</span>), <span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>    gradient_penalty <span class="op">=</span> ((gradients.norm(<span class="dv">2</span>, dim<span class="op">=</span><span class="dv">1</span>) <span class="op">-</span> <span class="dv">1</span>) <span class="op">**</span> <span class="dv">2</span>).mean() <span class="op">*</span> lambda_gp</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>    <span class="cf">return</span> gradient_penalty</span></code></pre></div>
+<p><strong>Critic 与 Generator 更新（WGAN-GP）</strong>:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="co"># Critic:Wasserstein 项 + 梯度惩罚（无权重裁剪）</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>real_validity <span class="op">=</span> critic(images)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>fake_images <span class="op">=</span> generator(noise).detach()</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>fake_validity <span class="op">=</span> critic(fake_images)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>c_loss_w <span class="op">=</span> <span class="op">-</span>torch.mean(real_validity) <span class="op">+</span> torch.mean(fake_validity)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a>gradient_penalty <span class="op">=</span> compute_gradient_penalty(critic, images, fake_images)</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>c_loss <span class="op">=</span> c_loss_w <span class="op">+</span> gradient_penalty</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a>c_loss.backward()</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a>c_optimizer.step()</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a><span class="co"># Generator:每 n_critic 个 batch 更新一次</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true"></a>fake_validity <span class="op">=</span> critic(generator(noise))</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true"></a>g_loss <span class="op">=</span> <span class="op">-</span>torch.mean(fake_validity)</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true"></a>g_loss.backward()</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true"></a>g_optimizer.step()</span></code></pre></div>
+<p>优化器使用 <strong>Adam</strong>，<code>betas=(0.0, 0.9)</code>，与 WGAN-GP 论文一致。</p>
+<hr />
+<h2 id="试验结果">6. 试验结果</h2>
+<p>本节基于 <code>code/dl/gan/wgan/</code> 的 WGAN-GP 实现，在 MNIST 上训练后的推理与 Critic 评分结果。</p>
+<h3 id="生成器生成新图像">6.1 生成器:生成新图像</h3>
+<p>代码中的 <code>infer</code> 部分展示 WGAN-GP 的<strong>生成能力</strong>:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="co"># 模型推理 - 生成新图像</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a><span class="cf">if</span> infer:</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>    generator.<span class="bu">eval</span>()</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a>    <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a>        noise <span class="op">=</span> torch.randn(sample_size, noise_dim, device<span class="op">=</span>device)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a>        fake_images <span class="op">=</span> generator(noise)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true"></a>        fake_images <span class="op">=</span> fake_images.view(sample_size, <span class="dv">1</span>, <span class="dv">28</span>, <span class="dv">28</span>)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true"></a>        <span class="co"># 将输出从 [-1, 1] 转换回 [0, 1] 用于显示</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true"></a>        fake_images <span class="op">=</span> (fake_images <span class="op">+</span> <span class="dv">1</span>) <span class="op">/</span> <span class="dv">2</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true"></a>        fake_images <span class="op">=</span> torch.clamp(fake_images, <span class="fl">0.0</span>, <span class="fl">1.0</span>)</span></code></pre></div>
+<div data-align="center">
+<p><img src="pic/gan/5.11.jpg" alt="WGAN-GP生成图像" style="width: 70%;"></p>
+</div>
+<p><small><strong>图11</strong> WGAN-GP 的生成能力:从随机噪声生成的 MNIST 数字图像及 Critic 分数（分数越高表示 Critic 认为越接近真实分布）。</small></p>
+<p>从生成结果可以观察:</p>
+<ul>
+<li><strong>生成质量</strong>:在训练充分且 Critic 保持「真实均分 &gt; 生成均分」时，生成器能产出清晰、类 MNIST 的数字图像。</li>
+<li><strong>多模态</strong>:生成器可覆盖多种数字形态，减轻模式崩塌。</li>
+</ul>
+<h3 id="critic评分能力">6.2 Critic:评分能力</h3>
+<p>与 GAN 的判别器不同，WGAN 的 Critic 输出<strong>无界标量</strong>，不做 0/1 二分类。代码中通过真实样本与生成样本的 Critic 分数统计评估训练状态:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a><span class="co"># 真实样本与生成样本的 Critic 分数</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a>generator.<span class="bu">eval</span>()</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a>critic.<span class="bu">eval</span>()</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a><span class="cf">with</span> torch.no_grad():</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a>    real_score <span class="op">=</span> critic(real_images).mean().item()</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a>    fake_images <span class="op">=</span> generator(noise)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a>    fake_score <span class="op">=</span> critic(fake_images).mean().item()</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a><span class="co"># 统计:真实均分、生成均分、差距（真实 − 生成）</span></span></code></pre></div>
+<div data-align="center">
+<p><img src="pic/gan/5.12.jpg" alt="真实图像与Critic分数" style="width: 70%;"></p>
+</div>
+<p><small><strong>图12</strong> 真实图像的 Critic 分数（同一 batch）。</small></p>
+<p>根据真实样本与生成样本的 Critic 分数统计（例如在同一 batch 上）:</p>
+<ul>
+<li><strong>真实图像</strong>:平均分数记为 <span class="math inline">\(\bar{f}_{\text{real}}\)</span>，本例为 <strong>5.7097</strong>；不同真实样本分数有高有低，取决于在 Critic 学到的分布中的「典型程度」。</li>
+<li><strong>生成图像</strong>:平均分数记为 <span class="math inline">\(\bar{f}_{\text{fake}}\)</span>，本例为 <strong>4.3750</strong>。</li>
+<li><strong>差距</strong>:<span class="math inline">\(\bar{f}_{\text{real}} - \bar{f}_{\text{fake}} = 5.7097 - 4.3750 = 1.3347\)</span>。理论期望为 <span class="math inline">\(W_1\)</span> 的近似，应 <strong>&gt; 0</strong>，本例满足，说明 Critic 能有效区分真假、训练状态健康。</li>
+</ul>
+<p>从上述统计可得到以下结论:</p>
+<ul>
+<li><strong>Critic 的评分含义</strong>:
+<ul>
+<li>Critic 分数<strong>无固定阈值</strong>（不能像 GAN 的 0.5 那样作真假界限）；<strong>分数越高</strong>表示在该 Critic 下越「像真实分布」。</li>
+<li>应比较<strong>同一模型、同一 batch</strong>下的<strong>真实均分</strong>与<strong>生成均分</strong>，而非单张对比。</li>
+</ul></li>
+<li><strong>WGAN 训练状态评估</strong>:
+<ul>
+<li><strong>健康</strong>:<span class="math inline">\(\bar{f}_{\text{real}} &gt; \bar{f}_{\text{fake}}\)</span>，且训练过程中差距保持为正，生成质量通常较好。</li>
+<li><strong>异常</strong>:<span class="math inline">\(\bar{f}_{\text{fake}} \geq \bar{f}_{\text{real}}\)</span>，说明 Critic 未能有效区分真假，可尝试增大 <code>n_critic</code>、<code>lambda_gp</code> 或训练轮数。</li>
+<li>若生成视觉质量差但分数不低，多为 Critic 与生成器尚未对齐或训练不足，需继续训练并监控真实/生成均分。</li>
+</ul></li>
+</ul>
+<hr />
+<h2 id="总结">7. 总结</h2>
+<ul>
+<li><strong>动机</strong>:GAN 的 JS 散度在支撑不重叠时梯度消失，训练不稳定；WGAN 改用 Wasserstein 距离，梯度性质更好。</li>
+<li><strong>理论</strong>:Wasserstein-1 的对偶形式给出 <span class="math inline">\(\max_f \{\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(x_{\text{fake}})]\}\)</span>，其中 <span class="math inline">\(f\)</span> 为 1-Lipschitz；可用权重裁剪或梯度惩罚近似该约束。</li>
+<li><strong>实现</strong>:Critic 无 sigmoid；本项目采用 <strong>WGAN-GP</strong>:在真实/生成样本的随机插值上施加梯度惩罚 <span class="math inline">\(\lambda(\|\nabla_{\hat{x}} f\|_2 - 1)^2\)</span>，无需权重裁剪，Critic 表达能力更强；Generator 最小化 <span class="math inline">\(-\mathbb{E}[f(G(z))]\)</span>；优化器推荐 Adam <span class="math inline">\((0, 0.9)\)</span>。</li>
+</ul>
+<hr />
+<h2 id="参考文献">参考文献</h2>
+<ol type="1">
+<li><p>Arjovsky, M., Chintala, S., &amp; Bottou, L. (2017). Wasserstein generative adversarial networks. <em>International Conference on Machine Learning</em> (pp. 214–223).</p></li>
+<li><p>Gulrajani, I., Ahmed, F., Arjovsky, M., Dumoulin, V., &amp; Courville, A. (2017). Improved training of Wasserstein GANs. <em>Advances in Neural Information Processing Systems</em>, 30.</p></li>
+<li><p>Arjovsky, M., &amp; Bottou, L. (2017). Towards principled methods for training generative adversarial networks. <em>International Conference on Learning Representations</em>.</p></li>
+<li><p>Goodfellow, I., Pouget-Abadie, J., Mirza, M., Xu, B., Warde-Farley, D., Ozair, S., … &amp; Bengio, Y. (2014). Generative adversarial nets. <em>Advances in Neural Information Processing Systems</em>, 27.</p></li>
+<li><p>Kaiming He, Deep Generative Models.</p></li>
+</ol>
+</body>
+</html>

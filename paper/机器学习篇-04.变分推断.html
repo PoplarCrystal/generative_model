@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>机器学习篇-04.变分推断</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="机器学习篇-04.变分推断">机器学习篇-04.变分推断</h1>
+<h2 id="近似推断方法">1. 近似推断方法</h2>
+<h3 id="两种主要方法">1.1 两种主要方法</h3>
+<p>对于概率模型 <span class="math inline">\(p(x, \theta) = p(x | \theta) p(\theta)\)</span>，有两种主要的近似推断方法:</p>
+<h4 id="变分推断-variational-inference-vi">1.1.1 变分推断 (Variational Inference, VI)</h4>
+<p><strong>方法</strong>:近似 <span class="math inline">\(p(\theta | x) \approx q(\theta) \in Q\)</span></p>
+<p><strong>特点</strong>: - <strong>有偏的 (Biased)</strong>:近似可能不准确 - <strong>更快且可扩展</strong>:计算效率高 - 使用参数化分布族 <span class="math inline">\(Q\)</span> 来近似后验</p>
+<h4 id="马尔可夫链蒙特卡洛-mcmc">1.1.2 马尔可夫链蒙特卡洛 (MCMC)</h4>
+<p><strong>方法</strong>:从非归一化的 <span class="math inline">\(p(\theta | x)\)</span> 中采样</p>
+<p><strong>特点</strong>: - <strong>无偏的 (Unbiased)</strong>:理论上可以精确 - <strong>需要大量样本</strong>:计算成本高 - 通过采样来近似后验分布</p>
+<p>可视化对比如图1所示。</p>
+<p><img src="pic/ml/4-1.jpg" alt="图1:变分推断 & 蒙特卡洛采样对比" style="width: 65%;"></p>
+<p><small><strong>图1</strong> 变分推断 &amp; 蒙特卡洛采样对比</small></p>
+<hr />
+<h2 id="变分推断的基本思想">2. 变分推断的基本思想</h2>
+<h3 id="核心问题">2.1 核心问题</h3>
+<p><strong>目标</strong>:找到后验分布的近似 <span class="math inline">\(p(\theta | x) \approx q(\theta) \in Q\)</span></p>
+<p><strong>优化准则</strong>:</p>
+<p><span class="math display">\[F(q) := \text{KL}(q(\theta) \| p(\theta | x)) \to \min_{q(\theta) \in Q} \tag{4.1}\]</span></p>
+<p>其中 <span class="math inline">\(\text{KL}(q \| p)\)</span> 是 Kullback-Leibler 散度，用于衡量两个分布之间的不匹配程度。</p>
+<h3 id="面临的挑战">2.2 面临的挑战</h3>
+<ol type="1">
+<li><strong>我们无法计算后验</strong>:如果后验可计算，就不需要近似了</li>
+<li><strong>如何对分布进行优化</strong>:需要将分布优化问题转化为可处理的形式</li>
+</ol>
+<hr />
+<h2 id="kl散度">3. KL散度</h2>
+<h3 id="定义">3.1 定义</h3>
+<p>Kullback-Leibler 散度是衡量同一域上两个分布之间不匹配程度的良好度量:</p>
+<p><span class="math display">\[\text{KL}(q(\theta) \| p(\theta | x)) = \int q(\theta) \log \frac{q(\theta)}{p(\theta | x)} d\theta \tag{4.2}\]</span></p>
+<h3 id="性质">3.2 性质</h3>
+<ol type="1">
+<li><strong>非负性</strong>:<span class="math inline">\(\text{KL}(q \| p) \geq 0\)</span>，当且仅当 <span class="math inline">\(q = p\)</span> 时等号成立</li>
+<li><strong>非对称性</strong>:<span class="math inline">\(\text{KL}(q \| p) \neq \text{KL}(p \| q)\)</span></li>
+<li><strong>零散度</strong>:<span class="math inline">\(\text{KL}(q \| p) = 0\)</span> 当且仅当 <span class="math inline">\(q = p\)</span></li>
+</ol>
+<h3 id="两种kl散度的区别">3.3 两种KL散度的区别</h3>
+<ul>
+<li><strong><span class="math inline">\(\text{KL}(q \| p)\)</span></strong>（反向KL）:倾向于“模式寻找”（mode-seeking）
+<ul>
+<li>当 <span class="math inline">\(q\)</span> 试图覆盖 <span class="math inline">\(p\)</span> 的主要模式时使用</li>
+<li>可能导致 <span class="math inline">\(q\)</span> 过于集中</li>
+</ul></li>
+<li><strong><span class="math inline">\(\text{KL}(p \| q)\)</span></strong>（前向KL）:倾向于“均值匹配”（mean-matching）
+<ul>
+<li>当 <span class="math inline">\(q\)</span> 试图覆盖 <span class="math inline">\(p\)</span> 的整个支撑集时使用</li>
+<li>可能导致 <span class="math inline">\(q\)</span> 过于分散</li>
+</ul></li>
+</ul>
+<p>在变分推断中，我们使用 <span class="math inline">\(\text{KL}(q \| p)\)</span>，因为它更容易优化（不需要从真实后验采样）。</p>
+<hr />
+<h2 id="证据下界-elbo-的推导">4. 证据下界 (ELBO) 的推导</h2>
+<h3 id="数学技巧">4.1 数学技巧</h3>
+<p>我们从证据（边际似然）开始:</p>
+<p><span class="math display">\[\log p(x) = \int q(\theta) \log p(x) d\theta\]</span></p>
+<p>由于 <span class="math inline">\(p(x)\)</span> 不依赖于 <span class="math inline">\(\theta\)</span>，我们可以将其移到积分内。然后使用贝叶斯定理:</p>
+<p><span class="math display">\[\log p(x) = \int q(\theta) \log \frac{p(x, \theta)}{p(\theta | x)} d\theta\]</span></p>
+<p>重新组织项:</p>
+<p><span class="math display">\[\log p(x) = \int q(\theta) \log \frac{p(x, \theta) q(\theta)}{p(\theta | x) q(\theta)} d\theta\]</span></p>
+<p><span class="math display">\[= \int q(\theta) \log \frac{p(x, \theta)}{q(\theta)} d\theta + \int q(\theta) \log \frac{q(\theta)}{p(\theta | x)} d\theta\]</span></p>
+<p><span class="math display">\[= \mathcal{L}(q(\theta)) + \text{KL}(q(\theta) \| p(\theta | x)) \tag{4.3}\]</span></p>
+<h3 id="elbo-的定义">4.2 ELBO 的定义</h3>
+<p><strong>证据下界 (Evidence Lower Bound, ELBO)</strong>:</p>
+<p><span class="math display">\[\mathcal{L}(q(\theta)) = \int q(\theta) \log \frac{p(x, \theta)}{q(\theta)} d\theta \tag{4.4}\]</span></p>
+<p><strong>关键关系</strong>:</p>
+<p><span class="math display">\[\log p(x) = \mathcal{L}(q(\theta)) + \text{KL}(q(\theta) \| p(\theta | x)) \tag{4.5}\]</span></p>
+<h3 id="elbo-的含义">4.3 ELBO 的含义</h3>
+<ol type="1">
+<li><strong>证据 (Evidence)</strong> <span class="math inline">\(p(x)\)</span>:
+<ul>
+<li>概率模型的证据表示观察到数据的总概率</li>
+<li>在贝叶斯定理中:<span class="math inline">\(p(\theta | x) = \frac{p(x | \theta) p(\theta)}{p(x)} = \frac{\text{似然} \times \text{先验}}{\text{证据}}\)</span></li>
+</ul></li>
+<li><strong>下界 (Lower Bound)</strong>:
+<ul>
+<li>由于 KL 散度非负:<span class="math inline">\(\text{KL}(q(\theta) \| p(\theta | x)) \geq 0\)</span></li>
+<li>因此:<span class="math inline">\(\log p(x) \geq \mathcal{L}(q(\theta))\)</span></li>
+<li>ELBO 是证据的下界</li>
+</ul></li>
+<li><strong>优化等价性</strong>:
+<ul>
+<li>最大化 ELBO 等价于最小化 KL 散度</li>
+<li>当 <span class="math inline">\(q(\theta) = p(\theta | x)\)</span> 时，ELBO 达到上界 <span class="math inline">\(\log p(x)\)</span></li>
+</ul></li>
+</ol>
+<hr />
+<h2 id="变分推断的优化问题">5. 变分推断的优化问题</h2>
+<h3 id="原始问题">5.1 原始问题</h3>
+<p><span class="math display">\[\text{KL}(q(\theta) \| p(\theta | x)) \to \min_{q(\theta) \in Q} \tag{4.6}\]</span></p>
+<h3 id="等价问题">5.2 等价问题</h3>
+<p>使用我们的“魔法”关系:</p>
+<p><span class="math display">\[\log p(x) = \mathcal{L}(q(\theta)) + \text{KL}(q(\theta) \| p(\theta | x)) \tag{4.7}\]</span></p>
+<p>注意到: - <span class="math inline">\(\log p(x)\)</span> <strong>不依赖于</strong> <span class="math inline">\(q\)</span> - <span class="math inline">\(\text{KL}(q(\theta) \| p(\theta | x))\)</span> <strong>依赖于</strong> <span class="math inline">\(q\)</span> - <span class="math inline">\(\mathcal{L}(q(\theta))\)</span> <strong>依赖于</strong> <span class="math inline">\(q\)</span></p>
+<p>因此:</p>
+<p><span class="math display">\[\text{KL}(q(\theta) \| p(\theta | x)) \to \min_{q(\theta) \in Q} \quad \Leftrightarrow \quad \mathcal{L}(q(\theta)) \to \max_{q(\theta) \in Q} \tag{4.8}\]</span></p>
+<h3 id="最终优化问题">5.3 最终优化问题</h3>
+<p><span class="math display">\[\mathcal{L}(q(\theta)) = \int q(\theta) \log \frac{p(x, \theta)}{q(\theta)} d\theta = \int q(\theta) \log \frac{p(x | \theta) p(\theta)}{q(\theta)} d\theta \to \max_{q(\theta) \in Q} \tag{4.9}\]</span></p>
+<h3 id="elbo-的两种解释">5.4 ELBO 的两种解释</h3>
+<h4 id="解释-1分解形式">5.4.1 解释 1:分解形式</h4>
+<p><span class="math display">\[\mathcal{L}(q(\theta)) = \int q(\theta) \log p(x | \theta) d\theta + \int q(\theta) \log \frac{p(\theta)}{q(\theta)} d\theta \tag{4.10}\]</span></p>
+<p><span class="math display">\[= \mathbb{E}_{q(\theta)}[\log p(x | \theta)] - \text{KL}(q(\theta) \| p(\theta)) \tag{4.11}\]</span></p>
+<h4 id="解释-2数据项和正则化项">5.4.2 解释 2:数据项和正则化项</h4>
+<ul>
+<li><strong>数据项</strong>:<span class="math inline">\(\mathbb{E}_{q(\theta)}[\log p(x | \theta)]\)</span>
+<ul>
+<li>鼓励 <span class="math inline">\(q(\theta)\)</span> 将概率质量放在能够很好解释数据的参数值上</li>
+<li>最大化数据的对数似然期望</li>
+</ul></li>
+<li><strong>正则化项</strong>:<span class="math inline">\(-\text{KL}(q(\theta) \| p(\theta))\)</span>
+<ul>
+<li>鼓励 <span class="math inline">\(q(\theta)\)</span> 接近先验 <span class="math inline">\(p(\theta)\)</span></li>
+<li>防止过拟合，提供正则化</li>
+</ul></li>
+</ul>
+<p><strong>平衡</strong>:ELBO 在拟合数据和保持接近先验之间进行权衡。</p>
+<hr />
+<h2 id="em算法">6. EM算法</h2>
+<h3 id="进入em算法">6.1 进入EM算法</h3>
+<p>式4.4中的<span class="math inline">\(\text{ELBO}(x; q, \theta)\)</span>有两个参数<span class="math inline">\(q(z)\)</span>和<span class="math inline">\(\theta\)</span>。这两个参数需要优化（找出使ELBO最大的两个参数）。然而，同时优化<span class="math inline">\(q(z)\)</span>和<span class="math inline">\(\theta\)</span>并不容易，因此需要重复进行固定一个参数并优化另一个参数的过程。具体来说就是重复进行固定<span class="math inline">\(\theta\)</span>并更新<span class="math inline">\(q(z)\)</span>，然后固定<span class="math inline">\(q(z)\)</span>并更新<span class="math inline">\(\theta\)</span>的过程。通过重复进行这一过程，我们可以逐渐接近最优解。</p>
+<p>首先将<span class="math inline">\(\theta\)</span>固定为当前值（假设此时<span class="math inline">\(\theta = \theta_{\text{old}}\)</span>），然后考虑对<span class="math inline">\(q(z)\)</span>进行优化。<span class="math inline">\(q(z)\)</span>表示关于<span class="math inline">\(z\)</span>的任意概率分布。无论<span class="math inline">\(q(z)\)</span>是什么样的概率分布，<span class="math inline">\(\log p_\theta(x) = \text{ELBO}(x; q, \theta) + \text{KL}(q(z) \| p_\theta(z|x))\)</span>都成立。然而，不同的<span class="math inline">\(q(z)\)</span>的分布使得<span class="math inline">\(\text{ELBO}(x; q, \theta)\)</span>与<span class="math inline">\(\log p_\theta(x)\)</span>的接近程度有所不同。当然，我们希望<span class="math inline">\(\text{ELBO}(x; q, \theta)\)</span>尽可能地接近<span class="math inline">\(\log p_\theta(x)\)</span>。为此，下面的式子可作为提示:</p>
+<p><span class="math display">\[\log p_\theta(x) = \text{ELBO}(x; q, \theta) + \text{KL}(q(z) \| p_\theta(z|x)) \tag{4.12}\]</span></p>
+<p>需要注意的是，<span class="math inline">\(q(z)\)</span>并未出现在式4.12左侧的<span class="math inline">\(\log p_\theta(x)\)</span>中。重点在于，无论<span class="math inline">\(q(z)\)</span>如何变化，ELBO项和KL项的总和都始终保持不变（参见图2）。</p>
+<p><img src="pic/ml/4-2.jpg" alt="图2:无论$q(z)$如何变化，ELBO项和KL项的总和都始终保持不变" style="width: 65%;"></p>
+<p><small><strong>图2</strong> 无论<span class="math inline">\(q(z)\)</span>如何变化，ELBO项和KL项的总和都始终保持不变</small></p>
+<p>从图2可以看出，KL项越小，ELBO项就越大。当两个概率分布相同时，KL散度取最小值0。因此，当<span class="math inline">\(q(z) = p_\theta(z|x)\)</span>时，KL项为0，此时ELBO项最大。由于KL项实际上是0，因此<span class="math inline">\(\log p_\theta(x) = \text{ELBO}(x; q, \theta)\)</span>。</p>
+<p>基于以上信息，<span class="math inline">\(q(z)\)</span>的更新式可以表示为<span class="math inline">\(q(z) = p_\theta(z|x)\)</span>。更准确地说，由于<span class="math inline">\(\theta\)</span>固定为<span class="math inline">\(\theta = \theta_{\text{old}}\)</span>，因此更新式是<span class="math inline">\(q(z) = p_{\theta_{\text{old}}}(z|x)\)</span>。这种由<span class="math inline">\(q(z) = p_\theta(z|x)\)</span>进行的更新是EM算法的“E步骤”。E来源于“Expectation Value”（期望值）中的E。之所以称为“期望值”，是因为<span class="math inline">\(q(z) = p_\theta(z|x)\)</span>时的ELBO可以表示为以下式子所示的期望值:</p>
+<p><span class="math display">\[\text{ELBO}(x; q = p_\theta(z|x), \theta) = \sum_z p_\theta(z|x) \log p_\theta(x, z) - \sum_z p_\theta(z|x) \log p_\theta(z|x) \tag{4.13}\]</span></p>
+<p>图3是E步骤更新的可视化图形。重要的一点是，当<span class="math inline">\(q(z) = p_\theta(z|x)\)</span>时，ELBO和对数似然是相等的。</p>
+<p><img src="pic/ml/4-3.jpg" alt="图3:E步骤中对数似然与ELBO的关系" style="width: 65%;"></p>
+<p><small><strong>图3</strong> E步骤中对数似然与ELBO的关系</small></p>
+<p>接下来是关于<span class="math inline">\(\theta\)</span>的优化，这个过程很简单。由于ELBO是sum-log的形式，因此可以用解析的方式求出。具体来说，可以通过求式4.13关于<span class="math inline">\(\theta\)</span>的导数，并解出其为0的方程的做法来求出。这项任务是EM算法的“M步骤”。M是“Maximization”（最大化）的首字母，意思是使ELBO相对于<span class="math inline">\(\theta\)</span>“最大化”（参见图4）。</p>
+<p><img src="pic/ml/4-4.jpg" alt="图4:M步骤使ELBO相对于$\theta$最大化" style="width: 65%;"></p>
+<p><small><strong>图4</strong> M步骤使ELBO相对于<span class="math inline">\(\theta\)</span>最大化</small></p>
+<p>在E步骤中，通过更新<span class="math inline">\(q(z)\)</span>可以使ELBO更接近（等于）<span class="math inline">\(\log p(x; \theta)\)</span>。而在M步骤中，通过更新<span class="math inline">\(\theta\)</span>可以增大ELBO的值，从而间接增大<span class="math inline">\(\log p(x; \theta)\)</span>的值。这就导致在E步骤中相等的<span class="math inline">\(\log p(x; \theta)\)</span>和ELBO的值相互远离。因此，我们需要再次执行E步骤，如此反复进行。通过这样交替执行E步骤和M步骤，就能使<span class="math inline">\(\log p(x; \theta)\)</span>逐渐增大（参见图5）。</p>
+<p><img src="pic/ml/4-5.jpg" alt="图5:重复E步骤和M步骤" style="width: 65%;"></p>
+<p><small><strong>图5</strong> 重复E步骤和M步骤</small></p>
+<p><strong>EM算法中对数似然的单调递增性</strong></p>
+<p>作为EM算法的一个重要特性，以下式子总是成立（本节在最后会给出证明）:</p>
+<p><span class="math display">\[\log p(x; \theta_{\text{new}}) \geq \log p(x; \theta_{\text{old}}) \tag{4.14}\]</span></p>
+<p>上式表示EM算法在每次更新时，对数似然总是单调递增。单调递增意味着对数似然在更新过程中不会减小。</p>
+<p>如果继续无限次地更新EM算法，那么对数似然就会在某个时刻停止变化。由于继续更新下去也不会再更新模型的参数，因此此时EM算法的更新应该停止。在实践中，我们会设定一个阈值，当对数似然变化的绝对值低于设定的阈值时，更新的循环将终止。</p>
+<h3 id="扩展到多个数据">6.2 扩展到多个数据</h3>
+<p>接下来，考虑将EM算法扩展到<span class="math inline">\(N\)</span>个观测数据<span class="math inline">\(\{x^{(1)}, x^{(2)}, \ldots, x^{(N)}\}\)</span>的情况。这里，我们为每个数据准备一个对应的概率分布，即<span class="math inline">\(\{q^{(1)}, q^{(2)}, \ldots, q^{(N)}\}\)</span>，共<span class="math inline">\(N\)</span>个。于是，对数似然和ELBO的关系如下所示:</p>
+<p><span class="math display">\[\frac{1}{N} \sum_{n=1}^{N} \log p_\theta(x^{(n)}) \geq \frac{1}{N} \sum_{n=1}^{N} \text{ELBO}(x^{(n)}; q^{(n)}, \theta) \tag{4.15}\]</span></p>
+<p>与只有一个数据的情况的区别在于式子中附加了<span class="math inline">\(\sum_{n=1}^{N}\)</span>。剩下的就是ELBO的优化问题了，这很简单。之所以这么说，是因为我们知道只有一个数据时的最优概率分布<span class="math inline">\(q(z)\)</span>是<span class="math inline">\(p_\theta(z|x)\)</span>。因此，对于<span class="math inline">\(\{x^{(1)}, x^{(2)}, \ldots, x^{(N)}\}\)</span>中的每个数据<span class="math inline">\(x^{(n)}\)</span>，其最优概率分布<span class="math inline">\(q^{(n)}(z)\)</span>为<span class="math inline">\(p_\theta(z|x^{(n)})\)</span>。</p>
+<p>另外，在有<span class="math inline">\(N\)</span>个数据的情况下，下面式子中所表示的“对数似然的均值”可用作判断更新循环是否结束的对数似然:</p>
+<p><span class="math display">\[\frac{1}{N} \sum_{n=1}^{N} \log p_\theta(x^{(n)}) \tag{4.16}\]</span></p>
+<p>汇总以上信息，EM算法可以归纳如下:</p>
+<ol type="1">
+<li><strong>E步骤</strong>:<span class="math inline">\(\{q^{(1)}, q^{(2)}, \ldots, q^{(N)}\}\)</span>的更新（<span class="math inline">\(\theta\)</span>是固定的）。
+<ul>
+<li>对于每个<span class="math inline">\(n\)</span>，有<span class="math inline">\(q^{(n)}(z) = p_\theta(z|x^{(n)})\)</span>。</li>
+</ul></li>
+<li><strong>M步骤</strong>:<span class="math inline">\(\theta\)</span>的更新（<span class="math inline">\(\{q^{(1)}, q^{(2)}, \ldots, q^{(N)}\}\)</span>是固定的）
+<ul>
+<li>通过解析的方式求使<span class="math inline">\(\sum_{n=1}^{N} \text{ELBO}(x^{(n)}; q^{(n)}, \theta)\)</span>最大的<span class="math inline">\(\theta\)</span>。</li>
+</ul></li>
+<li><strong>终止判断</strong>:计算对数似然的均值，并与之前的对数似然进行比较。</li>
+</ol>
+<h3 id="log-px-theta_textnew-geq-log-px-theta_textold-的证明">6.3 <span class="math inline">\(\log p(x; \theta_{\text{new}}) \geq \log p(x; \theta_{\text{old}})\)</span> 的证明★</h3>
+<p>最后进行<span class="math inline">\(\log p(x; \theta_{\text{new}}) \geq \log p(x; \theta_{\text{old}})\)</span>的证明。首先，在E步骤中，当使用<span class="math inline">\(q_{\text{old}}(z) = p_{\theta_{\text{old}}}(z|x)\)</span>进行更新时，由于对数似然和ELBO相同，因此有以下式子成立:</p>
+<p><span class="math display">\[\log p(x; \theta_{\text{old}}) = \text{ELBO}(x; q_{\text{old}}, \theta_{\text{old}}) \tag{4.17}\]</span></p>
+<p>在M步骤中，通过最大化上式的右边得到<span class="math inline">\(\theta_{\text{new}}\)</span>，因此有以下式子成立:</p>
+<p><span class="math display">\[\text{ELBO}(x; q_{\text{old}}, \theta_{\text{new}}) \geq \text{ELBO}(x; q_{\text{old}}, \theta_{\text{old}}) \tag{4.18}\]</span></p>
+<p>在下一个E步骤中，通过<span class="math inline">\(q_{\text{new}}(z) = p_{\theta_{\text{new}}}(z|x)\)</span>进行更新。此时有以下式子成立:</p>
+<p><span class="math display">\[\log p(x; \theta_{\text{new}}) = \text{ELBO}(x; q_{\text{new}}, \theta_{\text{new}}) \geq \text{ELBO}(x; q_{\text{old}}, \theta_{\text{new}}) \tag{4.19}\]</span></p>
+<p>综合以上式子，可以得到下面的式子:</p>
+<p><span class="math display">\[\log p(x; \theta_{\text{new}}) \geq \text{ELBO}(x; q_{\text{old}}, \theta_{\text{new}}) \geq \text{ELBO}(x; q_{\text{old}}, \theta_{\text{old}}) = \log p(x; \theta_{\text{old}}) \tag{4.20}\]</span></p>
+<p>这样我们就完成了<span class="math inline">\(\log p(x; \theta_{\text{new}}) \geq \log p(x; \theta_{\text{old}})\)</span>的证明。</p>
+<hr />
+<h2 id="gmm和em算法">7. GMM和EM算法★</h2>
+<p>在6节中，我们推导出了拥有潜变量的模型的EM算法。本节将对GMM这个具体的模型应用EM算法。</p>
+<h3 id="em算法的e步骤">7.1 EM算法的E步骤★</h3>
+<p>我们先来复习一下GMM。假设<span class="math inline">\(x\)</span>是观测变量，<span class="math inline">\(z\)</span>是潜变量，并且<span class="math inline">\(z\)</span>是一个取值范围从1到<span class="math inline">\(K\)</span>的离散型随机变量。然后，我们将GMM的参数表示为<span class="math inline">\(\theta = \{\phi, \mu, \Sigma\}\)</span>（为简化数学式，将3个参数汇总为<span class="math inline">\(\theta\)</span>）。这些参数都拥有<span class="math inline">\(K\)</span>个元素，如下所示:</p>
+<p><span class="math display">\[\phi = \{\phi_1, \phi_2, \ldots, \phi_K\} \tag{4.21}\]</span></p>
+<p><span class="math display">\[\mu = \{\mu_1, \mu_2, \ldots, \mu_K\} \tag{4.22}\]</span></p>
+<p><span class="math display">\[\Sigma = \{\Sigma_1, \Sigma_2, \ldots, \Sigma_K\} \tag{4.23}\]</span></p>
+<p>此时的似然<span class="math inline">\(p(x; \theta)\)</span>如以下式子所示:</p>
+<p><span class="math display">\[p(x; \theta) = \sum_{j=1}^{K} p(z = j; \theta) p(x|z = j; \theta) = \sum_{j=1}^{K} \phi_j \mathcal{N}(x; \mu_j, \Sigma_j) \tag{4.24}\]</span></p>
+<p>考虑到后续的式子展开，这里使用符号<span class="math inline">\(j\)</span>来替代<span class="math inline">\(k\)</span>。</p>
+<p>现在，假设我们获得了<span class="math inline">\(N\)</span>个观测数据<span class="math inline">\(\{x^{(1)}, x^{(2)}, \ldots, x^{(N)}\}\)</span>。在这种情况下，每个数据的对数似然的均值如以下式子所示。该值将用于判断EM算法的更新是否终止:</p>
+<p><span class="math display">\[\frac{1}{N} \sum_{n=1}^{N} \log p(x^{(n)}; \theta) = \frac{1}{N} \sum_{n=1}^{N} \log \sum_{j=1}^{K} \phi_j \mathcal{N}(x^{(n)}; \mu_j, \Sigma_j) \tag{4.25}\]</span></p>
+<p>接下来从E步骤开始应用EM算法。在E步骤中，固定<span class="math inline">\(\{\phi, \mu, \Sigma\}\)</span>，然后更新概率分布<span class="math inline">\(q(z)\)</span>。<span class="math inline">\(q^{(n)}(z = k)\)</span>是在给定<span class="math inline">\(x^{(n)}\)</span>的条件下求得的条件概率。<span class="math inline">\(q^{(n)}(z = k)\)</span>的数学式如下所示:</p>
+<p><span class="math display">\[q^{(n)}(z = k) = p(z = k|x^{(n)}; \theta) = \frac{p(x^{(n)}|z = k; \theta) p(z = k; \theta)}{p(x^{(n)}; \theta)} = \frac{\phi_k \mathcal{N}(x^{(n)}; \mu_k, \Sigma_k)}{\sum_{j=1}^{K} \phi_j \mathcal{N}(x^{(n)}; \mu_j, \Sigma_j)} \tag{4.26}\]</span></p>
+<p>为了简化表示，后续我们将使用<span class="math inline">\(q^{(n)}(k)\)</span>来代替<span class="math inline">\(q^{(n)}(z = k)\)</span>。这样我们就成功地用数学式表示了E步骤及其终止判断。以下是数学式的汇总:</p>
+<p><strong>E步骤</strong></p>
+<p>对于每个<span class="math inline">\((n, k)\)</span>，计算下面的值:</p>
+<p><span class="math display">\[q^{(n)}(k) = \frac{\phi_k \mathcal{N}(x^{(n)}; \mu_k, \Sigma_k)}{\sum_{j=1}^{K} \phi_j \mathcal{N}(x^{(n)}; \mu_j, \Sigma_j)} \tag{4.27}\]</span></p>
+<p><strong>M步骤</strong></p>
+<p>（详见7.2节）</p>
+<p><strong>终止判断</strong></p>
+<p>计算下一个对数似然，并将其与上一个对数似然进行比较:</p>
+<p><span class="math display">\[\frac{1}{N} \sum_{n=1}^{N} \log \sum_{j=1}^{K} \phi_j \mathcal{N}(x^{(n)}; \mu_j, \Sigma_j) \tag{4.28}\]</span></p>
+<h3 id="em算法的m步骤">7.2 EM算法的M步骤★</h3>
+<p>剩下的就是M步骤了。在M步骤中，固定<span class="math inline">\(q\)</span>，更新<span class="math inline">\(\theta = \{\phi, \mu, \Sigma\}\)</span>。具体来说，就是求出使ELBO最大的参数。ELBO的数学式如下所示:</p>
+<p><span class="math display">\[\text{ELBO}(\{x^{(n)}\}; \{q^{(n)}\}, \theta) = \sum_{n=1}^{N} \sum_{k=1}^{K} q^{(n)}(k) \log p_\theta(x^{(n)}, z = k) - \sum_{n=1}^{N} \sum_{k=1}^{K} q^{(n)}(k) \log q^{(n)}(k) \tag{4.29}\]</span></p>
+<p><span class="math display">\[= \sum_{n=1}^{N} \sum_{k=1}^{K} q^{(n)}(k) \log [\phi_k \mathcal{N}(x^{(n)}; \mu_k, \Sigma_k)] - \sum_{n=1}^{N} \sum_{k=1}^{K} q^{(n)}(k) \log q^{(n)}(k) \tag{4.30}\]</span></p>
+<p>值得注意的是，第二项不包含参数<span class="math inline">\(\{\phi, \mu, \Sigma\}\)</span>。由于M步骤的目标是找到使ELBO最大的<span class="math inline">\(\{\phi, \mu, \Sigma\}\)</span>，因此第二项可以忽略。所以，目标函数（最大化的对象）可以表示为<span class="math inline">\(J(\phi, \mu, \Sigma)\)</span>，其数学式如下所示:</p>
+<p><span class="math display">\[J(\phi, \mu, \Sigma) = \sum_{n=1}^{N} \sum_{k=1}^{K} q^{(n)}(k) \log [\phi_k \mathcal{N}(x^{(n)}; \mu_k, \Sigma_k)] = \sum_{n=1}^{N} \sum_{k=1}^{K} q^{(n)}(k) [\log \phi_k + \log \mathcal{N}(x^{(n)}; \mu_k, \Sigma_k)] \tag{4.31}\]</span></p>
+<p>下面来求使<span class="math inline">\(J(\phi, \mu, \Sigma)\)</span>最大的参数。GMM有3个参数<span class="math inline">\(\{\phi, \mu, \Sigma\}\)</span>。首先从<span class="math inline">\(\mu\)</span>开始。</p>
+<p>GMM的参数<span class="math inline">\(\mu\)</span>由<span class="math inline">\(K\)</span>个数据<span class="math inline">\(\{\mu_1, \mu_2, \ldots, \mu_K\}\)</span>构成。这里求关于第<span class="math inline">\(k\)</span>个数据<span class="math inline">\(\mu_k\)</span>的偏导数（梯度）。式子展开如下所示:</p>
+<p><span class="math display">\[\frac{\partial J}{\partial \mu_k} = \frac{\partial}{\partial \mu_k} \sum_{n=1}^{N} \sum_{j=1}^{K} q^{(n)}(j) \log \mathcal{N}(x^{(n)}; \mu_j, \Sigma_j) = \sum_{n=1}^{N} q^{(n)}(k) \frac{\partial}{\partial \mu_k} \log \mathcal{N}(x^{(n)}; \mu_k, \Sigma_k) \tag{4.32}\]</span></p>
+<p>对于不包含<span class="math inline">\(\mu_k\)</span>的项，关于<span class="math inline">\(\mu_k\)</span>的偏导数为0。</p>
+<p>式4.32中出现的<span class="math inline">\(\frac{\partial}{\partial \mu_k} \log \mathcal{N}(x^{(n)}; \mu_k, \Sigma_k)\)</span>是关于多维正态分布的均值向量的偏导数。推导过程中用到了下面的式A.6:</p>
+<p><span class="math display">\[\frac{\partial}{\partial \mu} \log \mathcal{N}(x; \mu, \Sigma) = \Sigma^{-1}(x - \mu) \tag{A.6}\]</span></p>
+<p>利用这个式子，继续展开如下:</p>
+<p><span class="math display">\[\frac{\partial J}{\partial \mu_k} = \sum_{n=1}^{N} q^{(n)}(k) \Sigma_k^{-1}(x^{(n)} - \mu_k) \tag{4.33}\]</span></p>
+<p>然后令<span class="math inline">\(\frac{\partial J}{\partial \mu_k} = 0\)</span>，得到下面的式子:</p>
+<p><span class="math display">\[\sum_{n=1}^{N} q^{(n)}(k) \Sigma_k^{-1}(x^{(n)} - \mu_k) = 0\]</span></p>
+<p><span class="math display">\[\sum_{n=1}^{N} q^{(n)}(k) (x^{(n)} - \mu_k) = 0\]</span></p>
+<p><span class="math display">\[\sum_{n=1}^{N} q^{(n)}(k) x^{(n)} = \sum_{n=1}^{N} q^{(n)}(k) \mu_k = \mu_k \sum_{n=1}^{N} q^{(n)}(k)\]</span></p>
+<p><span class="math display">\[\mu_k = \frac{\sum_{n=1}^{N} q^{(n)}(k) x^{(n)}}{\sum_{n=1}^{N} q^{(n)}(k)} \tag{4.34}\]</span></p>
+<p>这个式4.34就是<span class="math inline">\(\mu_k\)</span>的更新式，从<span class="math inline">\(k = 1\)</span>开始计算到<span class="math inline">\(K\)</span>。</p>
+<p>接下来是协方差矩阵<span class="math inline">\(\Sigma\)</span>。<span class="math inline">\(\Sigma_k\)</span>的求解方法与<span class="math inline">\(\mu_k\)</span>相同（使用式A.15）。这里只展示结果:</p>
+<p><span class="math display">\[\Sigma_k = \frac{\sum_{n=1}^{N} q^{(n)}(k) (x^{(n)} - \mu_k)(x^{(n)} - \mu_k)^T}{\sum_{n=1}^{N} q^{(n)}(k)} \tag{4.35}\]</span></p>
+<p>需要注意的是，式4.35中的<span class="math inline">\(\mu_k\)</span>是通过式4.34更新后的值。</p>
+<p>最后是<span class="math inline">\(\phi = \{\phi_1, \phi_2, \ldots, \phi_K\}\)</span>。在目标函数的式4.31中，与<span class="math inline">\(\phi\)</span>相关的项如下所示:</p>
+<p><span class="math display">\[\sum_{n=1}^{N} \sum_{k=1}^{K} q^{(n)}(k) \log \phi_k \tag{4.36}\]</span></p>
+<p>不过，与<span class="math inline">\(\mu\)</span>不同的是，<span class="math inline">\(\phi\)</span>的优化受到限制。<span class="math inline">\(\phi\)</span>必须满足以下约束条件:</p>
+<p><span class="math display">\[\sum_{k=1}^{K} \phi_k = 1 \tag{4.37}\]</span></p>
+<p>对于这种有约束的优化，可以使用拉格朗日乘子法（Lagrange Multiplier Method）来求解。</p>
+<p><strong>拉格朗日乘子法</strong></p>
+<p>拉格朗日乘子法可以用来解决“在<span class="math inline">\(g(x) = 0\)</span>的条件下最大化<span class="math inline">\(f(x)\)</span>”这样的问题。为此，定义以下式子:</p>
+<p><span class="math display">\[L = f(x) - \beta g(x) \tag{4.38}\]</span></p>
+<p>其中<span class="math inline">\(L\)</span>是拉格朗日函数，<span class="math inline">\(\beta\)</span>是被称为拉格朗日乘子的变量。在这种情况下，表示极值的<span class="math inline">\(x\)</span>满足下面的式子:</p>
+<p><span class="math display">\[\frac{\partial L}{\partial x} = 0, \quad \frac{\partial L}{\partial \beta} = 0 \tag{4.39}\]</span></p>
+<p>现在有两个变量<span class="math inline">\(x\)</span>和<span class="math inline">\(\beta\)</span>。通过求解上面两个联立方程，可知<span class="math inline">\(x\)</span>的极值。</p>
+<p>将拉格朗日乘子法应用于本问题时，拉格朗日函数<span class="math inline">\(L\)</span>的数学式如下所示:</p>
+<p><span class="math display">\[L = \sum_{n=1}^{N} \sum_{k=1}^{K} q^{(n)}(k) \log \phi_k + \beta \left(\sum_{k=1}^{K} \phi_k - 1\right) \tag{4.40}\]</span></p>
+<p>此时<span class="math inline">\(L\)</span>关于<span class="math inline">\(\phi_k\)</span>的偏导数可以表示为下面的式子:</p>
+<p><span class="math display">\[\frac{\partial L}{\partial \phi_k} = \sum_{n=1}^{N} q^{(n)}(k) \frac{1}{\phi_k} + \beta = \frac{\sum_{n=1}^{N} q^{(n)}(k)}{\phi_k} + \beta \tag{4.41}\]</span></p>
+<p>令这个式子等于0，即可得到以下解:</p>
+<p><span class="math display">\[\phi_k = -\frac{\sum_{n=1}^{N} q^{(n)}(k)}{\beta} \tag{4.42}\]</span></p>
+<p>然后向式4.42中代入约束条件<span class="math inline">\(\sum_{k=1}^{K} \phi_k = 1\)</span>:</p>
+<p><span class="math display">\[\sum_{k=1}^{K} \phi_k = -\frac{1}{\beta} \sum_{k=1}^{K} \sum_{n=1}^{N} q^{(n)}(k) = 1\]</span></p>
+<p><span class="math display">\[-\beta = \sum_{k=1}^{K} \sum_{n=1}^{N} q^{(n)}(k) = \sum_{n=1}^{N} \sum_{k=1}^{K} q^{(n)}(k) = N \tag{4.43}\]</span></p>
+<p>这里再对式4.43做一下补充说明。<span class="math inline">\(q^{(n)}(z)\)</span>是<span class="math inline">\(z\)</span>的概率分布，且与<span class="math inline">\(z\)</span>有关的概率之和为1。由于<span class="math inline">\(z\)</span>取1到<span class="math inline">\(K\)</span>的整数，因此有<span class="math inline">\(\sum_{k=1}^{K} q^{(n)}(z = k) = 1\)</span>成立。</p>
+<p>最后，将<span class="math inline">\(-\beta = N\)</span>代入式4.42，可以得到下面的式子。这就是<span class="math inline">\(\phi_k\)</span>的解:</p>
+<p><span class="math display">\[\phi_k = \frac{1}{N} \sum_{n=1}^{N} q^{(n)}(k) \tag{4.44}\]</span></p>
+<p>这样我们就完成了GMM模型的EM算法的推导。以下是数学式的汇总:</p>
+<p><strong>E步骤</strong></p>
+<p>对于每个<span class="math inline">\((n, k)\)</span>，计算下面的值:</p>
+<p><span class="math display">\[q^{(n)}(k) = \frac{\phi_k \mathcal{N}(x^{(n)}; \mu_k, \Sigma_k)}{\sum_{j=1}^{K} \phi_j \mathcal{N}(x^{(n)}; \mu_j, \Sigma_j)} \tag{4.45}\]</span></p>
+<p><strong>M步骤</strong></p>
+<p>对于每个<span class="math inline">\(k\)</span>，计算下面的值:</p>
+<p><span class="math display">\[\phi_k = \frac{1}{N} \sum_{n=1}^{N} q^{(n)}(k) \tag{4.46}\]</span></p>
+<p><span class="math display">\[\mu_k = \frac{\sum_{n=1}^{N} q^{(n)}(k) x^{(n)}}{\sum_{n=1}^{N} q^{(n)}(k)} \tag{4.47}\]</span></p>
+<p><span class="math display">\[\Sigma_k = \frac{\sum_{n=1}^{N} q^{(n)}(k) (x^{(n)} - \mu_k)(x^{(n)} - \mu_k)^T}{\sum_{n=1}^{N} q^{(n)}(k)} \tag{4.48}\]</span></p>
+<p><strong>终止判断</strong></p>
+<p>计算下一个对数似然，并将其与上一个对数似然进行比较:</p>
+<p><span class="math display">\[\frac{1}{N} \sum_{n=1}^{N} \log \sum_{j=1}^{K} \phi_j \mathcal{N}(x^{(n)}; \mu_j, \Sigma_j) \tag{4.49}\]</span></p>
+<hr />
+<h2 id="em算法的实现">8. EM算法的实现</h2>
+<p>本节将实现EM算法。使用的数据集是“老忠实间歇泉”数据集。</p>
+<h3 id="数据集与gmm的代码">8.1 数据集与GMM的代码</h3>
+<p>首先读取数据集并设置GMM的参数的初始值。代码如下所示:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="im">import</span> os</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>path <span class="op">=</span> os.path.join(os.path.dirname(<span class="va">__file__</span>), <span class="st">&#39;old_faithful.txt&#39;</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>xs <span class="op">=</span> np.loadtxt(path)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a><span class="bu">print</span>(xs.shape)  <span class="co"># (272, 2)</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>phis <span class="op">=</span> np.array([<span class="fl">0.5</span>, <span class="fl">0.5</span>])</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>mus <span class="op">=</span> np.array([[<span class="fl">0.0</span>, <span class="fl">50.0</span>],</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>                [<span class="fl">0.0</span>, <span class="fl">80.0</span>]])</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>covs <span class="op">=</span> np.array([np.eye(<span class="dv">2</span>), np.eye(<span class="dv">2</span>)])  <span class="co"># 单位矩阵</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a>K <span class="op">=</span> <span class="bu">len</span>(phis)  <span class="co"># 2</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true"></a>N <span class="op">=</span> <span class="bu">len</span>(xs)  <span class="co"># 272</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true"></a>MAX_ITERS <span class="op">=</span> <span class="dv">100</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true"></a>THRESHOLD <span class="op">=</span> <span class="fl">1e-4</span></span></code></pre></div>
+<p><code>xs</code>的形状是(272, 2)，意味着有272个二维数据。然后准备<code>phis</code>、<code>mus</code>和<code>covs</code>作为GMM的参数。变量<code>K</code>是高斯分布的个数，这里的值是2；<code>N</code>是数据的个数；<code>MAX_ITERS</code>是EM算法的最大迭代次数；<code>THRESHOLD</code>是停止EM算法更新的阈值。如果参数更新后对数似然之间的差的绝对值低于<code>THRESHOLD</code>，则终止更新。</p>
+<p>接下来是多变量正态分布、GMM和计算对数似然的代码:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="kw">def</span> multivariate_normal(x, mu, cov):</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>    det <span class="op">=</span> np.linalg.det(cov)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>    inv <span class="op">=</span> np.linalg.inv(cov)</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>    d <span class="op">=</span> <span class="bu">len</span>(x)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>    z <span class="op">=</span> <span class="dv">1</span> <span class="op">/</span> np.sqrt((<span class="dv">2</span> <span class="op">*</span> np.pi) <span class="op">**</span> d <span class="op">*</span> det)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a>    y <span class="op">=</span> z <span class="op">*</span> np.exp(<span class="op">-</span>(x <span class="op">-</span> mu).T <span class="op">@</span> inv <span class="op">@</span> (x <span class="op">-</span> mu) <span class="op">/</span> <span class="fl">2.0</span>)</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>    <span class="cf">return</span> y</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a><span class="kw">def</span> gmm(x, phis, mus, covs):</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a>    K <span class="op">=</span> <span class="bu">len</span>(phis)</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a>    y <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true"></a>    <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(K):</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true"></a>        phi, mu, cov <span class="op">=</span> phis[k], mus[k], covs[k]</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true"></a>        y <span class="op">+=</span> phi <span class="op">*</span> multivariate_normal(x, mu, cov)</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true"></a>    <span class="cf">return</span> y</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true"></a></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true"></a><span class="kw">def</span> likelihood(xs, phis, mus, covs):</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true"></a>    eps <span class="op">=</span> <span class="fl">1e-8</span>  <span class="co"># 避免log(0)的错误</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true"></a>    L <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true"></a>    N <span class="op">=</span> <span class="bu">len</span>(xs)</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true"></a>    <span class="cf">for</span> x <span class="kw">in</span> xs:</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true"></a>        y <span class="op">=</span> gmm(x, phis, mus, covs)</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true"></a>        L <span class="op">+=</span> np.log(y <span class="op">+</span> eps)</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true"></a>    <span class="cf">return</span> L <span class="op">/</span> N</span></code></pre></div>
+<p>前两个函数与步骤4中实现的代码相同。最后的<code>likelihood()</code>是用于计算对数似然的函数，它是下面的数学式的代码实现:</p>
+<p><span class="math display">\[\frac{1}{N} \sum_{n=1}^{N} \log \sum_{j=1}^{K} \phi_j \mathcal{N}(x^{(n)}; \mu_j, \Sigma_j) \tag{4.50}\]</span></p>
+<p>在<code>likelihood()</code>函数中，如果计算<code>np.log(0)</code>，则会发生错误。为了避免这种情况出现，需要给函数添加一个微小值<code>eps</code>。接下来，我们将继续实现EM算法的E步骤和M步骤。</p>
+<h3 id="e步骤和m步骤的实现">8.2 E步骤和M步骤的实现</h3>
+<p>首先从E步骤开始。E步骤的数学式如下所示:</p>
+<p><strong>E步骤</strong></p>
+<p>对于每个<span class="math inline">\((n, k)\)</span>，计算下面的值:</p>
+<p><span class="math display">\[q^{(n)}(k) = \frac{\phi_k \mathcal{N}(x^{(n)}; \mu_k, \Sigma_k)}{\sum_{j=1}^{K} \phi_j \mathcal{N}(x^{(n)}; \mu_j, \Sigma_j)} \tag{4.51}\]</span></p>
+<p>这个数学式的代码实现如下所示:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="cf">for</span> <span class="bu">iter</span> <span class="kw">in</span> <span class="bu">range</span>(MAX_ITERS):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>    <span class="co"># E-step</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>    qs <span class="op">=</span> np.zeros([N, K])</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a>    <span class="cf">for</span> n <span class="kw">in</span> <span class="bu">range</span>(N):</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a>        x <span class="op">=</span> xs[n]</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a>        <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(K):</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true"></a>            phi, mu, cov <span class="op">=</span> phis[k], mus[k], covs[k]</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true"></a>            qs[n, k] <span class="op">=</span> phi <span class="op">*</span> multivariate_normal(x, mu, cov)</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true"></a>        qs[n] <span class="op">/=</span> gmm(x, phis, mus, covs)</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true"></a>    </span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true"></a>    <span class="co"># M-step</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true"></a>    <span class="co"># [后面马上会给出代码，此处省略]</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true"></a>    </span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true"></a>    <span class="co"># 终止判断</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true"></a>    <span class="co"># [后面马上会给出代码，此处省略]</span></span></code></pre></div>
+<p>在这里，我们在<code>for</code>语句中编写了E步骤的代码。这段代码首先准备一个形状为<code>(N, K)</code>的<code>qs</code>，然后计算它的元素。结合数学式和代码来看会更容易理解。</p>
+<p>接下来是M步骤。首先是M步骤的数学式:</p>
+<p><strong>M步骤</strong></p>
+<p>对于每个<span class="math inline">\(k\)</span>，计算下面的值:</p>
+<p><span class="math display">\[\phi_k = \frac{1}{N} \sum_{n=1}^{N} q^{(n)}(k) \tag{4.52}\]</span></p>
+<p><span class="math display">\[\mu_k = \frac{\sum_{n=1}^{N} q^{(n)}(k) x^{(n)}}{\sum_{n=1}^{N} q^{(n)}(k)} \tag{4.53}\]</span></p>
+<p><span class="math display">\[\Sigma_k = \frac{\sum_{n=1}^{N} q^{(n)}(k) (x^{(n)} - \mu_k)(x^{(n)} - \mu_k)^T}{\sum_{n=1}^{N} q^{(n)}(k)} \tag{4.54}\]</span></p>
+<p>下面给出代码实现:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a><span class="cf">for</span> <span class="bu">iter</span> <span class="kw">in</span> <span class="bu">range</span>(MAX_ITERS):</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a>    <span class="co"># E-step</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a>    <span class="co"># [前面已给出代码，此处省略]</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a>    </span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a>    <span class="co"># M-step</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a>    qs_sum <span class="op">=</span> qs.<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a>    </span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a>    <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(K):</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a>        <span class="co"># 1. phis</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true"></a>        phis[k] <span class="op">=</span> qs_sum[k] <span class="op">/</span> N</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true"></a>        </span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true"></a>        <span class="co"># 2. mus</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true"></a>        c <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true"></a>        <span class="cf">for</span> n <span class="kw">in</span> <span class="bu">range</span>(N):</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true"></a>            c <span class="op">+=</span> qs[n, k] <span class="op">*</span> xs[n]</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true"></a>        mus[k] <span class="op">=</span> c <span class="op">/</span> qs_sum[k]</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true"></a>        </span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true"></a>        <span class="co"># 3. covs</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true"></a>        c <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true"></a>        <span class="cf">for</span> n <span class="kw">in</span> <span class="bu">range</span>(N):</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true"></a>            z <span class="op">=</span> xs[n] <span class="op">-</span> mus[k]</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true"></a>            z <span class="op">=</span> z[:, np.newaxis]  <span class="co"># 为了与数学式保持一致，将其转换为列向量</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true"></a>            c <span class="op">+=</span> qs[n, k] <span class="op">*</span> z <span class="op">@</span> z.T</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true"></a>        covs[k] <span class="op">=</span> c <span class="op">/</span> qs_sum[k]</span></code></pre></div>
+<p>数学式中<span class="math inline">\(\sum_{n=1}^{N} q^{(n)}(k)\)</span>的计算出现在了3个地方。因此，在代码中，我们首先通过<code>qs_sum = qs.sum(axis=0)</code>进行计算。之后，只需实现与数学式相对应的代码即可。</p>
+<p>最后是终止判断的代码:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a>current_likelihood <span class="op">=</span> likelihood(xs, phis, mus, covs)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a><span class="cf">for</span> <span class="bu">iter</span> <span class="kw">in</span> <span class="bu">range</span>(MAX_ITERS):</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true"></a>    <span class="co"># E-step</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true"></a>    <span class="co"># [前面已给出代码，此处省略]</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true"></a>    </span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true"></a>    <span class="co"># M-step</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true"></a>    <span class="co"># [前面已给出代码，此处省略]</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true"></a>    </span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true"></a>    <span class="co"># 终止判断</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true"></a>    <span class="bu">print</span>(<span class="ss">f&#39;</span><span class="sc">{</span>current_likelihood<span class="sc">:.3f}</span><span class="ss">&#39;</span>)  <span class="co"># 输出对数似然（显示到小数点后3位）</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true"></a>    </span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true"></a>    next_likelihood <span class="op">=</span> likelihood(xs, phis, mus, covs)</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true"></a>    diff <span class="op">=</span> np.<span class="bu">abs</span>(next_likelihood <span class="op">-</span> current_likelihood)  <span class="co"># 差的绝对值</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true"></a>    </span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true"></a>    <span class="cf">if</span> diff <span class="op">&lt;</span> THRESHOLD:</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true"></a>        <span class="cf">break</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true"></a>    </span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true"></a>    current_likelihood <span class="op">=</span> next_likelihood</span></code></pre></div>
+<p>这样我们就完成了EM算法的实现。接下来，我们运行代码来看一下。对数似然的变化情况如以下输出所示:</p>
+<pre><code>-16.538
+-4.415
+-4.357
+-4.382
+-4.245
+-4.288
+-4.164
+-4.156
+-4.155</code></pre>
+<p>可以看出，对数似然是单调递增的。这里在经过9次更新后达到了阈值。下面对由更新后的参数组成的GMM进行可视化。结果如图6所示。</p>
+<p><img src="pic/ml/4-6.jpg" alt="图6:GMM的可视化" style="width: 65%;"></p>
+<p><small><strong>图6</strong> GMM的可视化</small></p>
+<p>从图6可以看出，两个“簇”分别拟合了各自的正态分布。</p>
+<h3 id="数据生成">8.3 数据生成</h3>
+<p>接下来，使用训练后的GMM生成数据。代码如下所示:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true"></a>N <span class="op">=</span> <span class="dv">500</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true"></a>new_xs <span class="op">=</span> np.zeros([N, <span class="dv">2</span>])</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true"></a><span class="cf">for</span> n <span class="kw">in</span> <span class="bu">range</span>(N):</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true"></a>    k <span class="op">=</span> np.random.choice(<span class="dv">2</span>, p<span class="op">=</span>phis)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true"></a>    mu, cov <span class="op">=</span> mus[k], covs[k]</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true"></a>    new_xs[n] <span class="op">=</span> np.random.multivariate_normal(mu, cov)</span></code></pre></div>
+<p><code>np.random.choice(2, p=phis)</code>可以基于<code>phis</code>的概率分布随机选择0或1，然后基于所选值从相应的高斯分布生成数据。这样就生成了新数据。对生成的数据<code>new_xs</code>进行可视化，结果如图7所示。</p>
+<p><img src="pic/ml/4-7.jpg" alt="图7:数据分布（蓝色的点是真实的数据，橙色的点是生成的数据）" style="width: 65%;"></p>
+<p><small><strong>图7</strong> 数据分布（蓝色的点是真实的数据，橙色的点是生成的数据）</small></p>
+<p>从图7可以看出，生成的数据与真实数据相似。这样我们就成功地通过GMM生成了数据。</p>
+<hr />
+</body>
+</html>

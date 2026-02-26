@@ -2,6 +2,8 @@
 
 接下来我们进行CGAN的实现。CGAN在GAN的基础上引入条件变量 $c$，实现可控的条件生成。
 
+---
+
 ## 1. 实现的策略
 
 根据理论篇的内容可知，CGAN的目标函数为:
@@ -21,6 +23,7 @@ $$L(D) = \mathbb{E}_{x \sim p_{data}(x|c)}[\log D(x \vert c)] + \mathbb{E}_{z \s
 $$\text{Loss}_D = -\frac{1}{N}\sum_{i=1}^{N}[\log D(x_i \vert c_i) + \log(1 - D(G(z_i \vert c_i) \vert c_i))]$$
 
 其中:
+
 - $x_i$ 是真实样本，标签为 1，条件为 $c_i$
 - $G(z_i \vert c_i)$ 是生成样本，标签为 0，条件为 $c_i$
 - **关键**:判别器不仅要判断样本是否真实，还要判断样本是否与条件匹配
@@ -296,7 +299,7 @@ $$\text{Loss}_D = -\log(0.5) - \log(0.5) = 2 \log 2 \approx 1.39$$
 实际训练50个epochs后的损失曲线显示:
 
 <div align="center">
-<img src="pic/dl/gan/4.1.png" width="70%">
+<img src="pic/gan/4.1.png" width="70%">
 </div>
 
 <small>**图1** 实际训练50个epochs后的损失曲线:展示了条件生成器和条件判别器在实际训练过程中的损失变化。</small>
@@ -332,7 +335,7 @@ if infer:
 ```
 
 <div align="center">
-<img src="pic/dl/gan/4.2.png" width="70%">
+<img src="pic/gan/4.2.png" width="70%">
 </div>
 
 <small>**图2** CGAN的条件生成能力:根据指定标签生成的MNIST数字图像</small>
@@ -366,7 +369,7 @@ fake_pred = discriminator(fake_image_flat, real_label_tensor)
 ```
 
 <div align="center">
-<img src="pic/dl/gan/4.3.png" width="70%">
+<img src="pic/gan/4.3.png" width="70%">
 </div>
 
 <small>**图3** 判别器对真实图像和生成图像的判断:展示了16张真实图像和16张生成图像及其对应的判别器输出值</small>

@@ -144,7 +144,7 @@
         </style>
 </head>
 <body>
-<h1 id="ae系列篇02.-vae-从重建模型到生成模型">AE系列篇02. VAE: 从“重建模型”到“生成模型”</h1>
+<h1 id="ae系列篇-02.vae理论篇-从重建模型到生成模型">AE系列篇-02.VAE理论篇: 从“重建模型”到“生成模型”</h1>
 <h2 id="ae的问题与vae的引入">1. AE的问题与VAE的引入</h2>
 <h3 id="ae的局限性">1.1 AE的局限性</h3>
 <p>在上一节中，我们了解到<strong>自编码器（AE）</strong>的主要问题是<strong>潜在空间是非正则化的（Unregularized）</strong>:</p>
@@ -155,21 +155,21 @@
 </ol>
 <h3 id="vae的解决方案">1.2 VAE的解决方案</h3>
 <p><strong>变分自编码器（Variational Autoencoder, VAE）</strong> 解决了AE的非正则化潜在空间问题，为整个潜在空间提供了生成能力。</p>
-<p>如图2.1所示，VAE由两个主要部分组成:</p>
+<p>如图1所示，VAE由两个主要部分组成:</p>
 <ul>
 <li><strong>编码器（Encoder）</strong>:将高维输入数据映射到潜在空间，输出确定的潜在向量 <span class="math inline">\(z\)</span></li>
 <li><strong>解码器（Decoder）</strong>:将潜在向量重构回高维数据空间</li>
 </ul>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.1.jpeg" width="70%"></p>
+<p><img src="pic/ae/vae/2.1.jpeg" width="70%"></p>
 </div>
-<p><small><strong>图2.1</strong> VAE架构:输入 <span class="math inline">\(x\)</span> → 编码器 <span class="math inline">\(q_\phi(z \vert x)\)</span> → 潜在向量 <span class="math inline">\(z\)</span> → 解码器 <span class="math inline">\(p_\theta(x \vert z)\)</span> → 重构输出 <span class="math inline">\(\hat{x}\)</span></small></p>
-<p>因此，如果潜在变量 <span class="math inline">\(z\)</span> 服从某个固定的分布，换言之，基于固定的分布（如正态分布）生成潜变量 <span class="math inline">\(z\)</span>，那么现在的AE便具备<strong>生成能力</strong>。如图2.2所示，VAE使用神经网络将潜变量 <span class="math inline">\(z\)</span> 变换为观测变量 <span class="math inline">\(x\)</span>。</p>
+<p><small><strong>图1</strong> VAE架构:输入 <span class="math inline">\(x\)</span> → 编码器 <span class="math inline">\(q_\phi(z \vert x)\)</span> → 潜在向量 <span class="math inline">\(z\)</span> → 解码器 <span class="math inline">\(p_\theta(x \vert z)\)</span> → 重构输出 <span class="math inline">\(\hat{x}\)</span></small></p>
+<p>因此，如果潜在变量 <span class="math inline">\(z\)</span> 服从某个固定的分布，换言之，基于固定的分布（如正态分布）生成潜变量 <span class="math inline">\(z\)</span>，那么现在的AE便具备<strong>生成能力</strong>。如图2所示，VAE使用神经网络将潜变量 <span class="math inline">\(z\)</span> 变换为观测变量 <span class="math inline">\(x\)</span>。</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.2.jpeg" width="70%"></p>
+<p><img src="pic/ae/vae/2.2.jpeg" width="70%"></p>
 </div>
-<p><small><strong>图2.2</strong> VAE使用解码器将潜变量z变换为观测变量x</small></p>
-<p><strong>固定正态分布</strong>:VAE假设 <span class="math inline">\(z\)</span> 是基于固定的正态分布生成的，也就是均值为 <span class="math inline">\(0\)</span>、协方差矩阵为 <span class="math inline">\(I\)</span>（<span class="math inline">\(I\)</span> 为单位矩阵）的正态分布。因此，我们可以说"<span class="math inline">\(z\)</span> 服从 <span class="math inline">\(\mathcal{N}(z; 0, I)\)</span>"，数学式如下所示:</p>
+<p><small><strong>图2</strong> VAE使用解码器将潜变量<span class="math inline">\(z\)</span>变换为观测变量x</small></p>
+<p><strong>固定正态分布</strong>:VAE假设 <span class="math inline">\(z\)</span> 是基于固定的正态分布生成的，也就是均值为 <span class="math inline">\(0\)</span>、协方差矩阵为 <span class="math inline">\(I\)</span>（<span class="math inline">\(I\)</span> 为单位矩阵）的正态分布。因此，我们可以说“<span class="math inline">\(z\)</span> 服从 <span class="math inline">\(\mathcal{N}(z; 0, I)\)</span>”，数学式如下所示:</p>
 <p><span class="math display">\[p(z) = \mathcal{N}(z; 0, I) \tag{1}\]</span></p>
 <p>虽然潜变量 <span class="math inline">\(z\)</span> 是基于简单的概率分布 <span class="math inline">\(\mathcal{N}(z; 0, I)\)</span> 生成的，但是经由神经网络进行了复杂的变换。通过加深神经网络的层数并使用大量数据进行训练，可以实现更复杂的变换。由于这种神经网络负责从潜变量到观测变量的变换，因此也被称为<strong>解码器（Decoder）</strong>。</p>
 <p><strong>解码器的概率建模</strong>:我们的目标是得到观测变量 <span class="math inline">\(x\)</span> 的概率分布 <span class="math inline">\(p(x)\)</span>。因此，将 <span class="math inline">\(z\)</span> 变换为 <span class="math inline">\(x\)</span> 的神经网络需要对概率分布 <span class="math inline">\(p(x|z)\)</span> 进行建模。然而，神经网络的输出是向量，而不是概率分布。为了解决这个不一致的问题，我们可以构造一个正态分布，将神经网络的输出作为它的均值向量。数学式如下所示:</p>
@@ -177,9 +177,10 @@
 <p><span class="math display">\[p_\theta(x|z) = \mathcal{N}(x; \hat{x}, I) \tag{2}\]</span></p>
 <p>其中，<span class="math inline">\(z\)</span> 表示输入，<span class="math inline">\(\hat{x}\)</span> 表示输出，<span class="math inline">\(\theta\)</span> 表示神经网络的参数。另外，假设 <span class="math inline">\(x\)</span> 服从以 <span class="math inline">\(\hat{x}\)</span> 为均值向量的正态分布。为了便于探讨，假设协方差矩阵为单位矩阵 <span class="math inline">\(I\)</span>。</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.3.jpeg" width="70%"></p>
+<p><img src="pic/ae/vae/2.3.jpeg" width="70%"></p>
 </div>
-<p><small><strong>图2.3</strong> VAE的解码器执行的处理（"NN"表示神经网络），虚线箭头表示"输出的随机变量服从该概率分布"，在生成数据时，可以将虚线视为采样</small></p>
+<p><small><strong>图3</strong> VAE的解码器执行的处理（“NN”表示神经网络），虚线箭头表示“输出的随机变量服从该概率分布”，在生成数据时，可以将虚线视为采样</small></p>
+<hr />
 <h2 id="vae的架构与工作原理">2. VAE的架构与工作原理</h2>
 <h3 id="什么是变分自编码器">2.1 什么是变分自编码器？</h3>
 <h3 id="变分贝叶斯视角">2.1.1 变分贝叶斯视角</h3>
@@ -199,14 +200,14 @@
 <p>最优参数 <span class="math inline">\(\theta^*\)</span> 是最大化生成真实数据样本的概率:</p>
 <p><span class="math display">\[\theta^* = \arg\max_\theta \prod_{i=1}^n p_\theta(\mathbf{x}^{(i)})\]</span></p>
 <p>使用对数概率将乘积转换为求和:</p>
-<p><span class="math display">\[\theta^* = \arg\max_\theta \sum_{i=1}^n \log p_\theta(\mathbf{x}^{(i)})\]</span></p>
+<p><span class="math display">\[\theta^* = \arg\max_\theta \sum_{i=1}^n \log p_\theta(\mathbf{x}^{(i)}) \tag{3}\]</span></p>
 <p>为了涉及编码向量，我们更新方程为:</p>
 <p><span class="math display">\[\log p_\theta(\mathbf{x}) = \log \int p_\theta(\mathbf{x}|\mathbf{z}) p_\theta(\mathbf{z}) d\mathbf{z} \tag{4}\]</span></p>
-<p><strong>问题</strong>:直接计算这个积分很困难，因为需要检查所有可能的 <span class="math inline">\(\mathbf{z}\)</span> 值并求和。为了缩小值空间以加快搜索，我们引入一个新的近似函数 <span class="math inline">\(q_\phi(\mathbf{z}|\mathbf{x})\)</span>，参数化为 <span class="math inline">\(\phi\)</span>，来输出给定输入 <span class="math inline">\(\mathbf{x}\)</span> 的可能编码，如图2.4所示。</p>
+<p><strong>问题</strong>:直接计算这个积分很困难，因为需要检查所有可能的 <span class="math inline">\(\mathbf{z}\)</span> 值并求和。为了缩小值空间以加快搜索，我们引入一个新的近似函数 <span class="math inline">\(q_\phi(\mathbf{z}|\mathbf{x})\)</span>，参数化为 <span class="math inline">\(\phi\)</span>，来输出给定输入 <span class="math inline">\(\mathbf{x}\)</span> 的可能编码，如图4所示。</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.4.png" width="70%"></p>
+<p><img src="pic/ae/vae/2.4.png" width="70%"></p>
 </div>
-<p><small><strong>图2.4</strong> VAE的图模型:实线表示生成分布 <span class="math inline">\(p_\theta\)</span>，虚线表示近似分布 <span class="math inline">\(q_\phi\)</span> 用于近似难以处理的后验分布 <span class="math inline">\(p_\theta(\mathbf{z}|\mathbf{x})\)</span></small></p>
+<p><small><strong>图4</strong> VAE的图模型:实线表示生成分布 <span class="math inline">\(p_\theta\)</span>，虚线表示近似分布 <span class="math inline">\(q_\phi\)</span> 用于近似难以处理的后验分布 <span class="math inline">\(p_\theta(\mathbf{z}|\mathbf{x})\)</span></small></p>
 <p><strong>结构对应关系</strong>:</p>
 <ul>
 <li>条件概率 <span class="math inline">\(p_\theta(\mathbf{x}|\mathbf{z})\)</span> 定义了生成模型，类似于解码器，也称为<strong>概率解码器（Probabilistic Decoder）</strong></li>
@@ -246,11 +247,11 @@
 <p><span class="math display">\[p(z) = \mathcal{N}(z; 0, I)\]</span></p>
 <p><span class="math display">\[\hat{x} = \text{NeuralNet}(z; \theta)\]</span></p>
 <p><span class="math display">\[p_\theta(x|z) = \mathcal{N}(x; \hat{x}, I)\]</span></p>
-<p>先验 <span class="math inline">\(p(z)\)</span> 是正态分布，似然 <span class="math inline">\(p_\theta(x|z)\)</span> 也是正态分布，容易知道，后验 <span class="math inline">\(p_\theta(z|x)\)</span> 必然为正态分布，所以编码器应该具备如下图2.5所示的结构:</p>
+<p>先验 <span class="math inline">\(p(z)\)</span> 是正态分布，似然 <span class="math inline">\(p_\theta(x|z)\)</span> 也是正态分布，容易知道，后验 <span class="math inline">\(p_\theta(z|x)\)</span> 必然为正态分布，所以编码器应该具备如下图5所示的结构:</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.5.jpeg" width="70%"></p>
+<p><img src="pic/ae/vae/2.5.jpeg" width="70%"></p>
 </div>
-<p><small><strong>图2.5</strong> 编码器的结构:输入 x → 神经网络 → 输出 (μ, σ) → 后验分布 q_φ(z|x) = N(z; μ, σ²I)</small></p>
+<p><small><strong>图5</strong> 编码器的结构:输入 x → 神经网络 → 输出 (μ, σ) → 后验分布 q_φ(z|x) = N(z; μ, σ²I)</small></p>
 <p><strong>编码器（Encoder）</strong>:执行从观测变量 <span class="math inline">\(x\)</span> 到潜变量 <span class="math inline">\(z\)</span> 的变换，其数学式如下所示:</p>
 <p><span class="math display">\[\mu, \sigma = \text{NeuralNet}(x; \phi)\]</span></p>
 <p><span class="math display">\[q_\phi(z|x) = \mathcal{N}(z; \mu, \sigma^2 I) \tag{9}\]</span></p>
@@ -264,19 +265,15 @@
 <p><span class="math display">\[\mathbf{z} \sim \mathcal{N}(\mathbf{z}; \mu, \sigma^2 I)\]</span></p>
 <p><span class="math display">\[\hat{\mathbf{x}} = \text{NeuralNet}(\mathbf{z}; \theta)\]</span></p>
 <p><span class="math display">\[J_1 \approx \log \mathcal{N}(\mathbf{x}; \hat{\mathbf{x}}, I)\]</span></p>
-<p>符号“<span class="math inline">\(\sim\)</span>”表示采样，“<span class="math inline">\(\approx\)</span>”表示近似相等。作为参考，上述计算过程如图2.6所示:</p>
+<p>符号“<span class="math inline">\(\sim\)</span>”表示采样，“<span class="math inline">\(\approx\)</span>”表示近似相等。作为参考，上述计算过程如图6所示:</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.6.jpeg" width="70%"></p>
+<p><img src="pic/ae/vae/2.6.jpeg" width="70%"></p>
 </div>
-<p><small><strong>图2.6</strong> <span class="math inline">\(J_1\)</span> 的计算流程:编码器从输入数据 <span class="math inline">\(x\)</span> 采样 <span class="math inline">\(z\)</span>，解码器从 <span class="math inline">\(z\)</span> 生成 <span class="math inline">\(\hat{x}\)</span>，计算重建误差</small></p>
+<p><small><strong>图6</strong> <span class="math inline">\(J_1\)</span> 的计算流程:编码器从输入数据 <span class="math inline">\(x\)</span> 采样 <span class="math inline">\(z\)</span>，解码器从 <span class="math inline">\(z\)</span> 生成 <span class="math inline">\(\hat{x}\)</span>，计算重建误差</small></p>
 <p>这里进行的计算开始于编码器 <span class="math inline">\(\text{NeuralNet}(\mathbf{x}; \phi)\)</span> 从输入数据 <span class="math inline">\(\mathbf{x}\)</span> 中采样 <span class="math inline">\(\mathbf{z}\)</span>，在此基础上，通过解码器 <span class="math inline">\(\text{NeuralNet}(\mathbf{z}; \theta)\)</span> 重新生成数据 <span class="math inline">\(\hat{\mathbf{x}}\)</span>。重新生成的数据 <span class="math inline">\(\hat{\mathbf{x}}\)</span> 越接近原始输入数据 <span class="math inline">\(\mathbf{x}\)</span>，<span class="math inline">\(J_1\)</span> 的值就越大。因此，<span class="math inline">\(J_1\)</span> 可以被称为 <strong>重建误差项</strong>。</p>
 <p>另外，<span class="math inline">\(J_1 \approx \log \mathcal{N}(\mathbf{x}; \hat{\mathbf{x}}, I)\)</span> 可以进一步做如下计算:</p>
 <p><span class="math display">\[\begin{aligned} J_1 &amp;\approx \log \mathcal{N}(\mathbf{x}; \hat{\mathbf{x}}, I) \\ &amp;= -\frac{1}{2}(\mathbf{x} - \hat{\mathbf{x}})^T I^{-1}(\mathbf{x} - \hat{\mathbf{x}}) + \text{const} \\ &amp;= -\frac{1}{2}(\mathbf{x} - \hat{\mathbf{x}})^T(\mathbf{x} - \hat{\mathbf{x}}) + \text{const} \end{aligned} \tag{11}\]</span></p>
-<p>上面的计算使用了以下公式:</p>
-<ul>
-<li><span class="math inline">\(|I| = 1\)</span>（单位矩阵的行列式为1）</li>
-<li><span class="math inline">\(I^{-1} = I\)</span>（单位矩阵的逆矩阵为单位矩阵）</li>
-</ul>
+<p>上面的计算使用了以下公式: - <span class="math inline">\(|I| = 1\)</span>（单位矩阵的行列式为1） - <span class="math inline">\(I^{-1} = I\)</span>（单位矩阵的逆矩阵为单位矩阵）</p>
 <p>上面在关于 <span class="math inline">\(J_1\)</span> 的计算中出现了不包含参数的常数项，但在优化参数时，这些常数项可以忽略。因此，为了便于理解，式子中用 <span class="math inline">\(\text{const}\)</span> 表示常数项。</p>
 <p>还有一个式子是 <span class="math inline">\((\mathbf{x} - \hat{\mathbf{x}})^T(\mathbf{x} - \hat{\mathbf{x}})\)</span>，它表示向量的内积。向量内积的计算可以表示为平方误差（其中 <span class="math inline">\(\mathbf{x}\)</span> 的维度为 <span class="math inline">\(D\)</span>）:</p>
 <p><span class="math display">\[(\mathbf{x} - \hat{\mathbf{x}})^T(\mathbf{x} - \hat{\mathbf{x}}) = \|\mathbf{x} - \hat{\mathbf{x}}\|^2 = \sum_{i=1}^{D}(x_i - \hat{x}_i)^2\]</span></p>
@@ -286,47 +283,37 @@
 <p><span class="math inline">\(D_\text{KL}(q_\phi(\mathbf{z}|\mathbf{x}) \| p(\mathbf{z}))\)</span> 是以下两个正态分布的KL散度:</p>
 <p><span class="math display">\[q_\phi(\mathbf{z}|\mathbf{x}) = \mathcal{N}(\mathbf{z}; \mu, \sigma^2 I)\]</span></p>
 <p><span class="math display">\[p(\mathbf{z}) = \mathcal{N}(\mathbf{z}; 0, I)\]</span></p>
-<p>两个正态分布之间的KL散度如图2.7所示:</p>
+<p>两个正态分布之间的KL散度如图7所示:</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.7.jpeg" width="70%"></p>
+<p><img src="pic/ae/vae/2.7.jpeg" width="70%"></p>
 </div>
-<p><small><strong>图2.7</strong> 两个正态分布之间的KL散度计算</small></p>
+<p><small><strong>图7</strong> 两个正态分布之间的KL散度计算</small></p>
 <p>因此，这里的KL散度可以做如下计算:</p>
 <p><span class="math display">\[J_2 = D_\text{KL}(q_\phi(\mathbf{z}|\mathbf{x}) \| p(\mathbf{z})) = \frac{1}{2}\sum_{i=1}^{H}[\mu_i^2 + \sigma_i^2 - 1 - \log \sigma_i^2] \tag{12}\]</span></p>
 <h3 id="elbo的完整计算">2.2.3 ELBO的完整计算</h3>
 <p>基于以上探讨，ELBO可以做如下计算:</p>
 <p><span class="math display">\[\text{ELBO}(\mathbf{x}; \theta, \phi) = -\frac{1}{2}\|\mathbf{x} - \hat{\mathbf{x}}\|^2 - \frac{1}{2}\sum_{i=1}^{H}[\mu_i^2 + \sigma_i^2 - 1 - \log \sigma_i^2] + \text{const} \tag{13}\]</span></p>
-<p>作为参考，图2.8展示了计算ELBO的流程。图2.8所示的编码器和解码器模型让人联想起“古老”的自编码器，这也是VAE被称为<strong>变分自编码器（Variational Autoencoder）</strong>的原因。</p>
+<p>作为参考，图8展示了计算ELBO的流程。图8所示的编码器和解码器模型让人联想起“古老”的自编码器，这也是VAE被称为<strong>变分自编码器（Variational Autoencoder）</strong>的原因。</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.8.jpeg" width="70%"></p>
+<p><img src="pic/ae/vae/2.8.jpeg" width="70%"></p>
 </div>
-<p><small><strong>图2.8</strong> 计算ELBO的流程:编码器从输入数据x采样z，解码器从z生成x̂，ELBO = J₁ - J₂</small></p>
+<p><small><strong>图8</strong> 计算ELBO的流程:编码器从输入数据x采样z，解码器从z生成x̂，ELBO = J₁ - J₂</small></p>
 <h3 id="重参数化技巧reparameterization-trick">2.3 重参数化技巧（Reparameterization Trick）</h3>
 <p>为了最大化ELBO，我们需要更新VAE的参数 <span class="math inline">\(\theta\)</span> 和 <span class="math inline">\(\phi\)</span>。由于这两个参数都是神经网络的参数，可以通过梯度下降法进行优化。与EM算法不同（EM算法需要固定一个参数并更新另一个参数），VAE可以同时更新 <span class="math inline">\(\theta\)</span> 和 <span class="math inline">\(\phi\)</span>，前提是能够计算ELBO关于这两个参数的梯度。</p>
-<p>然而，梯度计算面临一个关键挑战。如图2.8所示，VAE的计算图包含采样操作。<strong>采样操作是不可微分的</strong>，这意味着梯度无法通过采样节点反向传播，从而阻碍了端到端的训练。要解决这个问题，需要引入<strong>重参数化技巧（Reparameterization Trick）</strong>。</p>
+<p>然而，梯度计算面临一个关键挑战。如图8所示，VAE的计算图包含采样操作。<strong>采样操作是不可微分的</strong>，这意味着梯度无法通过采样节点反向传播，从而阻碍了端到端的训练。要解决这个问题，需要引入<strong>重参数化技巧（Reparameterization Trick）</strong>。</p>
 <h3 id="为什么需要重参数化">2.3.1 为什么需要重参数化？</h3>
 <p>在VAE中，我们需要从近似后验分布 <span class="math inline">\(q_\phi(z|x) = \mathcal{N}(\mu, \sigma^2)\)</span> 中采样潜在向量 <span class="math inline">\(z\)</span>。然而，直接采样 <span class="math inline">\(z \sim \mathcal{N}(\mu, \sigma^2)\)</span> 会导致梯度无法通过采样操作传播回编码器，因为采样是一个随机过程，不具有可微性。</p>
 <p><strong>核心问题</strong>:采样操作阻断了梯度流，使得无法使用反向传播算法优化编码器参数 <span class="math inline">\(\phi\)</span>。</p>
 <h3 id="重参数化解决方案">2.3.2 重参数化解决方案</h3>
 <p><strong>重参数化技巧（Reparameterization Trick）</strong>通过将随机采样转换为可微分的确定性计算来解决这个问题:</p>
 <p><span class="math display">\[z = \mu + \sigma \odot \epsilon \tag{14}\]</span></p>
-<p>其中:</p>
-<ul>
-<li><span class="math inline">\(\mu\)</span> 和 <span class="math inline">\(\sigma\)</span> 是编码器的输出（可微分）</li>
-<li><span class="math inline">\(\epsilon \sim \mathcal{N}(0, I)\)</span> 是从标准正态分布采样的随机噪声（独立于模型参数）</li>
-<li><span class="math inline">\(\odot\)</span> 表示逐元素相乘</li>
-</ul>
-<p><strong>要点</strong>:</p>
-<ul>
-<li><strong>随机性分离</strong>:随机性被"移出"计算图，转移到独立于模型参数的随机变量 <span class="math inline">\(\epsilon\)</span></li>
-<li><strong>梯度可传播</strong>:梯度可以通过 <span class="math inline">\(\mu\)</span> 和 <span class="math inline">\(\sigma\)</span> 反向传播，因为它们是编码器的确定性输出</li>
-<li><strong>可微分采样</strong>:采样过程从不可微分的随机操作转变为可微分的确定性计算</li>
-</ul>
-<p>如图2.9所示:</p>
+<p>其中: - <span class="math inline">\(\mu\)</span> 和 <span class="math inline">\(\sigma\)</span> 是编码器的输出（可微分） - <span class="math inline">\(\epsilon \sim \mathcal{N}(0, I)\)</span> 是从标准正态分布采样的随机噪声（独立于模型参数） - <span class="math inline">\(\odot\)</span> 表示逐元素相乘</p>
+<p><strong>要点</strong>: - <strong>随机性分离</strong>:随机性被“移出”计算图，转移到独立于模型参数的随机变量 <span class="math inline">\(\epsilon\)</span> - <strong>梯度可传播</strong>:梯度可以通过 <span class="math inline">\(\mu\)</span> 和 <span class="math inline">\(\sigma\)</span> 反向传播，因为它们是编码器的确定性输出 - <strong>可微分采样</strong>:采样过程从不可微分的随机操作转变为可微分的确定性计算</p>
+<p>如图9所示:</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.9.jpeg" width="70%"></p>
+<p><img src="pic/ae/vae/2.9.jpeg" width="70%"></p>
 </div>
-<p><small><strong>图2.9</strong> 重参数化技巧:将不可微分的采样操作转换为可微分的确定性计算</small></p>
+<p><small><strong>图9</strong> 重参数化技巧:将不可微分的采样操作转换为可微分的确定性计算</small></p>
 <hr />
 <h2 id="vae概述">3. VAE概述</h2>
 <p><strong>变分自编码器（Variational Autoencoder, VAE）</strong> 是一种生成模型，它通过正则化潜在空间来解决AE的生成问题。</p>
@@ -336,56 +323,42 @@
 <li><strong>编码器输出分布参数</strong>:编码器不再直接输出潜在向量，而是输出分布的均值 <span class="math inline">\(\mu\)</span> 和标准差 <span class="math inline">\(\sigma\)</span></li>
 <li><strong>重参数化技巧</strong>:通过重参数化使采样过程可微分，支持反向传播</li>
 </ul>
-<p>VAE的结构如图2.10所示:</p>
+<p>VAE的结构如图10所示:</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.10.jpeg" width="70%"></p>
+<p><img src="pic/ae/vae/2.10.jpeg" width="70%"></p>
 </div>
-<p><small><strong>图2.10</strong> VAE结构:编码器输出分布参数 <span class="math inline">\((\mu, \sigma)\)</span>，通过重参数化采样 <span class="math inline">\(z\)</span>，解码器重构输出 <span class="math inline">\(\hat{x}\)</span></small></p>
-<p>图2.10展示了VAE的基本结构和工作流程。为了更全面地理解VAE的架构，图2.11进一步展示了VAE的完整架构示意图，包括编码器、解码器以及它们之间的连接关系。</p>
+<p><small><strong>图10</strong> VAE结构:编码器输出分布参数 <span class="math inline">\((\mu, \sigma)\)</span>，通过重参数化采样 <span class="math inline">\(z\)</span>，解码器重构输出 <span class="math inline">\(\hat{x}\)</span></small></p>
+<p>图10展示了VAE的基本结构和工作流程。为了更全面地理解VAE的架构，图11进一步展示了VAE的完整架构示意图，包括编码器、解码器以及它们之间的连接关系。</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.11.png" width="70%"></p>
+<p><img src="pic/ae/vae/2.11.png" width="70%"></p>
 </div>
-<p><small><strong>图2.11</strong> VAE的完整架构示意图:展示了编码器、解码器以及潜在空间的完整结构</small></p>
+<p><small><strong>图11</strong> VAE的完整架构示意图:展示了编码器、解码器以及潜在空间的完整结构</small></p>
+<hr />
 <h2 id="什么是正则化">4. 什么是“正则化”？</h2>
 <h3 id="正则化与非正则化的概念">4.1 正则化与非正则化的概念</h3>
 <p><strong>正则化（Regularization）</strong>是指对某个量施加约束或限制，而<strong>非正则化（Unregularized）</strong>意味着没有约束，可以是任意值。</p>
 <p>在AE中，编码器直接输出一个确定的潜在向量 <span class="math inline">\(z\)</span>，这个 <span class="math inline">\(z\)</span> 可以是任意值，没有分布约束。训练时，编码器只学习了训练数据对应的那些 <span class="math inline">\(z\)</span> 值，导致潜在空间中只有训练数据对应的区域是“有效的”，其他区域是“空洞”（gaps），没有对应任何训练数据。如果从空洞区域采样，解码器会生成无意义的输出。</p>
 <p>形象地说，把潜在空间想象成一张地图:<strong>AE</strong>的地图上只有几个标记点（训练数据对应的位置），其他地方是空白/未知区域；而<strong>VAE</strong>的整张地图都被“填满”，每个位置都有意义，可以安全地访问任何地方。</p>
-<p>下图展示了在MNIST数据集上训练网络后生成的潜在空间示例。图2.12展示了<strong>AE + KL正则化</strong>（即VAE）的潜在空间，图2.13展示了<strong>AE没有KL正则化</strong>的潜在空间。</p>
+<p>下图展示了在MNIST数据集上训练网络后生成的潜在空间示例。图12展示了<strong>AE + KL正则化</strong>（即VAE）的潜在空间，图13展示了<strong>AE没有KL正则化</strong>的潜在空间。</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.12.png" width="70%"></p>
+<p><img src="pic/ae/vae/2.12.png" width="70%"></p>
 </div>
-<p><small><strong>图2.12</strong> AE + KL正则化（VAE）的潜在空间可视化:潜在空间被正则化为接近标准正态分布，簇之间没有明显的空洞</small></p>
+<p><small><strong>图12</strong> AE + KL正则化（VAE）的潜在空间可视化:潜在空间被正则化为接近标准正态分布，簇之间没有明显的空洞</small></p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.13.png" width="70%"></p>
+<p><img src="pic/ae/vae/2.13.png" width="70%"></p>
 </div>
-<p><small><strong>图2.13</strong> AE没有KL正则化的潜在空间可视化:潜在空间存在明显的空洞区域</small></p>
-<p>从图2.12和图2.13的对比中可以发现:</p>
+<p><small><strong>图13</strong> AE没有KL正则化的潜在空间可视化:潜在空间存在明显的空洞区域</small></p>
+<p>从图12和图13的对比中可以发现:</p>
 <p><strong>AE + KL正则化（VAE）</strong>的训练过程试图在两种损失（重构损失和KL散度损失）之间找到平衡，最终得到一个类似于单位范数的潜在空间分布，其中相似的输入数据点被聚类在一起。单位范数条件确保潜在空间均匀分布，且聚类之间没有明显的间隙。实际上，相似数据输入的聚类通常会在某些区域重叠，聚类之间没有间隙，并且该空间类似于单位范数分布。</p>
 <p>而<strong>AE没有KL正则化</strong>的潜在空间存在明显的“空洞”（gaps），只有训练数据对应的区域是有效的，从空洞区域采样会生成无意义的输出。</p>
 <p>从实际影响来看，<strong>非正则化（AE）</strong>中，从 <span class="math inline">\(z = [1.2, -0.5, 3.1, \ldots]\)</span> 采样可能生成有意义的图像（如果这个区域有训练数据），但从 <span class="math inline">\(z = [10.0, 10.0, 10.0, \ldots]\)</span> 采样可能生成无意义的图像（空洞区域）。而<strong>正则化（VAE）</strong>中，从标准正态分布 <span class="math inline">\(\mathcal{N}(0, I)\)</span> 采样任何 <span class="math inline">\(z\)</span> 都能生成有意义的图像（因为整个空间都被正则化了）。</p>
 <h3 id="数学上的区别">4.2 数学上的区别</h3>
-<p><strong>AE（非正则化）</strong>:</p>
-<ul>
-<li>编码器:<span class="math inline">\(z = \text{encoder}(x)\)</span> → 输出确定的值</li>
-<li>潜在空间:可以是任意分布，没有约束</li>
-<li>结果:潜在空间不连续，存在空洞</li>
-</ul>
-<p><strong>VAE（正则化）</strong>:</p>
-<ul>
-<li>编码器:<span class="math inline">\((\mu, \sigma) = \text{encoder}(x)\)</span> → 输出分布参数</li>
-<li>潜在空间:被约束为接近标准正态分布 <span class="math inline">\(\mathcal{N}(0, I)\)</span></li>
-<li>结果:潜在空间连续、平滑，没有空洞</li>
-</ul>
+<p><strong>AE（非正则化）</strong>: - 编码器:<span class="math inline">\(z = \text{encoder}(x)\)</span> → 输出确定的值 - 潜在空间:可以是任意分布，没有约束 - 结果:潜在空间不连续，存在空洞</p>
+<p><strong>VAE（正则化）</strong>: - 编码器:<span class="math inline">\((\mu, \sigma) = \text{encoder}(x)\)</span> → 输出分布参数 - 潜在空间:被约束为接近标准正态分布 <span class="math inline">\(\mathcal{N}(0, I)\)</span> - 结果:潜在空间连续、平滑，没有空洞</p>
 <h3 id="为什么叫正则化">4.3 为什么叫“正则化”？</h3>
 <p>在VAE中，KL散度损失项:</p>
 <p><span class="math display">\[\text{KL}(q_\phi(z|x) \| p(z)) = \text{KL}(\mathcal{N}(\mu, \sigma^2) \| \mathcal{N}(0, I))\]</span></p>
-<p>这个损失项:</p>
-<ul>
-<li>强制 <span class="math inline">\(q_\phi(z|x)\)</span> 接近标准正态分布 <span class="math inline">\(\mathcal{N}(0, I)\)</span></li>
-<li>这就是对潜在空间的"正则化"（施加分布约束）</li>
-<li>没有这个约束 = 非正则化</li>
-</ul>
+<p>这个损失项: - 强制 <span class="math inline">\(q_\phi(z|x)\)</span> 接近标准正态分布 <span class="math inline">\(\mathcal{N}(0, I)\)</span> - 这就是对潜在空间的“正则化”（施加分布约束） - 没有这个约束 = 非正则化</p>
 <p><strong>总结</strong>:非正则化意味着潜在空间没有分布约束，导致存在“空洞”区域，这些区域不对应任何训练数据，因此无法生成有意义的输出。正则化通过约束潜在空间分布（如接近标准正态分布）来消除这些空洞，使整个空间都具有生成能力。</p>
 <hr />
 <h2 id="参考文献">参考文献</h2>

@@ -75,8 +75,9 @@
     code span.vs { color: #4070a0; } /* VerbatimString */
     code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
-  <script>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
         window.MathJax = {
             tex: {
                 inlineMath: [['$', '$'], ['\\(', '\\)']],
@@ -205,8 +206,9 @@
         </style>
 </head>
 <body>
-<h1 id="补充系列篇01.-mode-covering-vs-mode-seeking">补充系列篇01. Mode Covering vs Mode Seeking</h1>
+<h1 id="补充系列篇-01.mode-covering-vs-mode-seeking">补充系列篇-01.Mode: Covering vs Mode Seeking</h1>
 <p>“Mode Covering” 和 “Mode Seeking” 是在概率建模、生成模型（如 GANs、VAEs）以及变分推断等领域中常用来描述不同优化目标或行为的术语。它们的核心区别在于模型如何处理数据分布中的多模态性（multiple modes）。</p>
+<hr />
 <h2 id="基本概念">1. 基本概念</h2>
 <h3 id="mode模态">1.1 Mode（模态）</h3>
 <p>在概率分布中，一个“mode”指的是概率密度局部最大的点。例如，混合高斯分布可能有多个峰值，每个峰值就是一个 mode。</p>
@@ -224,14 +226,15 @@
 <li><strong>优化目标</strong>:通常与反向 KL 散度 <span class="math inline">\(D_{KL}(p_{model} \| p_{data})\)</span> 相关</li>
 <li><strong>特点</strong>:生成结果更锐利（sharp），但可能只集中在少数几个模式上，甚至只一个（即 mode collapse）。<strong>注意</strong>:Mode Seeking 行为容易导致 mode collapse，但 mode collapse 是后果而非同义词</li>
 </ul>
+<hr />
 <h2 id="数学视角以-kl-散度为例">2. 数学视角（以 KL 散度为例）</h2>
 <p>设真实数据分布为 <span class="math inline">\(p(x)\)</span>，模型分布为 <span class="math inline">\(q(x)\)</span>。</p>
 <table>
 <colgroup>
-<col style="width: 15%" />
-<col style="width: 30%" />
 <col style="width: 40%" />
-<col style="width: 15%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -256,11 +259,7 @@
 </tr>
 </tbody>
 </table>
-<p><strong>📌 简单记忆</strong>:</p>
-<ul>
-<li>前向 KL（<span class="math inline">\(p \Vert q\)</span>）→ 覆盖（covering）</li>
-<li>反向 KL（<span class="math inline">\(q \Vert p\)</span>）→ 寻找（seeking）</li>
-</ul>
+<p><strong>📌 简单记忆</strong>: - 前向 KL（<span class="math inline">\(p \Vert q\)</span>）→ 覆盖（covering） - 反向 KL（<span class="math inline">\(q \Vert p\)</span>）→ 寻找（seeking）</p>
 <h3 id="数学直觉">2.1 数学直觉</h3>
 <p><strong>Forward KL (<span class="math inline">\(D_{KL}(p \| q)\)</span>)</strong>: <span class="math display">\[D_{KL}(p \| q) = \int p(x) \log \frac{p(x)}{q(x)} dx\]</span></p>
 <ul>
@@ -274,6 +273,7 @@
 <li>如果 <span class="math inline">\(q(x) &gt; 0\)</span> 但 <span class="math inline">\(p(x) \approx 0\)</span>，<span class="math inline">\(\log \frac{q(x)}{p(x)} \to +\infty\)</span>，惩罚极大</li>
 <li><strong>结果</strong>:<span class="math inline">\(q\)</span> 会避开 <span class="math inline">\(p(x) \approx 0\)</span> 的区域，只集中在 <span class="math inline">\(p(x)\)</span> 大的地方，即只寻找高概率模式</li>
 </ul>
+<hr />
 <h2 id="代码实现与可视化">3. 代码实现与可视化</h2>
 <h3 id="代码结构">3.1 代码结构</h3>
 <p>我们使用 Python 实现一个可视化实验，展示 Forward KL 和 Reverse KL 在拟合双峰分布时的不同行为。</p>
@@ -286,21 +286,13 @@
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>        <span class="va">self</span>.mixture_probs <span class="op">=</span> mixture_probs  <span class="co"># 混合权重</span></span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>        <span class="va">self</span>.means <span class="op">=</span> means                  <span class="co"># 各分量的均值</span></span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>        <span class="va">self</span>.stds <span class="op">=</span> stds                    <span class="co"># 各分量的标准差</span></span></code></pre></div>
-<p><strong>关键方法</strong>:</p>
-<ul>
-<li><code>logpdf(samples)</code>: 计算对数概率密度，使用 <code>scipy.special.logsumexp</code> 避免数值下溢</li>
-<li><code>pdf(samples)</code>: 计算概率密度</li>
-</ul>
+<p><strong>关键方法</strong>: - <code>logpdf(samples)</code>: 计算对数概率密度，使用 <code>scipy.special.logsumexp</code> 避免数值下溢 - <code>pdf(samples)</code>: 计算概率密度</p>
 <h3 id="kl-散度计算">3.3 KL 散度计算</h3>
 <div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="kw">def</span> approx_kl(gmm_1, gmm_2, xs):</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;使用数值积分近似计算 KL 散度&quot;&quot;&quot;</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>    ys <span class="op">=</span> gmm_1.pdf(xs) <span class="op">*</span> (gmm_1.logpdf(xs) <span class="op">-</span> gmm_2.logpdf(xs))</span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>    <span class="cf">return</span> np.trapz(ys, xs)  <span class="co"># 梯形积分</span></span></code></pre></div>
-<p><strong>说明</strong>:</p>
-<ul>
-<li>使用梯形积分法（<code>np.trapz</code>）在离散点集上近似积分</li>
-<li>公式:<span class="math inline">\(D_{KL}(gmm_1 \| gmm_2) = \int gmm_1(x) \log \frac{gmm_1(x)}{gmm_2(x)} dx\)</span></li>
-</ul>
+<p><strong>说明</strong>: - 使用梯形积分法（<code>np.trapz</code>）在离散点集上近似积分 - 公式:<span class="math inline">\(D_{KL}(gmm_1 \| gmm_2) = \int gmm_1(x) \log \frac{gmm_1(x)}{gmm_2(x)} dx\)</span></p>
 <h3 id="两种优化函数">3.4 两种优化函数</h3>
 <p><strong>Forward KL 优化</strong>（Mode Covering）:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="kw">def</span> minimize_pq(p, xs, q_means, q_stds):</span>
@@ -343,7 +335,7 @@
 <h3 id="可视化结果">3.6 可视化结果</h3>
 <p>运行代码后，会生成包含5个子图的图像如图1所示，每个子图显示:</p>
 <div data-align="center">
-<p><img src="pic/dl/gan/0.0.png" alt="Forward KL vs Reverse KL 对比" style="width: 65%;"></p>
+<p><img src="pic/gan/0.0.png" alt="Forward KL vs Reverse KL 对比" style="width: 65%;"></p>
 </div>
 <p><small><strong>图1</strong> Forward KL vs Reverse KL 对比:展示了5个不同的双峰分布（从左到右，两个峰的距离逐渐增大），以及 Forward KL 和 Reverse KL 在拟合这些分布时的不同行为。</small></p>
 <ul>
@@ -386,27 +378,16 @@
 </ol>
 <h3 id="直观例子">3.7 直观例子</h3>
 <p>假设真实数据分布是两个分离的高斯峰（双峰分布）:</p>
-<p><strong>Mode Covering 模型</strong>:</p>
-<ul>
-<li>会尝试用一个宽泛的分布（比如一个宽高斯，或两个都拟合）去覆盖两个峰</li>
-<li>即使中间低密度区也被赋予一定概率</li>
-<li><strong>优点</strong>:不会遗漏任何模式</li>
-<li><strong>缺点</strong>:可能过于平滑，缺乏细节</li>
-</ul>
-<p><strong>Mode Seeking 模型</strong>:</p>
-<ul>
-<li>可能只拟合其中一个峰（因为它不想"冒险"跑到真实分布概率低的地方）</li>
-<li>导致另一个峰完全被忽略</li>
-<li><strong>优点</strong>:生成结果锐利、细节丰富</li>
-<li><strong>缺点</strong>:容易 mode collapse，多样性不足</li>
-</ul>
+<p><strong>Mode Covering 模型</strong>: - 会尝试用一个宽泛的分布（比如一个宽高斯，或两个都拟合）去覆盖两个峰 - 即使中间低密度区也被赋予一定概率 - <strong>优点</strong>:不会遗漏任何模式 - <strong>缺点</strong>:可能过于平滑，缺乏细节</p>
+<p><strong>Mode Seeking 模型</strong>: - 可能只拟合其中一个峰（因为它不想“冒险”跑到真实分布概率低的地方） - 导致另一个峰完全被忽略 - <strong>优点</strong>:生成结果锐利、细节丰富 - <strong>缺点</strong>:容易 mode collapse，多样性不足</p>
+<hr />
 <h2 id="在生成模型中的体现">4. 在生成模型中的体现</h2>
 <table style="width:100%;">
 <colgroup>
-<col style="width: 12%" />
-<col style="width: 50%" />
-<col style="width: 18%" />
-<col style="width: 20%" />
+<col style="width: 25%" />
+<col style="width: 33%" />
+<col style="width: 25%" />
+<col style="width: 16%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -445,13 +426,9 @@
 <li>但在实践中，由于梯度消失等问题，生成器的行为类似最小化反向 KL</li>
 <li><strong>结果</strong>:GAN 生成锐利的图像，但容易陷入 mode collapse，只生成少数几种模式</li>
 </ul>
+<hr />
 <h2 id="总结对比表">5. 总结对比表</h2>
 <table>
-<colgroup>
-<col style="width: 20%" />
-<col style="width: 40%" />
-<col style="width: 40%" />
-</colgroup>
 <thead>
 <tr class="header">
 <th>特性</th>

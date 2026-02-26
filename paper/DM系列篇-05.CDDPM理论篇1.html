@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>DM系列篇-05.CDDPM理论篇1: 从"无条件生成"到"条件生成"</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="dm系列篇-05.cddpm理论篇1-从无条件生成到条件生成">DM系列篇-05.CDDPM理论篇1: 从“无条件生成”到“条件生成”</h1>
+<h2 id="ddpm的问题与cddpm的引入">1. DDPM的问题与CDDPM的引入</h2>
+<h3 id="ddpm的局限性">1.1 DDPM的局限性</h3>
+<p>去噪扩散概率模型（DDPM）是一种强大的生成模型，它通过学习逐步去噪过程来生成高质量的数据样本。DDPM通过前向扩散过程将数据逐步转换为纯噪声，然后学习反向去噪过程从噪声中恢复数据。在生成新样本时，DDPM从标准正态分布 <span class="math inline">\(\mathcal{N}(0, I)\)</span> 中采样初始噪声 <span class="math inline">\(x_T\)</span>，然后通过训练好的去噪网络逐步去噪，最终生成新的数据样本。</p>
+<p>然而，传统的DDPM在处理一些需要特定条件控制的生成任务时显得力不从心。具体来说:</p>
+<p><strong>无法控制生成内容</strong>:DDPM从标准正态分布随机采样初始噪声 <span class="math inline">\(x_T\)</span>，生成的内容是完全随机的，无法指定生成特定类别的样本</p>
+<h3 id="cddpm的解决方案">1.2 CDDPM的解决方案</h3>
+<p>在图像生成任务中，我们可能希望根据特定标签（如数字“7”）来生成相应的图像，而不是随机生成一个图像， 如图1所示。</p>
+<div data-align="center">
+<p><img src="pic/dm/cddpm/5.1.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图1</strong> DDPM（无条件）vs CDDPM（条件生成）:通过指定条件标签，CDDPM可以生成特定类别的图像</small></p>
+<p>为了增强DDPM的灵活性和可控性，提出了<strong>条件去噪扩散概率模型（Conditional Denoising Diffusion Probabilistic Model, CDDPM）</strong>。CDDPM允许我们在生成过程中加入额外的信息（条件），从而实现更加精确和可控的数据生成。</p>
+<p><strong>核心思想</strong>:在DDPM的基础上，引入条件变量 <span class="math inline">\(c\)</span>，使得去噪过程依赖于条件信息。比如，可以通过指定条件变量 <span class="math inline">\(c\)</span> 来指导模型生成特定类别的样本。</p>
+<p>为了更好地理解DDPM和CDDPM的区别，我们先回顾一下DDPM的架构:</p>
+<div data-align="center">
+<p><img src="pic/dm/cddpm/5.2.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图2</strong> DDPM架构:前向过程 <span class="math inline">\(q(x_t|x_{t-1})\)</span> 添加噪声，反向过程 <span class="math inline">\(p_\theta(x_{t-1}|x_t)\)</span> 去噪生成</small></p>
+<hr />
+<h2 id="从cvae到cddpm">2. 从CVAE到CDDPM</h2>
+<p>我们先回顾一下CVAE的推导过程，我们当时提出了三个问题，在CDDPM中我们依旧需要回答这三个问题。</p>
+<h3 id="问题1条件c加在ddpm的哪个部分">2.1 问题1:条件C加在DDPM的哪个部分？</h3>
+<p>图3展示了条件c应该加在哪个部分的疑问:</p>
+<div data-align="center">
+<p><img src="pic/dm/cddpm/5.3.png" width="70%"></p>
+</div>
+<p><small><strong>图3</strong> 条件在CDDPM中的位置:条件是否应该加在前向过程和潜变量</small></p>
+<p>不同于CVAE过程，由于CDDPM的前向过程（Diffusion过程）是个确定性过程，所以我们需要考虑条件c有没有必要加在前向过程？结论是<strong>没必要</strong>。以下过程给出了推导:</p>
+<h4 id="使用贝叶斯规则推导前向过程与条件-c-无关">使用贝叶斯规则推导:前向过程与条件 <span class="math inline">\(c\)</span> 无关</h4>
+<p>我们使用贝叶斯概率规则和条件概率分解，严格证明:<strong>在扩散模型中，前向过程与条件变量 <span class="math inline">\(c\)</span> 无关</strong>，即:</p>
+<p><span class="math display">\[\boxed{q(x_{1:T}|x_0, c) = q(x_{1:T}|x_0)}\]</span></p>
+<p><strong>设定与目标</strong></p>
+<ul>
+<li>数据生成包含条件变量 <span class="math inline">\(c\)</span>，联合分布为 <span class="math inline">\(q(c, x_0, x_1, \ldots, x_T)\)</span></li>
+<li>前向加噪机制是预设的马尔可夫链，满足: <span class="math display">\[q(x_t|x_{t-1}, c) = q(x_t|x_{t-1}), \quad \forall t \geq 1 \tag{1}\]</span> 这是扩散模型的基本设计原则:<strong>加噪不依赖 <span class="math inline">\(c\)</span></strong></li>
+<li>目标:证明 <span class="math display">\[q(x_{1:T}|x_0, c) = q(x_{1:T}|x_0) \tag{Goal}\]</span></li>
+</ul>
+<p><strong>贝叶斯视角下的推导</strong></p>
+<p><strong>步骤 1:写出条件概率定义</strong></p>
+<p>根据条件概率公式:</p>
+<p><span class="math display">\[q(x_{1:T}|x_0, c) = \frac{q(x_{1:T}, x_0, c)}{q(x_0, c)} \tag{2}\]</span></p>
+<p>类似地:</p>
+<p><span class="math display">\[q(x_{1:T}|x_0) = \frac{q(x_{1:T}, x_0)}{q(x_0)} \tag{3}\]</span></p>
+<p><strong>步骤 2:展开联合分布 <span class="math inline">\(q(x_{1:T}, x_0, c)\)</span></strong></p>
+<p>利用链式法则:</p>
+<p><span class="math display">\[q(x_{1:T}, x_0, c) = q(c) \cdot q(x_0|c) \cdot q(x_{1:T}|x_0, c) \tag{4}\]</span></p>
+<p>由马尔可夫性和假设 (1):</p>
+<p><span class="math display">\[q(x_{1:T}|x_0, c) = \prod_{t=1}^T q(x_t|x_{t-1}, c) = \prod_{t=1}^T q(x_t|x_{t-1}) = q(x_{1:T}|x_0)\]</span></p>
+<p>因此，联合分布可写为:</p>
+<p><span class="math display">\[q(x_{1:T}, x_0, c) = q(c) \cdot q(x_0|c) \cdot q(x_{1:T}|x_0) \tag{5}\]</span></p>
+<p><strong>步骤 3:计算分母</strong></p>
+<p>显然:</p>
+<p><span class="math display">\[q(x_0, c) = q(c) \cdot q(x_0|c) \tag{6}\]</span></p>
+<p><strong>步骤 4:代入贝叶斯公式</strong></p>
+<p>将 (5) 和 (6) 代入 (2):</p>
+<p><span class="math display">\[q(x_{1:T}|x_0, c) = \frac{q(c) \cdot q(x_0|c) \cdot q(x_{1:T}|x_0)}{q(c) \cdot q(x_0|c)} = q(x_{1:T}|x_0) \tag{7}\]</span></p>
+<p>✅ <strong>得证！</strong></p>
+<p><strong>结论</strong></p>
+<p>由于前向转移核满足 <span class="math inline">\(q(x_t|x_{t-1}, c) = q(x_t|x_{t-1})\)</span>，整个轨迹分布与 <span class="math inline">\(c\)</span> 无关，故:</p>
+<p><span class="math display">\[\boxed{q(x_{1:T}|x_0, c) = q(x_{1:T}|x_0)}\]</span></p>
+<p>这意味着:<strong>无论是否引入条件 <span class="math inline">\(c\)</span>，前向扩散过程完全相同。条件信息仅用于反向去噪过程。</strong></p>
+<p>上述的证明过程同时说明了条件c与潜变量z是相互独立的，同时也就回答了问题2</p>
+<p>因此，在CDDPM中，我们只需要将条件 <span class="math inline">\(c\)</span> 加入到去噪网络 <span class="math inline">\(\epsilon_\theta(x_t, t, c)\)</span> 中，而前向过程 <span class="math inline">\(q(x_t|x_{t-1})\)</span> 保持不变。</p>
+<p>所以CDDPM的框架图如图4所示:</p>
+<div data-align="center">
+<p><img src="pic/dm/cddpm/5.4.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图4</strong> CDDPM框架:条件 <span class="math inline">\(c\)</span> 仅注入到去噪网络 <span class="math inline">\(\epsilon_\theta(x_t, t, c)\)</span>，前向过程保持不变</small></p>
+<h3 id="问题2条件c如何编码">2.2 问题2:条件c如何编码？</h3>
+<p>这个问题我们在CVAE解释过了，可以使用One-Hot编码和Embedding编码，在这里我们仅仅考虑Embedding编码，即</p>
+<p>条件变量 <span class="math inline">\(c\)</span> 需要编码成数值向量才能输入神经网络，常见的编码方式有:</p>
+<p><strong>方式2:Embedding编码</strong> - 方法:使用可学习的嵌入层将类别索引映射为低维向量 - 例如:类别3 → 可学习的N维向量 - 优点:维度可自定义，通常比one-hot更紧凑；可以学习到类别之间的语义关系 - 缺点:需要额外的可学习参数</p>
+<div data-align="center">
+<p><img src="pic/dm/cddpm/5.5.png" width="70%"></p>
+</div>
+<p><small><strong>图5</strong> 条件编码方式:Embedding编码</small></p>
+<h3 id="问题3条件c如何注入到去噪网络">2.3 问题3:条件c如何注入到去噪网络？</h3>
+<p>在CDDPM中，我们新增了一个问题:条件c如何注入到去噪网络</p>
+<p>不同于CVAE，CDDPM的Denoise过程的输入除了潜变量z，还有参数t, 如图6所示:</p>
+<div data-align="center">
+<p><img src="pic/dm/cddpm/5.6.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图6</strong> CDDPM去噪网络的输入:除了潜变量 <span class="math inline">\(x_t\)</span>，还有时间步 <span class="math inline">\(t\)</span>，条件 <span class="math inline">\(c\)</span> 需要注入到网络中</small></p>
+<p>于是我们需要考虑条件c如何注入到去噪网络:</p>
+<p>条件 <span class="math inline">\(c\)</span> 编码后需要注入到去噪网络中，常见的注入方式有:</p>
+<p><strong>方式1:条件嵌入与时间嵌入相加</strong> - 方法:将条件嵌入 <span class="math inline">\(emb(c)\)</span> 与时间嵌入 <span class="math inline">\(emb(t)\)</span> 相加，然后注入到网络的每个卷积块中 - 数学表达:<span class="math inline">\(v = emb(t) + emb(c)\)</span>，然后 <span class="math inline">\(v\)</span> 通过MLP后加到特征图 - 优点:实现简单，计算效率高 - 缺点:条件信息和时间信息混合，可能相互干扰</p>
+<p><strong>方式2:条件嵌入与时间嵌入拼接</strong> - 方法:将条件嵌入和时间嵌入拼接后通过MLP - 数学表达:<span class="math inline">\(v = MLP([emb(t), emb(c)])\)</span> - 优点:条件信息和时间信息分离，更灵活 - 缺点:需要更多的参数和计算</p>
+<p><strong>方式3:条件嵌入作为额外的输入通道</strong> - 方法:将条件嵌入广播到图像空间维度，作为额外的输入通道 - 优点:条件信息在空间维度上可见 - 缺点:增加输入维度，计算开销较大</p>
+<p><strong>标准实现</strong>:条件嵌入与时间嵌入相加 - 这是最常用和高效的方式 - 在U-Net的每个卷积块中，条件嵌入和时间嵌入相加后通过MLP，然后加到特征图上</p>
+<div data-align="center">
+<p><img src="pic/dm/cddpm/5.7.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图7</strong> 条件注入方式:条件嵌入与时间嵌入相加后注入到U-Net的每个卷积块</small></p>
+<hr />
+<h2 id="cddpm的损失函数推导">3. CDDPM的损失函数推导</h2>
+<h3 id="cddpm的条件elbo推导">3.1 CDDPM的条件ELBO推导</h3>
+<p>在CDDPM中，我们需要最大化条件对数似然 <span class="math inline">\(\log p_\theta(x_0|c)\)</span>。与DDPM类似，我们引入变分后验 <span class="math inline">\(q(x_{1:T}|x_0)\)</span> 来近似真实后验。</p>
+<p><strong>条件对数似然</strong>: <span class="math display">\[\log p_\theta(x_0|c) = \log \int p_\theta(x_{0:T}|c) dx_{1:T}\]</span></p>
+<p><strong>前向过程</strong>（固定，不依赖于条件）: <span class="math display">\[q(x_{1:T}|x_0) = \prod_{t=1}^{T} q(x_t|x_{t-1}) = \prod_{t=1}^{T} \mathcal{N}(x_t; \sqrt{\alpha_t} x_{t-1}, (1-\alpha_t) I)\]</span></p>
+<p><strong>反向过程</strong>（依赖于条件）: <span class="math display">\[p_\theta(x_{0:T}|c) = p(x_T) \prod_{t=1}^{T} p_\theta(x_{t-1}|x_t, c)\]</span></p>
+<p>其中 <span class="math inline">\(p(x_T) = \mathcal{N}(x_T; 0, I)\)</span>。</p>
+<p><strong>ELBO推导</strong>:</p>
+<p>与DDPM类似，我们可以推导出条件ELBO:</p>
+<p><span class="math display">\[\begin{aligned}
+\log p_\theta(x_0|c) &amp;= \log \int \frac{p_\theta(x_{0:T}|c) q(x_{1:T}|x_0)}{q(x_{1:T}|x_0)} dx_{1:T} \\
+&amp;\geq \mathbb{E}_{q(x_{1:T}|x_0)} \left[\log \frac{p_\theta(x_{0:T}|c)}{q(x_{1:T}|x_0)}\right]
+\end{aligned}\]</span></p>
+<p>展开后得到:</p>
+<p><span class="math display">\[\begin{aligned}
+\mathcal{L}(x_0, c; \theta) &amp;= \mathbb{E}_{q(x_1|x_0)} [\log p_\theta(x_0|x_1, c)] \\
+&amp;\quad - D_{KL}(q(x_T|x_0) \| p(x_T)) \\
+&amp;\quad - \sum_{t=2}^{T} \mathbb{E}_{q(x_t|x_0)} [D_{KL}(q(x_{t-1}|x_t, x_0) \| p_\theta(x_{t-1}|x_t, c))]
+\end{aligned}\]</span></p>
+<p><strong>ELBO的组成</strong>:</p>
+<ol type="1">
+<li><strong>重构项</strong>:<span class="math inline">\(\mathbb{E}_{q(x_1|x_0)} [\log p_\theta(x_0|x_1, c)]\)</span> - 鼓励模型从 <span class="math inline">\(x_1\)</span> 和条件 <span class="math inline">\(c\)</span> 重构原始输入 <span class="math inline">\(x_0\)</span></li>
+<li><strong>先验匹配项</strong>:<span class="math inline">\(D_{KL}(q(x_T|x_0) \| p(x_T))\)</span> - 最终噪声化输入分布与标准高斯先验的匹配（无参数，通常为0）</li>
+<li><strong>去噪匹配项</strong>:<span class="math inline">\(\mathbb{E}_{q(x_t|x_0)} [D_{KL}(q(x_{t-1}|x_t, x_0) \| p_\theta(x_{t-1}|x_t, c))]\)</span> - 学习条件去噪转移步骤 <span class="math inline">\(p_\theta(x_{t-1}|x_t, c)\)</span> 匹配真实去噪步骤 <span class="math inline">\(q(x_{t-1}|x_t, x_0)\)</span></li>
+</ol>
+<h3 id="简化的损失函数">3.2 简化的损失函数</h3>
+<p>与DDPM类似，CDDPM的损失函数可以简化为预测噪声的均方误差:</p>
+<p><strong>简化损失函数</strong>:</p>
+<p><span class="math display">\[\mathcal{L}_{CDDPM} = \mathbb{E}_{t, x_0, \epsilon, c} \left[ \|\epsilon - \epsilon_\theta(x_t, t, c)\|^2 \right]\]</span></p>
+<p>其中:</p>
+<ul>
+<li><span class="math inline">\(t \sim \text{Uniform}(1, T)\)</span> - 随机采样时间步</li>
+<li><span class="math inline">\(x_0 \sim p_{data}(x_0)\)</span> - 从数据分布采样</li>
+<li><span class="math inline">\(\epsilon \sim \mathcal{N}(0, I)\)</span> - 从标准正态分布采样噪声</li>
+<li><span class="math inline">\(x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon\)</span> - 前向扩散过程</li>
+<li><span class="math inline">\(c\)</span> - 条件变量（如类别标签）</li>
+</ul>
+<p><strong>关键变化</strong>:</p>
+<p>与DDPM相比，CDDPM的损失函数只有一处关键变化: - <strong>去噪网络</strong>:<span class="math inline">\(\epsilon_\theta(x_t, t, c)\)</span> - 去噪网络依赖于条件 <span class="math inline">\(c\)</span></p>
+<p><strong>训练过程</strong>:</p>
+<ol type="1">
+<li>从数据集中采样 <span class="math inline">\((x_0, c)\)</span></li>
+<li>随机采样时间步 <span class="math inline">\(t \sim \text{Uniform}(1, T)\)</span></li>
+<li>采样噪声 <span class="math inline">\(\epsilon \sim \mathcal{N}(0, I)\)</span></li>
+<li>计算 <span class="math inline">\(x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon\)</span></li>
+<li>预测噪声 <span class="math inline">\(\hat{\epsilon} = \epsilon_\theta(x_t, t, c)\)</span></li>
+<li>计算损失 <span class="math inline">\(L = \|\epsilon - \hat{\epsilon}\|^2\)</span></li>
+<li>反向传播并更新参数</li>
+</ol>
+<h3 id="条件去噪转移步骤">3.3 条件去噪转移步骤</h3>
+<p><strong>真实去噪步骤</strong>（与DDPM相同）: <span class="math display">\[q(x_{t-1}|x_t, x_0) = \mathcal{N}(x_{t-1}; \tilde{\mu}_t(x_t, x_0), \tilde{\beta}_t I)\]</span></p>
+<p>其中:</p>
+<p><span class="math display">\[\tilde{\mu}_t(x_t, x_0) = \frac{\sqrt{\bar{\alpha}_{t-1}} \beta_t}{1 - \bar{\alpha}_t} x_0 + \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} x_t\]</span></p>
+<p><span class="math display">\[\tilde{\beta}_t = \frac{1 - \bar{\alpha}_{t-1}}{1 - \bar{\alpha}_t} \beta_t\]</span></p>
+<p><strong>条件去噪步骤</strong>（依赖于条件）: <span class="math display">\[p_\theta(x_{t-1}|x_t, c) = \mathcal{N}(x_{t-1}; \mu_\theta(x_t, t, c), \Sigma_\theta(x_t, t, c))\]</span></p>
+<p>其中均值 <span class="math inline">\(\mu_\theta(x_t, t, c)\)</span> 可以通过预测噪声 <span class="math inline">\(\epsilon_\theta(x_t, t, c)\)</span> 计算:</p>
+<p><span class="math display">\[\mu_\theta(x_t, t, c) = \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{\beta_t}{\sqrt{1 - \bar{\alpha}_t}} \epsilon_\theta(x_t, t, c) \right)\]</span></p>
+<p>方差 <span class="math inline">\(\Sigma_\theta(x_t, t, c)\)</span> 通常设置为 <span class="math inline">\(\tilde{\beta}_t I\)</span>（与DDPM相同）。</p>
+<hr />
+<h2 id="conditional的作用与本质">4. Conditional的作用与本质</h2>
+<h3 id="conditional的作用">4.1 Conditional的作用</h3>
+<p>在CDDPM中，条件变量 <span class="math inline">\(c\)</span> 起到以下关键作用:</p>
+<ol type="1">
+<li><strong>控制生成内容</strong>:
+<ul>
+<li>通过指定不同的条件 <span class="math inline">\(c\)</span>，可以生成不同类别的样本</li>
+<li>例如:在MNIST上，<span class="math inline">\(c\)</span> 可以是数字标签（0-9），生成对应数字的图像</li>
+</ul></li>
+<li><strong>引导去噪过程</strong>:
+<ul>
+<li>条件 <span class="math inline">\(c\)</span> 引导去噪网络 <span class="math inline">\(\epsilon_\theta(x_t, t, c)\)</span> 朝着特定类别的方向去噪</li>
+<li>不同条件对应不同的去噪路径，最终生成不同类别的样本</li>
+</ul></li>
+<li><strong>提高生成质量</strong>:
+<ul>
+<li>条件信息帮助模型更好地理解去噪目标，提高生成样本的质量和准确性</li>
+</ul></li>
+</ol>
+<h3 id="conditional的本质改变去噪路径">4.2 Conditional的本质:改变去噪路径</h3>
+<p><strong>核心思想</strong>:CDDPM中条件 <span class="math inline">\(c\)</span> 的本质作用是<strong>改变去噪路径</strong>。</p>
+<h4 id="ddpm中的去噪路径">4.2.1 DDPM中的去噪路径</h4>
+<p>在DDPM中，去噪网络 <span class="math inline">\(\epsilon_\theta(x_t, t)\)</span> 不依赖于条件，从相同的初始噪声 <span class="math inline">\(x_T\)</span> 开始，总是沿着相同的去噪路径生成样本，无法控制生成的内容。</p>
+<h4 id="cddpm中的去噪路径变化">4.2.2 CDDPM中的去噪路径变化</h4>
+<p>在CDDPM中，条件 <span class="math inline">\(c\)</span> 改变了去噪路径:</p>
+<ul>
+<li><strong>不同条件对应不同路径</strong>:条件 <span class="math inline">\(c\)</span> 影响去噪网络 <span class="math inline">\(\epsilon_\theta(x_t, t, c)\)</span> 的预测，使得不同条件引导不同的去噪方向</li>
+<li><strong>条件引导去噪方向</strong>:在每一步去噪中，条件 <span class="math inline">\(c\)</span> 帮助模型选择正确的去噪方向，朝着目标类别收敛</li>
+<li><strong>最终生成不同内容</strong>:虽然从相同的初始噪声 <span class="math inline">\(x_T\)</span> 开始，但不同条件引导不同的去噪路径，最终生成不同类别的样本</li>
+</ul>
+<h4 id="数学表达">4.2.3 数学表达</h4>
+<p><strong>DDPM</strong>: <span class="math display">\[x_{t-1} = \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{\beta_t}{\sqrt{1 - \bar{\alpha}_t}} \epsilon_\theta(x_t, t) \right) + \sigma_t z\]</span></p>
+<p>去噪路径由 <span class="math inline">\(\epsilon_\theta(x_t, t)\)</span> 决定，不依赖于条件。</p>
+<p><strong>CDDPM</strong>: <span class="math display">\[x_{t-1} = \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{\beta_t}{\sqrt{1 - \bar{\alpha}_t}} \epsilon_\theta(x_t, t, c) \right) + \sigma_t z\]</span></p>
+<p>去噪路径由 <span class="math inline">\(\epsilon_\theta(x_t, t, c)\)</span> 决定，依赖于条件 <span class="math inline">\(c\)</span>，不同条件对应不同的去噪路径。</p>
+<h3 id="条件生成过程">4.3 条件生成过程</h3>
+<p><strong>条件生成算法</strong>:</p>
+<ol type="1">
+<li><strong>初始化</strong>:从标准正态分布采样 <span class="math inline">\(x_T \sim \mathcal{N}(0, I)\)</span></li>
+<li><strong>指定条件</strong>:给定条件 <span class="math inline">\(c\)</span>（如类别标签）</li>
+<li><strong>迭代去噪</strong>:对于 <span class="math inline">\(t = T, T-1, \ldots, 1\)</span>:
+<ul>
+<li>预测噪声:<span class="math inline">\(\hat{\epsilon} = \epsilon_\theta(x_t, t, c)\)</span></li>
+<li>计算均值:<span class="math inline">\(\mu_t = \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{\beta_t}{\sqrt{1 - \bar{\alpha}_t}} \hat{\epsilon} \right)\)</span></li>
+<li>采样:<span class="math inline">\(x_{t-1} = \mu_t + \sigma_t z\)</span>，其中 <span class="math inline">\(z \sim \mathcal{N}(0, I)\)</span></li>
+</ul></li>
+<li><strong>输出</strong>:<span class="math inline">\(x_0\)</span> 是生成的条件样本</li>
+</ol>
+<p><strong>关键点</strong>: - 条件 <span class="math inline">\(c\)</span> 在每一步去噪中都参与计算，引导去噪方向 - 从相同的 <span class="math inline">\(x_T\)</span> 开始，不同条件 <span class="math inline">\(c\)</span> 会生成不同的 <span class="math inline">\(x_0\)</span></p>
+<hr />
+<h2 id="参考">📚 参考</h2>
+<ul>
+<li>Ho, J., Jain, A., &amp; Abbeel, P. (2020). Denoising diffusion probabilistic models. <em>Advances in Neural Information Processing Systems</em>, 33, 6840-6851.</li>
+<li>Dhariwal, P., &amp; Nichol, A. (2021). Diffusion models beat gans on image synthesis. <em>Advances in Neural Information Processing Systems</em>, 34, 8780-8794.</li>
+<li>Ho, J., &amp; Salimans, T. (2022). Classifier-free diffusion guidance. <em>arXiv preprint arXiv:2207.12598</em>.</li>
+<li>《深度学习5:生成模型》</li>
+<li><a href="https://arxiv.org/abs/2208.11970">Understanding Diffusion Models: A Unified Perspective</a></li>
+<li>深度学习入门5：生成模型</li>
+</ul>
+</body>
+</html>

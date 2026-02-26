@@ -2,6 +2,8 @@
 
 接下来我们进行GAN的实现。GAN能够通过对抗训练学习高维和复杂数据的分布，生成清晰逼真的图像。
 
+---
+
 ## 1. 实现的策略
 
 根据理论篇的内容可知，GAN的目标函数为:
@@ -21,6 +23,7 @@ $$L(D) = \mathbb{E}_{x \sim p_{data}}[\log D(x)] + \mathbb{E}_{z \sim p_z}[\log(
 $$\text{Loss}_D = -\frac{1}{N}\sum_{i=1}^{N}[\log D(x_i) + \log(1 - D(G(z_i)))]$$
 
 其中:
+
 - $x_i$ 是真实样本，标签为 1
 - $G(z_i)$ 是生成样本，标签为 0
 
@@ -49,7 +52,7 @@ $$\text{Loss}_G = -\frac{1}{N}\sum_{i=1}^{N}\log D(G(z_i))$$
 如图1所示，两种损失函数形式的梯度对比:
 
 <div align="center">
-<img src="pic/dl/gan/2.1.jpeg" width="70%">
+<img src="pic/gan/2.1.jpeg" width="70%">
 </div>
 
 <small>**图1** 生成器损失函数的两种形式:最小化 $\log(1-D(G(z)))$ vs 最大化 $\log D(G(z))$。蓝色显示在训练初期（$D(G(z)) \approx 0$），最小化 $\log(1-D)$ 的梯度接近 0，导致梯度消失；棕色显示最大化 $\log D$ 在训练早期能提供更强的梯度信号，有助于生成器的训练。</small>
@@ -272,7 +275,7 @@ $$\text{Loss}_D = -\log(0.5) - \log(0.5) = 2 \log 2 \approx 1.39$$
 图2展示了理论训练过程中的损失曲线变化:
 
 <div align="center">
-<img src="pic/dl/gan/2.2.jpeg" width="70%">
+<img src="pic/gan/2.2.jpeg" width="70%">
 </div>
 
 <small>**图2** GAN训练的理论损失曲线:展示了判别器损失和生成器损失在训练过程中的变化趋势。在最优情况下，判别器损失收敛到 $2 \log 2 \approx 1.39$。</small>
@@ -281,7 +284,7 @@ $$\text{Loss}_D = -\log(0.5) - \log(0.5) = 2 \log 2 \approx 1.39$$
 实际训练50个epochs后的损失曲线显示:
 
 <div align="center">
-<img src="pic/dl/gan/2.3.png" width="70%">
+<img src="pic/gan/2.3.png" width="70%">
 </div>
 
 <small>**图3** 实际训练50个epochs后的损失曲线:展示了判别器和生成器在实际训练过程中的损失变化。</small>
@@ -313,7 +316,7 @@ if infer:
 ```
 
 <div align="center">
-<img src="pic/dl/gan/2.4.png" width="70%">
+<img src="pic/gan/2.4.png" width="70%">
 </div>
 
 <small>**图4** GAN的生成能力:从随机噪声生成的MNIST数字图像</small>
@@ -343,7 +346,7 @@ fake_pred = discriminator(fake_image)
 ```
 
 <div align="center">
-<img src="pic/dl/gan/2.5.png" width="70%">
+<img src="pic/gan/2.5.png" width="70%">
 </div>
 
 <small>**图5** 判别器对真实图像的判断</small>
@@ -364,6 +367,8 @@ fake_pred = discriminator(fake_image)
   - 如果真实样本输出 > 0.7 且生成样本输出 < 0.3:说明训练仍在进行中，判别器仍能较好地区分
   - 如果真实样本输出 < 0.5:可能存在问题（判别器训练不足或生成器过强）
   - 如果两者都接近 0.5:说明 GAN 接近纳什均衡，生成器已能生成逼真的图像，判别器无法区分真假分布
+
+---
 
 
 ## 4. 总结

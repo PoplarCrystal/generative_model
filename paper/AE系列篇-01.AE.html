@@ -206,17 +206,13 @@
         </style>
 </head>
 <body>
-<h1 id="ae系列篇01.-ae-从矩阵分解到数据压缩">AE系列篇01. AE: 从“矩阵分解”到“数据压缩”</h1>
+<h1 id="ae系列篇-01.ae-从矩阵分解到数据压缩">AE系列篇-01.AE: 从“矩阵分解”到“数据压缩”</h1>
 <h2 id="从矩阵分解到数据压缩">1. 从“矩阵分解”到“数据压缩”</h2>
 <h3 id="矩阵分解的启示">1.1 矩阵分解的启示</h3>
 <p>在数学和线性代数中，矩阵分解是一个核心概念。以<strong>奇异值分解（SVD, Singular Value Decomposition）</strong>为例，任意矩阵 <span class="math inline">\(A \in \mathbb{R}^{m \times n}\)</span> 可以分解为:</p>
 <p><span class="math display">\[A = U \Sigma V^T\]</span></p>
-<p>其中:</p>
-<ul>
-<li><span class="math inline">\(U \in \mathbb{R}^{m \times m}\)</span> 和 <span class="math inline">\(V \in \mathbb{R}^{n \times n}\)</span> 是正交矩阵</li>
-<li><span class="math inline">\(\Sigma \in \mathbb{R}^{m \times n}\)</span> 是对角矩阵，对角线上的元素是奇异值 <span class="math inline">\(\sigma_1 \geq \sigma_2 \geq \cdots \geq \sigma_r &gt; 0\)</span>（<span class="math inline">\(r\)</span> 是矩阵的秩）</li>
-</ul>
-<p><strong>核心思想</strong>:在实际应用中，大矩阵中真正"有效"的信息往往只集中在少数几个大的奇异值上，而很多奇异值接近零，对应的信息是冗余的。这意味着我们可以用更少的维度来表示原始数据，而不会丢失太多信息。</p>
+<p>其中: - <span class="math inline">\(U \in \mathbb{R}^{m \times m}\)</span> 和 <span class="math inline">\(V \in \mathbb{R}^{n \times n}\)</span> 是正交矩阵 - <span class="math inline">\(\Sigma \in \mathbb{R}^{m \times n}\)</span> 是对角矩阵，对角线上的元素是奇异值 <span class="math inline">\(\sigma_1 \geq \sigma_2 \geq \cdots \geq \sigma_r &gt; 0\)</span>（<span class="math inline">\(r\)</span> 是矩阵的秩）</p>
+<p><strong>核心思想</strong>:在实际应用中，大矩阵中真正“有效”的信息往往只集中在少数几个大的奇异值上，而很多奇异值接近零，对应的信息是冗余的。这意味着我们可以用更少的维度来表示原始数据，而不会丢失太多信息。</p>
 <p>例如，如果我们只保留前 <span class="math inline">\(k\)</span> 个最大的奇异值，可以得到一个低秩近似:</p>
 <p><span class="math display">\[A \approx U_k \Sigma_k V_k^T\]</span></p>
 <p>其中 <span class="math inline">\(U_k\)</span> 和 <span class="math inline">\(V_k\)</span> 只包含前 <span class="math inline">\(k\)</span> 列，<span class="math inline">\(\Sigma_k\)</span> 只包含前 <span class="math inline">\(k\)</span> 个奇异值。这样就将原始 <span class="math inline">\(m \times n\)</span> 的矩阵压缩到了更小的表示空间。</p>
@@ -275,18 +271,8 @@
 </tr>
 </tbody>
 </table>
-<p><strong>数值结果</strong>:</p>
-<ul>
-<li><strong>压缩比</strong>:从100个元素减少到50个元素，压缩了50%</li>
-<li><strong>重构误差</strong>:Frobenius范数误差仅为0.35</li>
-<li><strong>信息保留</strong>:保留了97.2%的信息，仅损失2.8%</li>
-</ul>
-<p><strong>总结</strong>:</p>
-<ol type="1">
-<li><strong>大部分信息集中在少数几个大的奇异值上</strong>:前5个奇异值就捕获了97.2%的信息</li>
-<li><strong>小的奇异值可以安全丢弃</strong>:后5个奇异值总共只贡献了2.8%的信息</li>
-<li><strong>压缩是可行的</strong>:用一半的存储空间就能表示几乎全部的信息</li>
-</ol>
+<p><strong>数值结果</strong>: - <strong>压缩比</strong>:从100个元素减少到50个元素，压缩了50% - <strong>重构误差</strong>:Frobenius范数误差仅为0.35 - <strong>信息保留</strong>:保留了97.2%的信息，仅损失2.8%</p>
+<p><strong>总结</strong>: 1. <strong>大部分信息集中在少数几个大的奇异值上</strong>:前5个奇异值就捕获了97.2%的信息 2. <strong>小的奇异值可以安全丢弃</strong>:后5个奇异值总共只贡献了2.8%的信息 3. <strong>压缩是可行的</strong>:用一半的存储空间就能表示几乎全部的信息</p>
 <p>这个例子清楚地展示了:<strong>大矩阵中真正有效的信息只集中在少数几个特征值/奇异值上，很多都是零或接近零，没有意义</strong>。这正是数据压缩和降维的核心思想，也是自编码器要解决的根本问题。</p>
 <h3 id="数据压缩的必要性">1.2 数据压缩的必要性</h3>
 <p><strong>数据压缩是训练网络的重要阶段</strong>。核心思想是:用更少的比特来表示相同数量的信息。这在深度学习中尤为重要，原因包括:</p>
@@ -313,34 +299,34 @@
 <p><strong>例子1:矩阵分解（SVD）</strong></p>
 <p>下图展示了10×10矩阵A通过SVD分解实现压缩的过程:</p>
 <div data-align="center">
-<p><img src="pic/dl/ae/1.1.png" width="80%"></p>
+<p><img src="pic/ae/ae/1.1.png" width="80%"></p>
 </div>
-<p><small><strong>图1.1</strong> 左侧:原始矩阵A（<span class="math inline">\(10 \times 10\)</span>，高维空间） | 中间:SVD分解结果（<span class="math inline">\(A = U\Sigma V^T\)</span>，显示所有10个奇异值） | 右侧:前5个最大的奇异值（低维空间）</small></p>
+<p><small><strong>图1</strong> 左侧:原始矩阵A（<span class="math inline">\(10 \times 10\)</span>，高维空间） | 中间:SVD分解结果（<span class="math inline">\(A = U\Sigma V^T\)</span>，显示所有10个奇异值） | 右侧:前5个最大的奇异值（低维空间）</small></p>
 <p><strong>压缩</strong>:原始矩阵 <span class="math inline">\(10 \times 10\)</span> 是高维空间，通过SVD分解保留前5个奇异值，压缩到低维空间。</p>
 <p><strong>例子2:自编码器（AE）</strong></p>
 <p>下图展示了MNIST图像通过自编码器实现压缩的过程:</p>
 <div data-align="center">
-<p><img src="pic/dl/ae/1.2.png" width="80%"></p>
+<p><img src="pic/ae/ae/1.2.png" width="80%"></p>
 </div>
-<p><small><strong>图1.2</strong> 左侧:原始MNIST图像（28×28像素，高维空间） | 中间:28×28数字矩阵（每个像素值0-255） | 右侧:16维潜在向量（Latent空间，低维空间）</small></p>
+<p><small><strong>图2</strong> 左侧:原始MNIST图像（28×28像素，高维空间） | 中间:28×28数字矩阵（每个像素值0-255） | 右侧:16维潜在向量（Latent空间，低维空间）</small></p>
 <p><strong>压缩</strong>:原始图像 <span class="math inline">\(28 \times 28 = 784\)</span> 维是高维空间，通过编码器压缩到16维Latent空间（低维空间）。</p>
 <h3 id="架构与工作原理">2.2 架构与工作原理</h3>
 <p>自编码器由编码器和解码器两部分组成，通过编码-解码过程实现数据压缩和重构:</p>
 <div data-align="center">
-<p><img src="pic/dl/ae/1.3.png" width="70%"></p>
+<p><img src="pic/ae/ae/1.3.jpeg" width="70%"></p>
 </div>
-<p><small><strong>图1.3</strong> 自编码器架构:输入 x → 编码器 e_θ(x) → 潜在向量 z → 解码器 d_φ(z) → 重构输出 x̂</small></p>
+<p><small><strong>图3</strong> 自编码器架构:输入 <span class="math inline">\(x\)</span> → 编码器 <span class="math inline">\(e_\phi(x)\)</span> → 潜在向量 <span class="math inline">\(z\)</span> → 解码器 <span class="math inline">\(d_\theta(z)\)</span> → 重构输出 <span class="math inline">\(\hat{x}\)</span></small></p>
 <h3 id="损失函数">2.3 损失函数</h3>
 <p>自编码器的目标是实现重构，因此损失函数即为重构误差，即编码器输入和解码器输出之间的均方误差:</p>
-<p><span class="math display">\[\mathcal{L}_{AE} = \|x - \hat{x}\|^2 = \|x - d_\phi(e_\theta(x))\|^2\]</span></p>
+<p><span class="math display">\[\mathcal{L}_{AE} = \|x - \hat{x}\|^2 = \|x - d_\theta(e_\phi(x))\|^2\]</span></p>
 <hr />
 <h2 id="可视化潜在空间">3. 可视化潜在空间</h2>
 <h3 id="潜在空间的聚类特性">3.1 潜在空间的聚类特性</h3>
 <p>下图展示了在MNIST数据集上训练自编码器后生成的潜在空间可视化示例:</p>
 <div data-align="center">
-<p><img src="pic/dl/ae/1.4.png" width="70%"></p>
+<p><img src="pic/ae/ae/1.4.png" width="70%"></p>
 </div>
-<p><small><strong>图1.4</strong> 潜在空间可视化:相同的数字倾向于在潜在空间中聚集在一起，形成不同的簇。同时，潜在空间中存在一些不对应任何数据点的“空洞”区域。</small></p>
+<p><small><strong>图4</strong> 潜在空间可视化:相同的数字倾向于在潜在空间中聚集在一起，形成不同的簇。同时，潜在空间中存在一些不对应任何数据点的“空洞”区域。</small></p>
 <p>从图中可以观察到:</p>
 <ol type="1">
 <li><p><strong>聚类现象</strong>:相同的数字倾向于在潜在空间中聚集在一起。例如，所有的“0”会形成一个簇，所有的“1”会形成另一个簇，以此类推。</p></li>
@@ -397,10 +383,10 @@
 <span id="cb1-39"><a href="#cb1-39" aria-hidden="true"></a>    <span class="co"># AE 只有重构损失，没有 KL 散度</span></span>
 <span id="cb1-40"><a href="#cb1-40" aria-hidden="true"></a>    <span class="cf">return</span> F.mse_loss(x_hat, x, reduction<span class="op">=</span><span class="st">&#39;mean&#39;</span>)</span></code></pre></div>
 <div data-align="center">
-<p><img src="pic/dl/ae/1.5.png" height="50%"></p>
+<p><img src="pic/ae/ae/1.5.png" height="50%"></p>
 </div>
-<p><small><strong>图1.5</strong> 自编码器网络结构</small></p>
-<p>图1.5展示了自编码器网络结构，其中Encoder为两层全连接网络（使用ReLU激活函数），将输入压缩到潜在空间；Decoder为两层全连接网络（使用ReLU和Sigmoid激活函数），将潜在向量重构回原始空间。损失函数仅包含重构损失（MSE），没有正则化项。</p>
+<p><small><strong>图5</strong> 自编码器网络结构</small></p>
+<p>图5展示了自编码器网络结构，其中Encoder为两层全连接网络（使用ReLU激活函数），将输入压缩到潜在空间；Decoder为两层全连接网络（使用ReLU和Sigmoid激活函数），将潜在向量重构回原始空间。损失函数仅包含重构损失（MSE），没有正则化项。</p>
 <h3 id="训练与推理">4.2 训练与推理</h3>
 <h4 id="模型训练">4.2.1 模型训练</h4>
 <p>训练过程的核心代码如下:</p>
@@ -449,10 +435,10 @@
 <span id="cb4-15"><a href="#cb4-15" aria-hidden="true"></a>        reconstructed_images <span class="op">=</span> x_reconstructed.view(sample_size, <span class="dv">1</span>, <span class="dv">28</span>, <span class="dv">28</span>).cpu()</span>
 <span id="cb4-16"><a href="#cb4-16" aria-hidden="true"></a>        labels_cpu <span class="op">=</span> labels_test.numpy()</span></code></pre></div>
 <div data-align="center">
-<p><img src="pic/dl/ae/1.6.png" width="70%"></p>
+<p><img src="pic/ae/ae/1.6.png" width="70%"></p>
 </div>
-<p><small><strong>图1.6</strong> AE的重建能力:左列为原始图像，右列为重构图像。</small></p>
-<p>图1.6展示了AE的重建能力，两者非常相似，说明潜在空间成功捕获了输入的关键信息，证明了AE在数据压缩方面的有效性。</p>
+<p><small><strong>图6</strong> AE的重建能力:左列为原始图像，右列为重构图像。</small></p>
+<p>图6展示了AE的重建能力，两者非常相似，说明潜在空间成功捕获了输入的关键信息，证明了AE在数据压缩方面的有效性。</p>
 <h3 id="推理2生成能力generation">5.2 推理2:生成能力（Generation）</h3>
 <p>代码中的 <code>infer2</code> 部分展示了AE的<strong>生成能力</strong>（或更准确地说，是生成能力的局限性）:</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a><span class="co"># 模型推理2 - 生成新图像（从潜在空间随机采样）</span></span>
@@ -464,10 +450,10 @@
 <span id="cb5-7"><a href="#cb5-7" aria-hidden="true"></a>        x <span class="op">=</span> model.decoder(z)  <span class="co"># 仅使用解码器生成图像</span></span>
 <span id="cb5-8"><a href="#cb5-8" aria-hidden="true"></a>        generated_images <span class="op">=</span> x.view(sample_size, <span class="dv">1</span>, <span class="dv">28</span>, <span class="dv">28</span>).cpu()</span></code></pre></div>
 <div data-align="center">
-<p><img src="pic/dl/ae/1.7.png" width="70%"></p>
+<p><img src="pic/ae/ae/1.7.png" width="70%"></p>
 </div>
-<p><small><strong>图1.7</strong> AE的生成能力</small></p>
-<p>图1.7展示了AE生成能力的局限性:从标准正态分布随机采样潜在向量 <span class="math inline">\(z\)</span>，直接通过解码器生成图像。结果生成的图像通常是<strong>无意义的</strong>或<strong>模糊的</strong>，这是因为AE的潜在空间是非正则化的，存在大量“空洞”区域。</p>
+<p><small><strong>图7</strong> AE的生成能力</small></p>
+<p>图7展示了AE生成能力的局限性:从标准正态分布随机采样潜在向量 <span class="math inline">\(z\)</span>，直接通过解码器生成图像。结果生成的图像通常是<strong>无意义的</strong>或<strong>模糊的</strong>，这是因为AE的潜在空间是非正则化的，存在大量“空洞”区域。</p>
 <p>这与3中的描述是一致的，至于如何解决这个问题，我们在下一节VAE中进行介绍。</p>
 </body>
 </html>

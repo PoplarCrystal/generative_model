@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>补充系列篇-04.生成模型与判别模型</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="补充系列篇-04.生成模型与判别模型">补充系列篇-04.生成模型与判别模型</h1>
+<p>在机器学习中，我们通常将模型分为两类:<strong>生成模型 (Generative Model)</strong> 和 <strong>判别模型 (Discriminative Model)</strong>。</p>
+<hr />
+<h2 id="生成模型-vs-判别模型">1. 生成模型 vs 判别模型</h2>
+<h3 id="判别模型-discriminative-model">判别模型 (Discriminative Model)</h3>
+<ul>
+<li><strong>目标</strong>:学习条件概率分布 <strong><span class="math inline">\(P(Y|X)\)</span></strong>。</li>
+<li><strong>直观理解</strong>:给定输入 <span class="math inline">\(X\)</span>（如图片），直接预测标签 <span class="math inline">\(Y\)</span>（如数字）。</li>
+<li><strong>流程</strong>:样本 <span class="math inline">\(x \rightarrow\)</span> 标签 <span class="math inline">\(y\)</span>。</li>
+<li><strong>性质</strong>:<strong>单一确定输出</strong>。对于特定输入，期望得到一个确定的正确标签。</li>
+</ul>
+<h3 id="生成模型-generative-model">生成模型 (Generative Model)</h3>
+<ul>
+<li><strong>目标</strong>:学习条件概率分布 <strong><span class="math inline">\(P(X|Y)\)</span></strong>。</li>
+<li><strong>直观理解</strong>:学习每个类别 <span class="math inline">\(Y\)</span> 下，数据 <span class="math inline">\(X\)</span> 的分布形态。</li>
+<li><strong>流程</strong>:标签 <span class="math inline">\(y \rightarrow\)</span> 样本 <span class="math inline">\(x\)</span>。</li>
+<li><strong>性质</strong>:<strong>多可能输出</strong>。对于一个标签（如“猫”），可生成无数种不同的猫图。生成模型建模的是分布，而非单一值。</li>
+</ul>
+<p>如图 1、图 2 所示:</p>
+<div data-align="center">
+<p><img src="pic/add/4.1.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图1</strong> 生成模型与判别模型的定义:判别模型输入样本 <span class="math inline">\(x\)</span> 输出标签 <span class="math inline">\(y\)</span>；生成模型输入标签 <span class="math inline">\(y\)</span> 输出样本 <span class="math inline">\(x\)</span></small></p>
+<div data-align="center">
+<p><img src="pic/add/4.2.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图2</strong> 生成模型与判别模型的概率描述:<span class="math inline">\(P(Y|X)\)</span> 与 <span class="math inline">\(P(X|Y)\)</span> 的直观对比</small></p>
+<hr />
+<h2 id="它们之间的转换关系">2. 它们之间的转换关系</h2>
+<h3 id="生成模型可以是判别模型吗">生成模型可以是判别模型吗？</h3>
+<p><strong>答案:可以。</strong> 这正是本文的核心。利用 <strong>贝叶斯公式 (Bayes’ Rule)</strong>，我们可以将生成模型学到的 <span class="math inline">\(P(x|y)\)</span> 转化为判别所需的 <span class="math inline">\(P(y|x)\)</span>:</p>
+<p><span class="math display">\[ \underset{\text{判别}}{P(y|x)} = \underset{\text{生成}}{P(x|y)} \cdot \frac{\overset{\text{先验}}{P(y)}}{\underset{\text{常数}}{P(x)}} \]</span></p>
+<ul>
+<li><span class="math inline">\(P(y|x)\)</span>:<strong>判别 (discriminative)</strong></li>
+<li><span class="math inline">\(P(x|y)\)</span>:<strong>生成 (generative)</strong></li>
+<li><span class="math inline">\(P(y)\)</span>:<strong>假设已知的先验 (assuming known prior)</strong>，通常各类别的频率是已知的。</li>
+<li><span class="math inline">\(P(x)\)</span>:<strong>给定的常数 (constant for given x)</strong>，在分类时对所有类别 <span class="math inline">\(y\)</span> 是一样的，可以忽略。</li>
+</ul>
+<p>因此，<strong>生成模型天生就可以用来做判别任务</strong>。</p>
+<h3 id="判别模型可以是生成模型吗">判别模型可以是生成模型吗？</h3>
+<p><strong>答案:通常很难。</strong> 让我们尝试反转贝叶斯公式:</p>
+<p><span class="math display">\[ \underset{\text{生成}}{P(x|y)} = \underset{\text{判别}}{P(y|x)} \cdot \frac{\overset{\text{需建模分布}}{P(x)}}{\underset{\text{常数}}{P(y)}} \]</span></p>
+<ul>
+<li><span class="math inline">\(P(x|y)\)</span>:<strong>生成 (generative)</strong></li>
+<li><span class="math inline">\(P(y|x)\)</span>:<strong>判别 (discriminative)</strong></li>
+<li><span class="math inline">\(P(y)\)</span>:<strong>给定的常数 (constant for given y)</strong>。</li>
+<li><span class="math inline">\(P(x)\)</span>:<strong>需建模的数据边缘分布</strong>，即什么样的 <span class="math inline">\(x\)</span> 是真实的（什么样的图片是真实图片）。这是最大的挑战——判别模型只学习了决策边界 <span class="math inline">\(P(y|x)\)</span>，完全丢弃了关于 <span class="math inline">\(P(x)\)</span> 的信息，因此无法直接通过公式反推生成样本。</li>
+</ul>
+<p><strong>核心挑战</strong>: 无论是生成还是判别，核心挑战都在于<strong>如何表示和预测分布 (Representing and Predicting Distributions)</strong>。 * 判别模型预测标签的分布 <span class="math inline">\(P(Y|X)\)</span>（通常很简单，是一个离散分布）。 * 生成模型预测数据的分布 <span class="math inline">\(P(X|Y)\)</span>（通常很复杂，是高维空间中的连续分布）。</p>
+<p>如图 3 所示:</p>
+<div data-align="center">
+<p><img src="pic/add/4.3.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图3</strong> 生成模型与判别模型的转换关系:贝叶斯公式连接 <span class="math inline">\(P(y|x)\)</span> 与 <span class="math inline">\(P(x|y)\)</span></small></p>
+<hr />
+<h2 id="实际应用利用-cvae-进行分类">3. 实际应用:利用 CVAE 进行分类</h2>
+<p>通过上述理论，我们可以利用 CVAE 的生成能力进行分类。</p>
+<p>分类决策规则可以写为:</p>
+<p><span class="math display">\[ \hat{y} = \arg\max_{y} P(y|x) = \arg\max_{y} \frac{P(x|y)P(y)}{P(x)} \]</span></p>
+<p>忽略常数分母 <span class="math inline">\(P(x)\)</span>:</p>
+<p><span class="math display">\[ \hat{y} = \arg\max_{y} \underbrace{P(x|y)}_{\text{CVAE Generation}} \cdot \underbrace{P(y)}_{\text{Class Prior}} \]</span></p>
+<p><strong>结论</strong>:如果我们能计算出图片 <span class="math inline">\(x\)</span> 在每个类别 <span class="math inline">\(y\)</span> 下的生成概率（似然度），我们就能分类！</p>
+<blockquote>
+<p><strong>注意:关于先验概率 <span class="math inline">\(P(y)\)</span> 的说明</strong></p>
+<p>在上述公式中，我们似乎只关注了 <span class="math inline">\(P(x|y)\)</span> 而忽略了 <span class="math inline">\(P(y)\)</span>。 这是因为在 MNIST 等均衡数据集中，每个类别出现的概率是大致相等的（<span class="math inline">\(P(y=0) = P(y=1) = \cdots = P(y=9) \approx 0.1\)</span>）。</p>
+<p>当 <span class="math inline">\(P(y)\)</span> 为常数时，<span class="math inline">\(\arg\max_y P(x|y)P(y)\)</span> 等价于 <span class="math inline">\(\arg\max_y P(x|y)\)</span>。</p>
+<p><strong>如果数据集类别不平衡</strong>（例如类别 A 占 90%，类别 B 占 10%），则必须显式地乘上先验概率 <span class="math inline">\(P(y)\)</span>，否则模型会忽略类别分布的偏差。 在对数域计算时，公式变为:<span class="math inline">\(\text{Score}_y = \log P(x|y) + \log P(y)\)</span>。</p>
+</blockquote>
+<hr />
+<h2 id="cvae-如何计算-pxc">4. CVAE 如何计算 <span class="math inline">\(P(x|c)\)</span>？</h2>
+<p>CVAE（条件变分自编码器）训练的目标是最大化对数似然的下界（ELBO）。这意味着 CVAE 本身就是一个密度估计器。</p>
+<p>在 CVAE 中，条件 <span class="math inline">\(c\)</span> 就是标签 <span class="math inline">\(y\)</span>。我们需要计算 <span class="math inline">\(\log P(x|c)\)</span>。</p>
+<h3 id="重要性采样-importance-sampling精确估计">重要性采样 (Importance Sampling)（精确估计）</h3>
+<p>ELBO 只是下界，为了更精确地估计 <span class="math inline">\(\log P(x|c)\)</span>，我们可以使用重要性采样（类似于 IWAE 的做法）:</p>
+<p><span class="math display">\[ P(x|c) = \int P(x|z,c)P(z|c) dz = \mathbb{E}_{z \sim q(z|x,c)} \left[ \frac{P(x|z,c)P(z|c)}{q(z|x,c)} \right] \]</span></p>
+<p>在对数域中计算（Log-Sum-Exp 技巧）:</p>
+<p><span class="math display">\[ \log P(x|c) \approx \log \left( \frac{1}{K} \sum_{k=1}^K \frac{P(x|z_k,c)P(z_k|c)}{q(z_k|x,c)} \right) \]</span></p>
+<p>其中 <span class="math inline">\(z_k\)</span> 是从编码器 <span class="math inline">\(q(z|x,c)\)</span> 中采样的 <span class="math inline">\(K\)</span> 个样本。</p>
+<p>我们在代码 <code>cvae_estimate_prob_density.py</code> 中正是使用了这种方法: 1. 对于一张未知的数字图片 <span class="math inline">\(x\)</span>。 2. 假设它是 “0”，计算 Score_0 = <span class="math inline">\(\log P(x|c=0)\)</span>。 3. 假设它是 “1”，计算 Score_1 = <span class="math inline">\(\log P(x|c=1)\)</span>。 4. … 5. 选择 Score 最高的类别。</p>
+<p><strong>核心代码</strong>（<code>cvae_estimate_prob_density.py</code>）:</p>
+<p><code>estimate_log_probability</code> —— 用重要性采样估计 <span class="math inline">\(\log P(x|c)\)</span>:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="kw">def</span> estimate_log_probability(model, x, c_label, n_samples<span class="op">=</span><span class="dv">100</span>):</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;log p(x|c) ≈ log(1/K * Σ [p(x|z,c)p(z)/q(z|x,c)])&quot;&quot;&quot;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>    model.<span class="bu">eval</span>()</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>    <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>        <span class="co"># 编码 q(z|x,c)，采样 z ~ q(z|x,c) 共 K 次</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>        mu_q, sigma_q <span class="op">=</span> model.encoder(torch.cat((x, c), dim<span class="op">=</span><span class="dv">1</span>))</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>        mu_q, sigma_q <span class="op">=</span> mu_q.expand(n_samples, <span class="op">-</span><span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>), sigma_q.expand(n_samples, <span class="op">-</span><span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>        epsilon <span class="op">=</span> torch.randn_like(mu_q)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>        z <span class="op">=</span> mu_q <span class="op">+</span> epsilon <span class="op">*</span> sigma_q</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>        </span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>        <span class="co"># log p(x|z,c) 解码器似然 | log p(z) 标准正态先验 | log q(z|x,c)</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a>        z_c <span class="op">=</span> torch.cat((z, c.expand(n_samples, <span class="op">-</span><span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>)), dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a>        x_hat <span class="op">=</span> model.decoder(z_c)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true"></a>        log_p_x_z <span class="op">=</span> <span class="op">-</span>torch.<span class="bu">sum</span>((x <span class="op">-</span> x_hat) <span class="op">**</span> <span class="dv">2</span>, dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true"></a>        log_p_z <span class="op">=</span> <span class="op">-</span><span class="fl">0.5</span> <span class="op">*</span> torch.<span class="bu">sum</span>(z <span class="op">**</span> <span class="dv">2</span>, dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true"></a>        log_q_z <span class="op">=</span> <span class="op">-</span><span class="fl">0.5</span> <span class="op">*</span> torch.<span class="bu">sum</span>(<span class="dv">2</span><span class="op">*</span>torch.log(sigma_q) <span class="op">+</span> epsilon<span class="op">**</span><span class="dv">2</span>, dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true"></a>        </span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true"></a>        log_w <span class="op">=</span> log_p_x_z <span class="op">+</span> log_p_z <span class="op">-</span> log_q_z</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true"></a>        <span class="cf">return</span> (torch.logsumexp(log_w, dim<span class="op">=</span><span class="dv">0</span>) <span class="op">-</span> np.log(n_samples)).item()</span></code></pre></div>
+<p><code>classify_sample</code> —— 分类决策 <span class="math inline">\(\hat{y} = \arg\max_c \log P(x|c)\)</span>:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="kw">def</span> classify_sample(model, x, num_classes):</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>    log_probs <span class="op">=</span> [estimate_log_probability(model, x, c) <span class="cf">for</span> c <span class="kw">in</span> <span class="bu">range</span>(num_classes)]</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>    <span class="cf">return</span> np.argmax(log_probs)</span></code></pre></div>
+<hr />
+<h2 id="实验结果分析">5. 实验结果分析</h2>
+<p>如图 4 所示:</p>
+<div data-align="center">
+<p><img src="pic/add/4.4.png" width="70%"></p>
+</div>
+<p><small><strong>图4</strong> CVAE 密度估计分类 MNIST 结果:每张图显示真实标签与预测标签，绿色表示正确、红色表示错误</small></p>
+<p>在我们的 MNIST 实验中，CVAE 作为分类器表现相当不错。</p>
+<ul>
+<li><strong>直观解释</strong>:当你告诉模型“这是一张 7”并输入一张 7 的图片时，模型觉得“很合理”，重构误差低，概率密度高。</li>
+<li><strong>反之</strong>:当你告诉模型“这是一张 0”却输入一张 7 的图片时，模型会试图强行把 7 编码成 0 的潜在空间，或者解码器试图用 0 的模式去解释 7，导致巨大的重构误差或极低的概率密度。</li>
+</ul>
+<hr />
+<h2 id="总结">6. 总结</h2>
+<p>将 CVAE 用于分类，本质上是在做 <strong>假设检验</strong>: “假设它是类别 A，这个数据的出现概率是多少？假设它是类别 B，概率又是多少？”</p>
+<p>这展示了生成模型最迷人的特性:<strong>它不仅仅是为了创造新的图片，更是为了理解数据的本质结构和分布。</strong></p>
+<p><strong>推理 (Inference)</strong> 时，生成模型通常包含两类组件: * <strong>采样器 (Sampler)</strong>:用于生成新样本，如从 <span class="math inline">\(P(x|y)\)</span> 中采样得到新的 <span class="math inline">\(x\)</span>。 * <strong>概率密度估计器 (Density Estimator)</strong>（可选）:用于计算某个样本 <span class="math inline">\(x\)</span> 的概率密度，如在 VAE、Flow 等模型中估计 <span class="math inline">\(\log P(x|c)\)</span>。</p>
+<p>本文以 CVAE 为例，聚焦后者——如何用生成模型进行概率密度估计并用于分类。相关代码见 <code>code/dl/ae/cvae/cvae_estimate_prob_density.py</code>。</p>
+<hr />
+<h2 id="参考文献">参考文献</h2>
+<ol type="1">
+<li>He, K. Deep Generative Models. [课程讲义/ slides]</li>
+<li>Ng, A. Y., &amp; Jordan, M. I. (2002). On discriminative vs. generative classifiers: A comparison of logistic regression and naive Bayes. <em>Advances in Neural Information Processing Systems</em>, 14.</li>
+<li>Kingma, D. P., &amp; Welling, M. (2014). Auto-encoding variational Bayes. <em>ICLR</em>.</li>
+<li>Sohn, K., Lee, H., &amp; Yan, X. (2015). Learning structured output representation using deep conditional generative models. <em>Advances in Neural Information Processing Systems</em>, 28.</li>
+<li>Burda, Y., Grosse, R. B., &amp; Salakhutdinov, R. (2016). Importance weighted autoencoders. <em>ICLR</em>.</li>
+</ol>
+</body>
+</html>

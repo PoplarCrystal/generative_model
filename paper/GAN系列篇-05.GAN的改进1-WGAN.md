@@ -1,6 +1,8 @@
-# GAN系列篇-05.GAN的改进1-WGAN
+# GAN系列篇-05.GAN的改进1: WGAN
 
 原始 GAN 通过判别器与生成器的极小极大博弈，等价于最小化真实分布与生成分布之间的 JS 散度。当两分布支撑集不重叠时，JS 散度常为常数，导致梯度消失、训练不稳定。WGAN（Wasserstein GAN）用 Wasserstein 距离替代 JS 散度，并引入 Critic（评论家）与权重裁剪或梯度惩罚，使损失具有更好的梯度性质，训练更稳定。本章介绍 WGAN 的动机、理论基础、目标函数与实现要点。
+
+---
 
 ## 1. WGAN 的动机
 
@@ -54,6 +56,8 @@ WGAN（Arjovsky et al., 2017）做了以下改进:
 
 <small>**图3** JS 散度在支撑集不重叠时恒为常数，导致梯度消失；Wasserstein 距离仍随分布变化而变化，可提供有效梯度。</small>
 
+---
+
 ## 2. WGAN 的理论基础
 
 Wasserstein 距离（Wasserstein Distance），又称**推土机距离**（Earth Mover’s Distance, EMD），是一种衡量两个概率分布之间差异的度量方式。它在最优传输理论（Optimal Transport Theory）中具有核心地位，近年来因其在生成模型（如 WGAN）中的优异表现而广受关注。
@@ -67,14 +71,16 @@ Wasserstein 距离（Wasserstein Distance），又称**推土机距离**（Earth
 这比“是否重叠”更精细，因此比 KL 散度、JS 散度更适合处理支撑集不重叠（support disjoint）的分布（这在高维空间中非常常见）。
 
 <div align="center">
-
 <img src="pic/gan/5.4.jpeg" alt="Wasserstein距离推土机直观" style="width: 65%;">
-
-<img src="pic/gan/5.5.jpeg" alt="把P分布通过铲子变成Q分布" style="width: 65%;">
-
 </div>
 
-<small>**图4、图5** 把 P 分布通过“铲子”变成 Q 分布所需要的步骤。</small>
+<small>**图4** Wasserstein距离推土机直观</small>
+
+<div align="center">
+<img src="pic/gan/5.5.jpeg" alt="把P分布通过铲子变成Q分布" style="width: 65%;">
+</div>
+
+<small>**图5** 把 P 分布通过"铲子"变成 Q 分布所需要的步骤</small>
 
 ### 2.1 Wasserstein-1 距离
 
@@ -146,18 +152,22 @@ $$L_c = -\big(\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(x_{\text{fake}})]\bi
 - **Critic**:最小化 $L_c = -\big(\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(G(z))]\big)$；
 - **Generator**:最小化 $L_g = -\mathbb{E}[f(G(z))]$。
 
+---
+
 
 ## 3. WGAN 与 GAN 的对比
 
 <div align="center">
-
 <img src="pic/gan/5.9.jpeg" alt="WGAN与GAN对比" style="width: 65%;">
-
-<img src="pic/gan/5.10.jpeg" alt="WGAN与GAN对比" style="width: 65%;">
-
 </div>
 
-<small>**图9、图10** WGAN 与原始 GAN 的对比。</small>
+<small>**图9** WGAN 与原始 GAN 的对比</small>
+
+<div align="center">
+<img src="pic/gan/5.10.jpeg" alt="WGAN与GAN对比" style="width: 65%;">
+</div>
+
+<small>**图10** WGAN 与原始 GAN 的对比</small>
 
 主要差异可概括为三点:
 
@@ -175,6 +185,8 @@ $$L_c = -\big(\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(x_{\text{fake}})]\bi
 | 梯度性质       | 支撑不重叠时易梯度消失       | 仍可提供有效梯度                   |
 | 训练稳定性     | 对超参敏感，易模式崩塌       | 相对更稳定，损失可作监控            |
 | 典型优化器     | Adam                         | RMSprop（论文推荐）                 |
+
+---
 
 
 ## 4. 训练流程与实现要点
@@ -204,6 +216,8 @@ $$L_c = -\big(\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(x_{\text{fake}})]\bi
 
 - **Critic 损失** $L_c$:在训练良好时，$-L_c$（即 $\mathbb{E}[f(x_{\text{real}})] - \mathbb{E}[f(G(z))]$）可视为 $W_1$ 的估计，**可作为训练进度与生成质量的参考**（值越大说明分布越接近或 Critic 越强）。
 - 与 GAN 不同:GAN 的判别器输出接近 0.5 表示“无法区分”；WGAN 的 Critic 分数无固定阈值，**分数越高越像真实分布**，且损失曲线更有信息量。
+
+---
 
 
 ## 5. 代码实现要点
@@ -251,6 +265,8 @@ g_optimizer.step()
 ```
 
 优化器使用 **Adam**，`betas=(0.0, 0.9)`，与 WGAN-GP 论文一致。
+
+---
 
 
 ## 6. 试验结果
@@ -326,6 +342,8 @@ with torch.no_grad():
   - **健康**:$\bar{f}_{\text{real}} > \bar{f}_{\text{fake}}$，且训练过程中差距保持为正，生成质量通常较好。
   - **异常**:$\bar{f}_{\text{fake}} \geq \bar{f}_{\text{real}}$，说明 Critic 未能有效区分真假，可尝试增大 `n_critic`、`lambda_gp` 或训练轮数。
   - 若生成视觉质量差但分数不低，多为 Critic 与生成器尚未对齐或训练不足，需继续训练并监控真实/生成均分。
+
+---
 
 
 ## 7. 总结

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>GAN系列篇-03.CGAN理论篇: 从"无条件生成"到"条件生成"</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="gan系列篇-03.cgan理论篇-从无条件生成到条件生成">GAN系列篇-03.CGAN理论篇: 从“无条件生成”到“条件生成”</h1>
+<h2 id="gan的问题与cgan的引入">1. GAN的问题与CGAN的引入</h2>
+<h3 id="gan的局限性">1.1 GAN的局限性</h3>
+<p>生成对抗网络（GAN）是一种强大的生成模型，它通过对抗训练让生成分布 <span class="math inline">\(p_g(x)\)</span> 逼近真实数据分布 <span class="math inline">\(p_{data}(x)\)</span>，从而能够生成逼真的样本。标准GAN从随机噪声 <span class="math inline">\(z \sim p_z(z)\)</span> 生成样本，通过生成器 <span class="math inline">\(G(z)\)</span> 学习到的分布 <span class="math inline">\(p_g(x)\)</span> 来生成新样本。</p>
+<p>然而，传统的GAN在处理一些需要特定条件控制的生成任务时显得力不从心。具体来说:</p>
+<p><strong>无法控制生成内容</strong>:标准GAN从随机噪声 <span class="math inline">\(z \sim p_z(z)\)</span> 生成样本，生成的内容是完全随机的，无法指定生成特定类别的样本。例如，在MNIST数据集上，我们无法控制生成器生成数字“7”的图像，只能随机生成任意数字。</p>
+<h3 id="cgan的解决方案">1.2 CGAN的解决方案</h3>
+<p>在图像生成任务中，我们可能希望根据特定标签（如数字“7”）来生成相应的图像，而不是随机生成一个图像。</p>
+<p>为了增强GAN的灵活性和可控性，提出了<strong>条件生成对抗网络（Conditional Generative Adversarial Network, CGAN）</strong>。CGAN允许我们在生成过程中加入额外的信息（条件），从而实现更加精确和可控的数据生成。</p>
+<p><strong>核心思想</strong>:在GAN的基础上，引入条件变量 <span class="math inline">\(c\)</span>，使得生成过程依赖于条件信息。通过指定条件变量 <span class="math inline">\(c\)</span>（如类别标签、文本描述等）来指导模型生成特定类别的样本。</p>
+<p>为了更好地理解GAN和CGAN的区别，我们先回顾一下标准GAN的架构:</p>
+<p><strong>标准GAN</strong>: - 生成器:<span class="math inline">\(G(z) \rightarrow x\)</span>，输入随机噪声 <span class="math inline">\(z\)</span>，输出样本 <span class="math inline">\(x\)</span> - 判别器:<span class="math inline">\(D(x) \rightarrow [0,1]\)</span>，输入样本 <span class="math inline">\(x\)</span>，输出真实概率</p>
+<div data-align="center">
+<p><img src="pic/gan/3.1.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图1</strong> 标准GAN的框架图:生成器从噪声 <span class="math inline">\(z\)</span> 生成样本 <span class="math inline">\(x\)</span>，判别器判断样本 <span class="math inline">\(x\)</span> 是否真实</small></p>
+<hr />
+<h2 id="cgan的核心问题">2. CGAN的核心问题</h2>
+<h3 id="问题1条件c如何加入模型">2.1 问题1:条件c如何加入模型？</h3>
+<p>在CGAN中，条件变量 <span class="math inline">\(c\)</span> 需要同时加入到生成器和判别器中，形成条件对抗。</p>
+<p><strong>生成器 <span class="math inline">\(G(z \vert c)\)</span></strong>: - 输入:噪声 <span class="math inline">\(z \sim p_z(z)\)</span> + 条件 <span class="math inline">\(c\)</span> - 输出:以 <span class="math inline">\(c\)</span> 为条件的假样本 <span class="math inline">\(x&#39; = G(z \vert c)\)</span> - 目标:生成符合条件 <span class="math inline">\(c\)</span> 的逼真样本</p>
+<p><strong>判别器 <span class="math inline">\(D(x \vert c)\)</span></strong>: - 输入:样本 <span class="math inline">\(x\)</span> + 条件 <span class="math inline">\(c\)</span> - 输出:该样本在给定条件 <span class="math inline">\(c\)</span> 下为真实的概率 <span class="math inline">\(D(x \vert c) \in [0,1]\)</span> - 目标:判断 <span class="math inline">\((x, c)\)</span> 是否匹配（即 <span class="math inline">\(x\)</span> 是否属于类别 <span class="math inline">\(c\)</span>）</p>
+<div data-align="center">
+<p><img src="pic/gan/3.2.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图2</strong> CGAN的框架图:生成器从噪声 <span class="math inline">\(z\)</span> 和条件 <span class="math inline">\(c\)</span> 生成样本 <span class="math inline">\(x\)</span>，判别器判断样本 <span class="math inline">\(x\)</span> 在给定条件 <span class="math inline">\(c\)</span> 下是否真实</small></p>
+<p>✅ <strong>关键</strong>:<strong>G 和 D 都“知道”当前的条件 <span class="math inline">\(c\)</span></strong>，形成条件对抗。这与标准GAN的区别在于，判别器不仅要判断样本是否真实，还要判断样本是否与条件匹配。</p>
+<h3 id="问题2条件c如何编码">2.2 问题2:条件c如何编码？</h3>
+<p>条件变量 <span class="math inline">\(c\)</span> 通常是离散标签（如 MNIST 的 0~9），需要转换为数值向量才能输入神经网络。常见的编码方式有:</p>
+<p><strong>方式1:One-Hot编码</strong>（最常用） - 方法:将类别索引转换为独热向量 - 例如:类别3 → <span class="math inline">\([0, 0, 0, 1, 0, 0, 0, 0, 0, 0]\)</span>（MNIST的10个类别） - 优点:简单直观，不需要额外参数 - 缺点:维度等于类别数，当类别数很大时维度很高；编码是固定的，无法学习</p>
+<p><strong>方式2:Embedding编码</strong> - 方法:使用可学习的嵌入层将类别索引映射为低维向量 - 例如:类别3 → 可学习的N维向量 - 优点:维度可自定义，通常比one-hot更紧凑；可以学习到类别之间的语义关系 - 缺点:需要额外的可学习参数</p>
+<p><strong>实现示例（MNIST, 10类，One-Hot编码）</strong>:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="co"># 生成器输入</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>z <span class="op">=</span> torch.randn(batch_size, latent_dim)          <span class="co"># [B, 100]</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>c <span class="op">=</span> F.one_hot(labels, num_classes<span class="op">=</span><span class="dv">10</span>).<span class="bu">float</span>()    <span class="co"># [B, 10]</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>input_g <span class="op">=</span> torch.cat([z, c], dim<span class="op">=</span><span class="dv">1</span>)               <span class="co"># [B, 110]</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>x_fake <span class="op">=</span> G(input_g)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a><span class="co"># 判别器输入</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>x_flat <span class="op">=</span> x.view(batch_size, <span class="op">-</span><span class="dv">1</span>)                   <span class="co"># [B, 784]</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>input_d <span class="op">=</span> torch.cat([x_flat, c], dim<span class="op">=</span><span class="dv">1</span>)          <span class="co"># [B, 794]</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>output <span class="op">=</span> D(input_d)                               <span class="co"># [B, 1]</span></span></code></pre></div>
+<hr />
+<h2 id="cgan的损失函数推导">3. CGAN的损失函数推导</h2>
+<h3 id="从条件概率建模出发">3.1 从条件概率建模出发</h3>
+<p>CGAN的核心是将无条件生成问题转化为条件生成问题。现在的问题变成:给定条件 <span class="math inline">\(c\)</span>，判断 <span class="math inline">\(x\)</span> 是来自真实条件分布 <span class="math inline">\(p_{data}(x|c)\)</span> 还是生成分布 <span class="math inline">\(p_g(x|c)\)</span>。</p>
+<h3 id="判别器的目标">3.2 判别器的目标</h3>
+<p>判别器要最大化以下对数似然:</p>
+<p><span class="math display">\[L_D = \mathbb{E}_{x \sim p_{data}(x|c)} \left[ \log D(x \vert c) \right] + \mathbb{E}_{z \sim p_z(z)} \left[ \log \left(1 - D(G(z \vert c) \vert c) \right) \right]\]</span></p>
+<p>其中:</p>
+<ul>
+<li><strong>第一项</strong>:真实样本对 <span class="math inline">\((x, c)\)</span> 应被判为真（输出 <span class="math inline">\(\approx 1\)</span>），这里 <span class="math inline">\((x, c) \sim p_{data}(x,c)\)</span> 表示从数据集中采样 <span class="math inline">\((x, c)\)</span> 对</li>
+<li><strong>第二项</strong>:生成样本对 <span class="math inline">\((G(z \vert c), c)\)</span> 应被判为假（输出 <span class="math inline">\(\approx 0\)</span>），这里 <span class="math inline">\((x, c) \sim p_{data}(x,c)\)</span>（从数据集中采样条件 <span class="math inline">\(c\)</span>），<span class="math inline">\(z \sim p_z(z)\)</span>（从先验分布采样噪声），<span class="math inline">\(G(z \vert c) \sim p_g(x|c)\)</span>（生成器输出）</li>
+</ul>
+<p>📌 <strong>注意</strong>:在训练时，我们从数据集中采样 <span class="math inline">\((x, c)\)</span> 对，条件 <span class="math inline">\(c\)</span> 自然来自数据分布。判别器不仅要判断样本是否真实，还要判断样本是否与条件匹配。</p>
+<h3 id="生成器的目标">3.3 生成器的目标</h3>
+<p>生成器希望欺骗判别器，即让 <span class="math inline">\(D(G(z \vert c) \vert c)\)</span> 尽可能大。</p>
+<p><strong>原始目标（理论形式）</strong>: <span class="math display">\[\min_G \mathbb{E}_{z \sim p_z(z)} \left[ \log \left(1 - D(G(z \vert c) \vert c) \right) \right]\]</span></p>
+<p><strong>实践中采用非饱和版本</strong>（避免梯度消失）: <span class="math display">\[\max_G \mathbb{E}_{z \sim p_z(z)} \left[ \log D(G(z \vert c) \vert c) \right]\]</span></p>
+<p>这与标准GAN中生成器的非饱和损失形式一致，在训练早期能提供更强的梯度信号。</p>
+<h3 id="完整的min-max目标函数">3.4 完整的Min-Max目标函数</h3>
+<p>将两者结合，得到CGAN的标准损失函数:</p>
+<p><span class="math display">\[
+\min_G \max_D L(D, G) = \mathbb{E}_{x \sim p_{data}(x|c)} \left[ \log D(x \vert c) \right] + \mathbb{E}_{z \sim p_z(z)} \left[ \log \left(1 - D(G(z \vert c) \vert c) \right) \right]
+ \tag{1} \]</span></p>
+<p>🔸 <strong>对比标准GAN</strong>:只是在 <span class="math inline">\(D\)</span> 和 <span class="math inline">\(G\)</span> 的输入中<strong>显式加入了条件 <span class="math inline">\(c\)</span></strong>，并将所有分布条件化！</p>
+<p><strong>标准GAN的目标函数</strong>: <span class="math display">\[\min_G \max_D L(D, G) = \mathbb{E}_{x \sim p_{data}(x)} \left[ \log D(x) \right] + \mathbb{E}_{z \sim p_z(z)} \left[ \log \left(1 - D(G(z)) \right) \right]\]</span></p>
+<p><strong>CGAN的目标函数</strong>: <span class="math display">\[\min_G \max_D L(D, G) = \mathbb{E}_{x \sim p_{data}(x|c)} \left[ \log D(x \vert c) \right] + \mathbb{E}_{z \sim p_z(z)} \left[ \log \left(1 - D(G(z \vert c) \vert c) \right) \right]\]</span></p>
+<p>可以看出，CGAN只是在标准GAN的基础上，将所有分布都条件化于 <span class="math inline">\(c\)</span>:<span class="math inline">\(p_{data}(x) \rightarrow p_{data}(x|c)\)</span>，<span class="math inline">\(p_g(x) \rightarrow p_g(x|c)\)</span>。</p>
+<hr />
+<h2 id="理论解释与条件js散度的关系">4. 理论解释:与条件JS散度的关系</h2>
+<h3 id="最优判别器">4.1 最优判别器</h3>
+<p>类似标准GAN，可以证明当判别器最优时:</p>
+<p><span class="math display">\[D^*(x \vert c) = \frac{p_{data}(x|c)}{p_{data}(x|c) + p_g(x|c)}\]</span></p>
+<p>这个结果与标准GAN类似，只是将无条件分布替换为条件分布。判别器输出的是:给定条件 <span class="math inline">\(c\)</span>，样本 <span class="math inline">\(x\)</span> 来自真实条件分布 <span class="math inline">\(p_{data}(x|c)\)</span> 的概率。</p>
+<h3 id="条件js散度">4.2 条件JS散度</h3>
+<p>将最优判别器代入目标函数后，可得:</p>
+<p><span class="math display">\[L(D^*, G) = 2 \mathrm{JS}\left( p_{data}(x|c) \| p_g(x|c) \right) -2\log 2 \]</span></p>
+<p>📌 <strong>结论</strong>:CGAN的训练等价于最小化条件分布 <span class="math inline">\(p_g(x|c)\)</span> 与真实条件分布 <span class="math inline">\(p_{data}(x|c)\)</span> 之间的<strong>期望JS散度</strong>。</p>
+<p>当对所有条件 <span class="math inline">\(c\)</span> 都有 <span class="math inline">\(p_g(x|c) = p_{data}(x|c)\)</span> 时，达到全局最优。</p>
+<hr />
+<h2 id="conditional的作用与本质">5. Conditional的作用与本质</h2>
+<h3 id="conditional的作用">5.1 Conditional的作用</h3>
+<p>在CGAN中，条件变量 <span class="math inline">\(c\)</span> 起到以下关键作用:</p>
+<ol type="1">
+<li><strong>控制生成内容</strong>:
+<ul>
+<li>通过指定不同的条件 <span class="math inline">\(c\)</span>，可以生成不同类别的样本</li>
+<li>例如:在MNIST上，<span class="math inline">\(c\)</span> 可以是数字标签（0-9），生成对应数字的图像</li>
+</ul></li>
+<li><strong>增强判别能力</strong>:
+<ul>
+<li>判别器不仅要判断样本是否真实，还要判断样本是否与条件匹配</li>
+<li>这有助于生成器学习生成与条件一致的样本</li>
+</ul></li>
+<li><strong>提高训练稳定性</strong>:
+<ul>
+<li>条件信息为生成器和判别器提供了额外的监督信号</li>
+<li>有助于避免mode collapse问题</li>
+</ul></li>
+</ol>
+<h3 id="conditional的本质条件对抗">5.2 Conditional的本质:条件对抗</h3>
+<p><strong>核心思想</strong>:CGAN中条件 <span class="math inline">\(c\)</span> 的本质作用是<strong>将无条件对抗转化为条件对抗</strong>。</p>
+<h4 id="标准gan中的对抗">5.2.1 标准GAN中的对抗</h4>
+<p>在标准GAN中: - 生成器:<span class="math inline">\(G(z) \rightarrow x\)</span>，从噪声生成样本 - 判别器:<span class="math inline">\(D(x) \rightarrow [0,1]\)</span>，判断样本是否真实 - 对抗:生成器试图生成逼真样本，判别器试图区分真假</p>
+<h4 id="cgan中的条件对抗">5.2.2 CGAN中的条件对抗</h4>
+<p>在CGAN中: - 生成器:<span class="math inline">\(G(z \vert c) \rightarrow x\)</span>，从噪声和条件生成样本 - 判别器:<span class="math inline">\(D(x \vert c) \rightarrow [0,1]\)</span>，判断样本在给定条件下是否真实 - 条件对抗:生成器试图生成与条件匹配的逼真样本，判别器试图判断样本是否真实且与条件匹配</p>
+<h4 id="数学表达">5.2.3 数学表达</h4>
+<p><strong>标准GAN</strong>: <span class="math display">\[\min_G \max_D L(D, G) = \mathbb{E}_{x \sim p_{data}(x)} [\log D(x)] + \mathbb{E}_{z \sim p_z(z)} [\log(1 - D(G(z)))]\]</span></p>
+<p><strong>CGAN</strong>: <span class="math display">\[\min_G \max_D L(D, G) = \mathbb{E}_{x \sim p_{data}(x|c)} [\log D(x \vert c)] + \mathbb{E}_{z \sim p_z(z)} [\log(1 - D(G(z \vert c) \vert c))]\]</span></p>
+<p>条件 <span class="math inline">\(c\)</span> 将无条件分布 <span class="math inline">\(p(x)\)</span> 分解为条件分布 <span class="math inline">\(p(x|c)\)</span>，使得生成过程可控。</p>
+<hr />
+<h2 id="参考">📚 参考</h2>
+<ul>
+<li>Mirza, M., &amp; Osindero, S. (2014). Conditional generative adversarial nets. <em>arXiv preprint arXiv:1411.1784</em>.</li>
+<li>Goodfellow et al., <em>Generative Adversarial Nets</em>, NeurIPS 2014.</li>
+</ul>
+</body>
+</html>

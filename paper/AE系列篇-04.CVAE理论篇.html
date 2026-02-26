@@ -144,7 +144,7 @@
         </style>
 </head>
 <body>
-<h1 id="ae系列篇04.-cvae-从无条件生成到条件生成理论篇">AE系列篇04. CVAE: 从“无条件生成”到“条件生成”（理论篇）</h1>
+<h1 id="ae系列篇-04.cvae理论篇-从无条件生成到条件生成">AE系列篇-04.CVAE理论篇: 从“无条件生成”到“条件生成”</h1>
 <h2 id="vae的问题与cvae的引入">1. VAE的问题与CVAE的引入</h2>
 <h3 id="vae的局限性">1.1 VAE的局限性</h3>
 <p>变分自编码器（VAE）是一种强大的生成模型，它通过学习数据的潜在表示（latent representation）来生成新样本。VAE通过正则化潜在空间，使得整个潜在空间都具有生成能力，可以从标准正态分布 <span class="math inline">\(\mathcal{N}(0, I)\)</span> 中采样潜在变量 <span class="math inline">\(z\)</span>，然后通过解码器生成新的数据样本。</p>
@@ -156,9 +156,10 @@
 <p><strong>核心思想</strong>:在VAE的基础上，引入条件变量 <span class="math inline">\(c\)</span>，使得生成过程依赖于条件信息。比如，可以通过指定条件变量 <span class="math inline">\(c\)</span> 来指导模型生成特定类别的样本。</p>
 <p>为了更好地理解VAE和CVAE的区别，我们先回顾一下VAE的架构:</p>
 <div data-align="center">
-<p><img src="pic/dl/cvae/3.1.jpeg" width="70%"></p>
+<p><img src="pic/ae/cvae/3.1.jpeg" width="70%"></p>
 </div>
 <p><small><strong>图1</strong> VAE架构:编码器输出分布参数 <span class="math inline">\((\mu, \sigma)\)</span>，通过重参数化采样 <span class="math inline">\(z\)</span>，解码器重构输出 <span class="math inline">\(\hat{x}\)</span></small></p>
+<hr />
 <h2 id="cvae的三个核心问题">2. CVAE的三个核心问题</h2>
 <p>于是自然而然出现了三个待解答的问题。</p>
 <h3 id="问题1条件c加在vae的哪个部分">2.1 问题1:条件C加在VAE的哪个部分？</h3>
@@ -170,7 +171,7 @@
 <li>特点:条件信息影响潜在表示 <span class="math inline">\(z\)</span>，但不直接影响生成过程</li>
 </ul>
 <div data-align="center">
-<p><img src="pic/dl/cvae/3.2.1.jpeg" width="70%"></p>
+<p><img src="pic/ae/cvae/3.2.1.jpeg" width="70%"></p>
 </div>
 <p><small><strong>图2</strong> 选项1:条件只加在编码器</small></p>
 <p><strong>选项2:条件只加在解码器（Decoder）</strong></p>
@@ -180,7 +181,7 @@
 <li>特点:潜在表示 <span class="math inline">\(z\)</span> 与条件独立，条件信息只影响生成过程</li>
 </ul>
 <div data-align="center">
-<p><img src="pic/dl/cvae/3.2.2.jpeg" width="70%"></p>
+<p><img src="pic/ae/cvae/3.2.2.jpeg" width="70%"></p>
 </div>
 <p><small><strong>图3</strong> 选项2:条件只加在解码器</small></p>
 <p><strong>选项3:条件同时加在编码器和解码器</strong></p>
@@ -190,56 +191,33 @@
 <li>特点:条件信息既影响潜在表示，也影响生成过程，这是最常见的CVAE形式</li>
 </ul>
 <div data-align="center">
-<p><img src="pic/dl/cvae/3.2.3.jpeg" width="70%"></p>
+<p><img src="pic/ae/cvae/3.2.3.jpeg" width="70%"></p>
 </div>
 <p><small><strong>图4</strong> 选项3:条件同时加在编码器和解码器</small></p>
 <h3 id="问题2条件c和潜在变量z是独立还是非独立的">2.2 问题2:条件c和潜在变量z是独立还是非独立的？</h3>
 <p>这是一个重要的理论问题，涉及先验分布 <span class="math inline">\(p(z|c)\)</span> 的选择:</p>
-<p><strong>情况1:c和z独立（Independent）</strong></p>
-<ul>
-<li>假设:<span class="math inline">\(p(z|c) = p(z) = \mathcal{N}(0, I)\)</span></li>
-<li>含义:条件 <span class="math inline">\(c\)</span> 不影响潜在变量 <span class="math inline">\(z\)</span> 的先验分布</li>
-<li>实现:不需要额外的Prior网络，先验分布是固定的标准正态分布</li>
-<li>KL项:<span class="math inline">\(\text{KL}(q_\phi(z|x,c) \| p(z))\)</span> 或 <span class="math inline">\(\text{KL}(q_\phi(z|x) \| p(z))\)</span></li>
-</ul>
+<p><strong>情况1:c和z独立（Independent）</strong> - 假设:<span class="math inline">\(p(z|c) = p(z) = \mathcal{N}(0, I)\)</span> - 含义:条件 <span class="math inline">\(c\)</span> 不影响潜在变量 <span class="math inline">\(z\)</span> 的先验分布 - 实现:不需要额外的Prior网络，先验分布是固定的标准正态分布 - KL项:<span class="math inline">\(\text{KL}(q_\phi(z|x,c) \| p(z))\)</span> 或 <span class="math inline">\(\text{KL}(q_\phi(z|x) \| p(z))\)</span></p>
 <div data-align="center">
-<p><img src="pic/dl/cvae/3.3.1.jpeg" width="70%"></p>
+<p><img src="pic/ae/cvae/3.3.1.jpeg" width="70%"></p>
 </div>
 <p><small><strong>图5</strong> 情况1:c和z独立</small></p>
-<p><strong>情况2:c和z非独立（Dependent）</strong></p>
-<ul>
-<li>假设:<span class="math inline">\(p(z|c) = \mathcal{N}(\mu_{prior}(c), \sigma_{prior}^2(c))\)</span> - 先验分布依赖于条件</li>
-<li>含义:不同条件对应不同的潜在空间先验分布</li>
-<li>实现:需要Prior网络来学习条件先验 <span class="math inline">\(p(z|c)\)</span></li>
-<li>KL项:<span class="math inline">\(\text{KL}(q_\phi(z|x,c) \| p(z|c))\)</span> 或 <span class="math inline">\(\text{KL}(q_\phi(z|x) \| p(z|c))\)</span></li>
-</ul>
+<p><strong>情况2:c和z非独立（Dependent）</strong> - 假设:<span class="math inline">\(p(z|c) = \mathcal{N}(\mu_{prior}(c), \sigma_{prior}^2(c))\)</span> - 先验分布依赖于条件 - 含义:不同条件对应不同的潜在空间先验分布 - 实现:需要Prior网络来学习条件先验 <span class="math inline">\(p(z|c)\)</span> - KL项:<span class="math inline">\(\text{KL}(q_\phi(z|x,c) \| p(z|c))\)</span> 或 <span class="math inline">\(\text{KL}(q_\phi(z|x) \| p(z|c))\)</span></p>
 <div data-align="center">
-<p><img src="pic/dl/cvae/3.3.2.jpeg" width="70%"></p>
+<p><img src="pic/ae/cvae/3.3.2.jpeg" width="70%"></p>
 </div>
 <p><small><strong>图6</strong> 情况2:c和z非独立</small></p>
 <h3 id="问题3条件c如何编码">2.3 问题3:条件c如何编码？</h3>
 <p>条件变量 <span class="math inline">\(c\)</span> 需要编码成数值向量才能输入神经网络，常见的编码方式有:</p>
-<p><strong>方式1:One-Hot编码</strong></p>
-<ul>
-<li>方法:将类别索引转换为独热向量</li>
-<li>例如:类别3 → <span class="math inline">\([0, 0, 0, 1, 0, 0, 0, 0, 0, 0]\)</span>（MNIST的10个类别）</li>
-<li>优点:简单直观，不需要额外参数</li>
-<li>缺点:维度等于类别数，当类别数很大时维度很高；编码是固定的，无法学习</li>
-</ul>
-<p><strong>方式2:Embedding编码</strong></p>
-<ul>
-<li>方法:使用可学习的嵌入层将类别索引映射为低维向量</li>
-<li>例如:类别3 → 可学习的N维向量</li>
-<li>优点:维度可自定义，通常比one-hot更紧凑；可以学习到类别之间的语义关系</li>
-<li>缺点:需要额外的可学习参数</li>
-</ul>
+<p><strong>方式1:One-Hot编码</strong> - 方法:将类别索引转换为独热向量 - 例如:类别3 → <span class="math inline">\([0, 0, 0, 1, 0, 0, 0, 0, 0, 0]\)</span>（MNIST的10个类别） - 优点:简单直观，不需要额外参数 - 缺点:维度等于类别数，当类别数很大时维度很高；编码是固定的，无法学习</p>
+<p><strong>方式2:Embedding编码</strong> - 方法:使用可学习的嵌入层将类别索引映射为低维向量 - 例如:类别3 → 可学习的N维向量 - 优点:维度可自定义，通常比one-hot更紧凑；可以学习到类别之间的语义关系 - 缺点:需要额外的可学习参数</p>
 <div data-align="center">
-<p><img src="pic/dl/cvae/3.4.1.png" width="50%"></p>
+<p><img src="pic/ae/cvae/3.4.1.png" width="50%"></p>
 </div>
 <div data-align="center">
-<p><img src="pic/dl/cvae/3.4.2.png" width="50%"></p>
+<p><img src="pic/ae/cvae/3.4.2.png" width="50%"></p>
 </div>
 <p><small><strong>图7</strong> 条件编码方式:One-Hot编码（左）vs Embedding编码（右）</small></p>
+<hr />
 <h2 id="cvae的elbo推导与变体">3. CVAE的ELBO推导与变体</h2>
 <h3 id="cvae的elbo推导">3.1 CVAE的ELBO推导</h3>
 <p>在CVAE中，我们需要最大化条件对数似然 <span class="math inline">\(\log p_\theta(x|c)\)</span>。与VAE类似，我们引入变分后验 <span class="math inline">\(q_\phi(z|x,c)\)</span> 来近似真实后验 <span class="math inline">\(p_\theta(z|x,c)\)</span>。</p>
@@ -264,32 +242,18 @@
 <p>在变分贝叶斯方法中，损失函数是ELBO的负值:</p>
 <p><span class="math display">\[\mathcal{L}_{CVAE} = -\mathcal{L}(\mathbf{x},c; \theta, \phi) = -\mathbb{E}_{\mathbf{z}\sim q_\phi(\mathbf{z}|\mathbf{x},c)}\log p_\theta(\mathbf{x}|\mathbf{z},c) + D_\text{KL}(q_\phi(\mathbf{z}|\mathbf{x},c) \| p_\theta(\mathbf{z}|c)) \tag{5}\]</span></p>
 <p>通过最小化损失，我们实际上是在最大化生成真实数据样本（在给定条件 <span class="math inline">\(c\)</span> 下）概率的下界。</p>
-<p>与VAE相比，CVAE的ELBO有两处关键变化:</p>
-<ol type="1">
-<li><strong>重构项</strong>:<span class="math inline">\(\mathbb{E}_{\mathbf{z}\sim q_\phi(\mathbf{z}|\mathbf{x},c)}\log p_\theta(\mathbf{x}|\mathbf{z},c)\)</span> - 解码器依赖于条件 <span class="math inline">\(c\)</span></li>
-<li><strong>KL项</strong>:<span class="math inline">\(D_\text{KL}(q_\phi(\mathbf{z}|\mathbf{x},c) \| p_\theta(\mathbf{z}|c))\)</span> - 先验分布依赖于条件 <span class="math inline">\(c\)</span></li>
-</ol>
+<p>与VAE相比，CVAE的ELBO有两处关键变化: 1. <strong>重构项</strong>:<span class="math inline">\(\mathbb{E}_{\mathbf{z}\sim q_\phi(\mathbf{z}|\mathbf{x},c)}\log p_\theta(\mathbf{x}|\mathbf{z},c)\)</span> - 解码器依赖于条件 <span class="math inline">\(c\)</span> 2. <strong>KL项</strong>:<span class="math inline">\(D_\text{KL}(q_\phi(\mathbf{z}|\mathbf{x},c) \| p_\theta(\mathbf{z}|c))\)</span> - 先验分布依赖于条件 <span class="math inline">\(c\)</span></p>
 <p>可以看出，这就是最标准的CVAE的形式。接下来，我们来回答2中提出来的几个问题，关于c与z的独立性问题，以及c可以加在哪个位置？</p>
 <h3 id="变体1c和z独立-vs-非独立">3.2 变体1:c和z独立 vs 非独立</h3>
 <h4 id="独立情况pzc-pz-mathcaln0-i">3.2.1 独立情况:<span class="math inline">\(p(z|c) = p(z) = \mathcal{N}(0, I)\)</span></h4>
 <p><strong>假设</strong>:条件 <span class="math inline">\(c\)</span> 和潜在变量 <span class="math inline">\(z\)</span> 是独立的，先验分布不依赖于条件。</p>
 <p><strong>ELBO</strong>: <span class="math display">\[\mathcal{L}(x,c; \theta, \phi) = \mathbb{E}_{z \sim q_\phi(z|x,c)}[\log p_\theta(x|z,c)] - \text{KL}(q_\phi(z|x,c) \| p(z)) \tag{6}\]</span></p>
-<p><strong>特点</strong>:</p>
-<ul>
-<li>不需要Prior网络，先验分布是固定的标准正态分布</li>
-<li>KL项简化为:<span class="math inline">\(\text{KL}(q_\phi(z|x,c) \| \mathcal{N}(0, I))\)</span></li>
-<li>计算简单，参数量较少</li>
-</ul>
+<p><strong>特点</strong>: - 不需要Prior网络，先验分布是固定的标准正态分布 - KL项简化为:<span class="math inline">\(\text{KL}(q_\phi(z|x,c) \| \mathcal{N}(0, I))\)</span> - 计算简单，参数量较少</p>
 <p><strong>KL散度计算</strong>: <span class="math display">\[\text{KL}(q_\phi(z|x,c) \| p(z)) = \text{KL}(\mathcal{N}(\mu, \sigma^2 I) \| \mathcal{N}(0, I)) = \frac{1}{2}\sum_{i=1}^{H}[\mu_i^2 + \sigma_i^2 - 1 - \log \sigma_i^2] \tag{7}\]</span></p>
 <h4 id="非独立情况pzc-mathcalnmu_priorc-sigma_prior2c">3.2.2 非独立情况:<span class="math inline">\(p(z|c) = \mathcal{N}(\mu_{prior}(c), \sigma_{prior}^2(c))\)</span></h4>
 <p><strong>假设</strong>:条件 <span class="math inline">\(c\)</span> 和潜在变量 <span class="math inline">\(z\)</span> 是非独立的，先验分布依赖于条件。</p>
 <p><strong>ELBO</strong>: <span class="math display">\[\mathcal{L}(x,c; \theta, \phi) = \mathbb{E}_{z \sim q_\phi(z|x,c)}[\log p_\theta(x|z,c)] - \text{KL}(q_\phi(z|x,c) \| p_\theta(z|c)) \tag{8}\]</span></p>
-<p><strong>特点</strong>:</p>
-<ul>
-<li>需要Prior网络来学习条件先验 <span class="math inline">\(p_\theta(z|c)\)</span></li>
-<li>Prior网络输出:<span class="math inline">\(\mu_{prior}(c), \sigma_{prior}(c)\)</span></li>
-<li>更灵活，可以建模不同条件对应的不同潜在空间结构</li>
-</ul>
+<p><strong>特点</strong>: - 需要Prior网络来学习条件先验 <span class="math inline">\(p_\theta(z|c)\)</span> - Prior网络输出:<span class="math inline">\(\mu_{prior}(c), \sigma_{prior}(c)\)</span> - 更灵活，可以建模不同条件对应的不同潜在空间结构</p>
 <p><strong>KL散度计算</strong>: 两个高斯分布之间的KL散度:</p>
 <p><span class="math display">\[\begin{aligned}
 \text{KL}(q_\phi(z|x,c) \| p_\theta(z|c)) &amp;= \text{KL}(\mathcal{N}(\mu_q, \sigma_q^2) \| \mathcal{N}(\mu_{prior}, \sigma_{prior}^2)) \\
@@ -301,41 +265,27 @@
 <li>非独立情况（右图）:有Prior网络，先验依赖于 <span class="math inline">\(c\)</span></li>
 </ul>
 <div data-align="center">
-<p><img src="pic/dl/cvae/3.3.1.jpeg" width="70%"></p>
+<p><img src="pic/ae/cvae/3.3.1.jpeg" width="70%"></p>
 </div>
 <div data-align="center">
-<p><img src="pic/dl/cvae/3.3.2.jpeg" width="70%"></p>
+<p><img src="pic/ae/cvae/3.3.2.jpeg" width="70%"></p>
 </div>
 <p><small><strong>图8</strong> CVAE的两种先验对比:独立情况（左，固定先验）vs 非独立情况（右，Prior网络学习先验 <span class="math inline">\(p(z|c)\)</span>）</small></p>
 <h3 id="变体2条件只加在解码器">3.3 变体2:条件只加在解码器</h3>
-<p><strong>模型定义</strong>:</p>
-<ul>
-<li>编码器:<span class="math inline">\(q_\phi(z|x)\)</span> - 不使用条件 <span class="math inline">\(c\)</span></li>
-<li>解码器:<span class="math inline">\(p_\theta(x|z,c)\)</span> - 使用条件 <span class="math inline">\(c\)</span></li>
-<li>先验:<span class="math inline">\(p_\theta(z|c)\)</span> 或 <span class="math inline">\(p(z)\)</span></li>
-</ul>
+<p><strong>模型定义</strong>: - 编码器:<span class="math inline">\(q_\phi(z|x)\)</span> - 不使用条件 <span class="math inline">\(c\)</span> - 解码器:<span class="math inline">\(p_\theta(x|z,c)\)</span> - 使用条件 <span class="math inline">\(c\)</span> - 先验:<span class="math inline">\(p_\theta(z|c)\)</span> 或 <span class="math inline">\(p(z)\)</span></p>
 <p><strong>ELBO</strong>: 如果使用条件先验 <span class="math inline">\(p_\theta(z|c)\)</span>: <span class="math display">\[\mathcal{L}(x,c; \theta, \phi) = \mathbb{E}_{z \sim q_\phi(z|x)}[\log p_\theta(x|z,c)] - \text{KL}(q_\phi(z|x) \| p_\theta(z|c)) \tag{10}\]</span></p>
 <p>如果使用固定先验 <span class="math inline">\(p(z) = \mathcal{N}(0, I)\)</span>: <span class="math display">\[\mathcal{L}(x,c; \theta, \phi) = \mathbb{E}_{z \sim q_\phi(z|x)}[\log p_\theta(x|z,c)] - \text{KL}(q_\phi(z|x) \| p(z)) \tag{11}\]</span></p>
-<p><strong>特点</strong>:</p>
-<ul>
-<li>潜在表示 <span class="math inline">\(z\)</span> 与条件 <span class="math inline">\(c\)</span> 在编码阶段独立</li>
-<li>条件信息只影响生成过程，不影响潜在表示的学习</li>
-<li>适用于希望潜在表示与条件解耦的场景</li>
-</ul>
+<p><strong>特点</strong>: - 潜在表示 <span class="math inline">\(z\)</span> 与条件 <span class="math inline">\(c\)</span> 在编码阶段独立 - 条件信息只影响生成过程，不影响潜在表示的学习 - 适用于希望潜在表示与条件解耦的场景</p>
 <div data-align="center">
-<p><img src="pic/dl/cvae/3.5.1.jpeg" width="70%"></p>
+<p><img src="pic/ae/cvae/3.5.1.jpeg" width="70%"></p>
 </div>
 <p><small><strong>图9</strong> 条件只加在解码器的CVAE变体(c和z非独立的情况)</small></p>
 <h3 id="变体3条件只加在编码器">3.4 变体3:条件只加在编码器？</h3>
 <p><strong>理论问题</strong>:如果条件 <span class="math inline">\(c\)</span> 只加在编码器，即 <span class="math inline">\(q_\phi(z|x,c)\)</span>，而解码器不使用条件，即 <span class="math inline">\(p_\theta(x|z)\)</span>，会出现什么问题？</p>
 <p><strong>问题分析</strong>:</p>
-<p><strong>生成过程不可控</strong>:</p>
-<ul>
-<li>在生成新样本时，我们需要从先验 <span class="math inline">\(p(z|c)\)</span> 或 <span class="math inline">\(p(z)\)</span> 采样 <span class="math inline">\(z\)</span>，然后通过解码器 <span class="math inline">\(p_\theta(x|z)\)</span> 生成 <span class="math inline">\(x\)</span></li>
-<li>由于解码器不依赖于条件 <span class="math inline">\(c\)</span>，无法根据条件控制生成内容</li>
-<li>即使条件影响编码过程，生成时也无法利用条件信息</li>
-</ul>
+<p><strong>生成过程不可控</strong>: - 在生成新样本时，我们需要从先验 <span class="math inline">\(p(z|c)\)</span> 或 <span class="math inline">\(p(z)\)</span> 采样 <span class="math inline">\(z\)</span>，然后通过解码器 <span class="math inline">\(p_\theta(x|z)\)</span> 生成 <span class="math inline">\(x\)</span> - 由于解码器不依赖于条件 <span class="math inline">\(c\)</span>，无法根据条件控制生成内容 - 即使条件影响编码过程，生成时也无法利用条件信息</p>
 <p><strong>结论</strong>:条件至少要在解码器中使用，才能实现条件生成。因此，CVAE的标准形式是条件同时加在编码器和解码器，或者只加在解码器。</p>
+<hr />
 <h2 id="conditional的作用与本质">4. Conditional的作用与本质</h2>
 <h3 id="conditional的作用">4.1 Conditional的作用</h3>
 <p>在CVAE中，条件变量 <span class="math inline">\(c\)</span> 起到以下关键作用:</p>
@@ -358,34 +308,23 @@
 <p>无论生成什么内容，<span class="math inline">\(z\)</span> 都从相同的标准正态分布采样。</p>
 <h4 id="cvae中的z分布变化">4.2.2 CVAE中的z分布变化</h4>
 <p>在CVAE中，条件 <span class="math inline">\(c\)</span> 改变了 <span class="math inline">\(z\)</span> 的分布:</p>
-<p><strong>非独立情况为例</strong></p>
-<ul>
-<li>先验 <span class="math inline">\(p_\theta(z|c)\)</span> 直接依赖于条件 <span class="math inline">\(c\)</span></li>
-<li>不同条件 <span class="math inline">\(c\)</span> 对应不同的先验分布:<span class="math inline">\(\mathcal{N}(\mu_{prior}(c), \sigma_{prior}^2(c))\)</span></li>
-<li>后验 <span class="math inline">\(q_\phi(z|x,c)\)</span> 也依赖于条件 <span class="math inline">\(c\)</span></li>
-<li>条件 <span class="math inline">\(c\)</span> 直接改变了潜在变量 <span class="math inline">\(z\)</span> 的分布</li>
-</ul>
+<p><strong>非独立情况为例</strong> - 先验 <span class="math inline">\(p_\theta(z|c)\)</span> 直接依赖于条件 <span class="math inline">\(c\)</span> - 不同条件 <span class="math inline">\(c\)</span> 对应不同的先验分布:<span class="math inline">\(\mathcal{N}(\mu_{prior}(c), \sigma_{prior}^2(c))\)</span> - 后验 <span class="math inline">\(q_\phi(z|x,c)\)</span> 也依赖于条件 <span class="math inline">\(c\)</span> - 条件 <span class="math inline">\(c\)</span> 直接改变了潜在变量 <span class="math inline">\(z\)</span> 的分布</p>
 <h4 id="数学表达">4.2.3 数学表达</h4>
 <p><strong>VAE</strong>: <span class="math display">\[z \sim p(z) = \mathcal{N}(0, I) \tag{13}\]</span> 潜在变量 <span class="math inline">\(z\)</span> 服从固定的标准正态分布。</p>
 <p><strong>CVAE（非独立情况）</strong>: <span class="math display">\[z \sim p_\theta(z|c) = \mathcal{N}(\mu_{prior}(c), \sigma_{prior}^2(c)) \tag{14}\]</span> 先验分布直接依赖于条件 <span class="math inline">\(c\)</span>，不同条件对应不同的分布。</p>
 <h3 id="总结">4.3 总结</h3>
-<p><strong>CVAE的核心机制</strong>:</p>
-<ol type="1">
-<li><strong>条件编码</strong>:将条件 <span class="math inline">\(c\)</span> 编码为数值向量（one-hot 或 embedding）</li>
-<li><strong>条件注入</strong>:将条件 <span class="math inline">\(c\)</span> 注入到编码器和/或解码器中</li>
-<li><strong>分布改变</strong>:条件 <span class="math inline">\(c\)</span> 改变潜在变量 <span class="math inline">\(z\)</span> 的分布（先验和/或后验）</li>
-<li><strong>条件生成</strong>:通过从条件相关的分布采样 <span class="math inline">\(z\)</span>，生成条件相关的样本</li>
-</ol>
+<p><strong>CVAE的核心机制</strong>: 1. <strong>条件编码</strong>:将条件 <span class="math inline">\(c\)</span> 编码为数值向量（one-hot 或 embedding） 2. <strong>条件注入</strong>:将条件 <span class="math inline">\(c\)</span> 注入到编码器和/或解码器中 3. <strong>分布改变</strong>:条件 <span class="math inline">\(c\)</span> 改变潜在变量 <span class="math inline">\(z\)</span> 的分布（先验和/或后验） 4. <strong>条件生成</strong>:通过从条件相关的分布采样 <span class="math inline">\(z\)</span>，生成条件相关的样本</p>
 <div data-align="center">
-<p><img src="pic/dl/cvae/3.6.jpeg" width="70%"></p>
+<p><img src="pic/ae/cvae/3.6.jpeg" width="70%"></p>
 </div>
 <p><small><strong>图10</strong> CVAE的完整架构图</small></p>
+<hr />
 <h2 id="参考文献">参考文献</h2>
 <ol type="1">
-<li>Sohn, K., Lee, H., &amp; Yan, X. (2015). Learning structured output representation using deep conditional generative models. <em>Advances in neural information processing systems</em>, 28.</li>
-<li>Kingma, D. P., &amp; Welling, M. (2013). Auto-encoding variational bayes. <em>arXiv preprint arXiv:1312.6114</em>.</li>
-<li>《深度学习5:生成模型》</li>
-<li><a href="https://towardsdatascience.com/understanding-variational-autoencoders-vaes-f70510919f73/">Conditional Variational Autoencoders</a></li>
+<li><p>Sohn, K., Lee, H., &amp; Yan, X. (2015). Learning structured output representation using deep conditional generative models. <em>Advances in neural information processing systems</em>, 28.</p></li>
+<li><p>Kingma, D. P., &amp; Welling, M. (2013). Auto-encoding variational bayes. <em>arXiv preprint arXiv:1312.6114</em>.</p></li>
+<li><p>《深度学习5:生成模型》</p></li>
+<li><p><a href="https://towardsdatascience.com/understanding-variational-autoencoders-vaes-f70510919f73/">Conditional Variational Autoencoders</a></p></li>
 </ol>
 </body>
 </html>

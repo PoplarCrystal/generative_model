@@ -25,10 +25,12 @@
 - 判别器:$D(x) \rightarrow [0,1]$，输入样本 $x$，输出真实概率
 
 <div align="center">
-<img src="pic/dl/gan/3.1.jpeg" width="70%">
+<img src="pic/gan/3.1.jpeg" width="70%">
 </div>
 
 <small>**图1** 标准GAN的框架图:生成器从噪声 $z$ 生成样本 $x$，判别器判断样本 $x$ 是否真实</small>
+
+---
 
 ## 2. CGAN的核心问题
 
@@ -47,7 +49,7 @@
 - 目标:判断 $(x, c)$ 是否匹配（即 $x$ 是否属于类别 $c$）
 
 <div align="center">
-<img src="pic/dl/gan/3.2.jpeg" width="70%">
+<img src="pic/gan/3.2.jpeg" width="70%">
 </div>
 
 <small>**图2** CGAN的框架图:生成器从噪声 $z$ 和条件 $c$ 生成样本 $x$，判别器判断样本 $x$ 在给定条件 $c$ 下是否真实</small>
@@ -85,6 +87,8 @@ input_d = torch.cat([x_flat, c], dim=1)          # [B, 794]
 output = D(input_d)                               # [B, 1]
 ```
 
+---
+
 ## 3. CGAN的损失函数推导
 
 ### 3.1 从条件概率建模出发
@@ -98,6 +102,7 @@ CGAN的核心是将无条件生成问题转化为条件生成问题。现在的�
 $$L_D = \mathbb{E}_{x \sim p_{data}(x|c)} \left[ \log D(x \vert c) \right] + \mathbb{E}_{z \sim p_z(z)} \left[ \log \left(1 - D(G(z \vert c) \vert c) \right) \right]$$
 
 其中:
+
 - **第一项**:真实样本对 $(x, c)$ 应被判为真（输出 $\approx 1$），这里 $(x, c) \sim p_{data}(x,c)$ 表示从数据集中采样 $(x, c)$ 对
 - **第二项**:生成样本对 $(G(z \vert c), c)$ 应被判为假（输出 $\approx 0$），这里 $(x, c) \sim p_{data}(x,c)$（从数据集中采样条件 $c$），$z \sim p_z(z)$（从先验分布采样噪声），$G(z \vert c) \sim p_g(x|c)$（生成器输出）
 
@@ -133,6 +138,8 @@ $$\min_G \max_D L(D, G) = \mathbb{E}_{x \sim p_{data}(x|c)} \left[ \log D(x \ver
 
 可以看出，CGAN只是在标准GAN的基础上，将所有分布都条件化于 $c$:$p_{data}(x) \rightarrow p_{data}(x|c)$，$p_g(x) \rightarrow p_g(x|c)$。
 
+---
+
 ## 4. 理论解释:与条件JS散度的关系
 
 ### 4.1 最优判别器
@@ -152,6 +159,8 @@ $$L(D^*, G) = 2 \mathrm{JS}\left( p_{data}(x|c) \| p_g(x|c) \right) -2\log 2 $$
 📌 **结论**:CGAN的训练等价于最小化条件分布 $p_g(x|c)$ 与真实条件分布 $p_{data}(x|c)$ 之间的**期望JS散度**。
 
 当对所有条件 $c$ 都有 $p_g(x|c) = p_{data}(x|c)$ 时，达到全局最优。
+
+---
 
 ## 5. Conditional的作用与本质
 

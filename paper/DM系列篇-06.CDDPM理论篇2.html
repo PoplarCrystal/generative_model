@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>DM系列篇-06.CDDPM理论篇2: Classifier Guidance 与 Classifier-Free Guidance</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="dm系列篇-06.cddpm理论篇2-classifier-guidance-与-classifier-free-guidance">DM系列篇-06.CDDPM理论篇2: Classifier Guidance 与 Classifier-Free Guidance</h1>
+<h2 id="引言">1. 引言</h2>
+<p>在标准的CDDPM（条件去噪扩散概率模型）方法中，条件信息直接注入到去噪网络中，实现条件生成。然而，还有两种重要的条件生成引导方法:<strong>Classifier Guidance</strong>（分类器引导）和<strong>Classifier-Free Guidance</strong>（无分类器引导）。这两种方法通过不同的机制来增强条件生成的控制能力，并在采样过程中提供更灵活的条件控制。</p>
+<p>本章将从基于得分函数的形式化表述出发，详细介绍这两种引导方法的基本原理、实现方式和优缺点。</p>
+<hr />
+<h2 id="基于得分函数的形式化">2. 基于得分函数的形式化</h2>
+<h3 id="得分函数回顾">2.1 得分函数回顾</h3>
+<p>在深入讨论条件得分函数之前，我们先回顾一下<strong>得分函数</strong>（Score Function）的基本概念。</p>
+<p>对于概率分布 <span class="math inline">\(p(x)\)</span>，得分函数定义为关于 <span class="math inline">\(x\)</span> 的对数概率梯度:</p>
+<p><span class="math display">\[\nabla_x \log p(x)\]</span></p>
+<p>在扩散模型中，我们学习的是噪声条件得分函数 <span class="math inline">\(s_\theta(x_t, t) = \nabla_{x_t} \log p(x_t)\)</span>，它描述了在噪声水平 <span class="math inline">\(t\)</span> 下数据分布的对数概率梯度。通过预测噪声 <span class="math inline">\(\epsilon_\theta(x_t, t)\)</span>，我们可以间接学习得分函数，因为:</p>
+<p><span class="math display">\[\nabla_{x_t} \log p(x_t) = -\frac{\epsilon_\theta(x_t, t)}{\sqrt{1 - \bar{\alpha}_t}}\]</span></p>
+<h3 id="条件得分函数的推导">2.2 条件得分函数的推导</h3>
+<p>现在，我们将得分函数的概念扩展到条件分布。我们的目标是学习<strong>条件得分函数</strong> <span class="math inline">\(\nabla_{x_t} \log p(x_t|c)\)</span>，即在任意噪声水平 <span class="math inline">\(t\)</span> 下，给定条件 <span class="math inline">\(c\)</span> 时条件模型的对数概率梯度。</p>
+<p>根据贝叶斯定理，我们可以将条件概率 <span class="math inline">\(p(x_t|c)\)</span> 表示为:</p>
+<p><span class="math display">\[p(x_t|c) = \frac{p(x_t) p(c|x_t)}{p(c)} \tag{1}\]</span></p>
+<p>接下来，我们计算关于 <span class="math inline">\(x_t\)</span> 的梯度:</p>
+<p><span class="math display">\[\begin{aligned}
+\nabla_{x_t} \log p(x_t|c) &amp;= \nabla_{x_t} \log \frac{p(x_t) p(c|x_t)}{p(c)} \\
+&amp;= \nabla_{x_t} \left[ \log p(x_t) + \log p(c|x_t) - \log p(c) \right] \\
+&amp;= \nabla_{x_t} \log p(x_t) + \nabla_{x_t} \log p(c|x_t) - \nabla_{x_t} \log p(c) \tag{2}
+\end{aligned}\]</span></p>
+<p>注意到在中间的表达式中出现了 <span class="math inline">\(\nabla_{x_t} \log p(c)\)</span>，但由于 <span class="math inline">\(p(c)\)</span> 中不包含 <span class="math inline">\(x_t\)</span>，因此 <span class="math inline">\(p(c)\)</span> 关于 <span class="math inline">\(x_t\)</span> 的梯度为零:</p>
+<p><span class="math display">\[\nabla_{x_t} \log p(c) = 0 \tag{3}\]</span></p>
+<p>由此，我们得到最终的数学表达式:</p>
+<p><span class="math display">\[\nabla_{x_t}  \underbrace{\log p(x_t|c)}_{\text{条件得分}}= \underbrace{\nabla_{x_t} \log p(x_t)}_{\text{得分}} + \underbrace{\nabla_{x_t} \log p(c|x_t)}_{\text{对抗梯度}} \tag{4}\]</span></p>
+<p><strong>要点</strong>:最终推导的结果表明，条件得分函数可以分解为两部分: 1. <strong>无条件得分</strong>:<span class="math inline">\(\nabla_{x_t} \log p(x_t)\)</span> - 表示数据本身的分布梯度 2. <strong>对抗梯度</strong>:<span class="math inline">\(\nabla_{x_t} \log p(c|x_t)\)</span> - 表示分类器对条件信息的梯度响应</p>
+<p>这为后续的两种引导方法提供了理论基础。</p>
+<hr />
+<h2 id="classifier-guidance分类器引导">3. Classifier Guidance（分类器引导）</h2>
+<h3 id="分类器的由来">3.1 分类器的由来</h3>
+<p>我们仔细查看公式4可以发现， <strong>无条件得分</strong>:<span class="math inline">\(\nabla_{x_t} \log p(x_t)\)</span> - 这一项可以使用预测得分函数的神经网络<span class="math inline">\(s_\theta(x_t, t)\)</span> 来计算</p>
+<p>那么<strong>对抗梯度</strong>:<span class="math inline">\(\nabla_{x_t} \log p(c|x_t)\)</span>呢？我们先观察<span class="math inline">\(p(c|x_t)\)</span>这一项，通过判别模型，很容易观察出:</p>
+<p>将时刻 <span class="math inline">\(t\)</span> 的噪声图像 <span class="math inline">\(x_t\)</span> 作为输入，并输出类别 <span class="math inline">\(c\)</span> 的概率 <span class="math inline">\(p(c|x_t)\)</span>。</p>
+<p>于是，我们可以用一个神经网络<span class="math inline">\(p_\phi(c|x_t)\)</span>来拟合，如图1所示。</p>
+<div data-align="center">
+<p><img src="pic/dm/cddpm/6.1.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图1</strong> 噪声分类器:将噪声图像 <span class="math inline">\(x_t\)</span> 作为输入，输出类别 <span class="math inline">\(c\)</span> 的概率 <span class="math inline">\(p_\phi(c|x_t)\)</span></small></p>
+<p>又因为该过程跟扩散模型其实不相关，所以这个网络可以单独训练（预训练）</p>
+<p>综上所述:分类器是一个能够对数据进行分类的预训练神经网络</p>
+<p>但是，这并不是我们想要的<span class="math inline">\(\nabla_{x_t} \log p(c|x_t)\)</span>，那么怎么由分类器<span class="math inline">\(p_\phi(c|x_t)\)</span>得到<span class="math inline">\(\nabla_{x_t} \log p(c|x_t)\)</span>呢？答案也很简单:梯度反向传播。</p>
+<p>如图2所示，<span class="math inline">\(\nabla_{x_t} \log p(c|x_t)\)</span> 显示了在当前 <span class="math inline">\(x_t\)</span> 下，类别 <span class="math inline">\(c\)</span> 的对数似然增加最快的方向。</p>
+<div data-align="center">
+<p><img src="pic/dm/cddpm/6.2.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图2</strong> 对抗梯度:通过梯度反向传播从分类器 <span class="math inline">\(p_\phi(c|x_t)\)</span> 得到 <span class="math inline">\(\nabla_{x_t} \log p(c|x_t)\)</span>，表示类别 <span class="math inline">\(c\)</span> 的对数似然增加最快的方向</small></p>
+<p>因此，如果沿着 <span class="math inline">\(\nabla_{x_t} \log p(c|x_t)\)</span> 的方向更新 <span class="math inline">\(x_t\)</span>，那么更新后的图像被分类为类别 <span class="math inline">\(c\)</span> 的概率会更高。</p>
+<h3 id="引导公式">3.2 引导公式</h3>
+<p>为了引入细粒度控制，使模型能够鼓励或抑制对条件信息的考虑，Classifier Guidance通过超参数 <span class="math inline">\(\gamma\)</span> 对噪声分类器的对抗梯度进行缩放，这样就能调整分类器的贡献度。Classifier Guidance下学习的得分函数可以总结为:</p>
+<p><span class="math display">\[\nabla_{x_t} \log p(x_t|c) = \nabla_{x_t} \log p(x_t) + \gamma \nabla_{x_t} \log p(c|x_t) \tag{5}\]</span></p>
+<p>权重 <span class="math inline">\(\gamma\)</span> 是人为设定的值（超参数），用于调整分类器向类别 <span class="math inline">\(c\)</span> 方向引导的程度。<span class="math inline">\(\gamma\)</span> 值越大，条件 <span class="math inline">\(c\)</span> 的作用就越显著。使用表示推断得分的神经网络 <span class="math inline">\(s_\theta(x_t, t)\)</span> 和表示分类器的 <span class="math inline">\(p_\phi(c|x_t)\)</span>，可以将公式 (5) 改写为如下形式:</p>
+<p><span class="math display">\[\nabla_{x_t} \log p(x_t|c) \approx s_\theta(x_t, t) + \gamma \nabla_{x_t} \log p(c|x_t) \tag{6}\]</span></p>
+<h3 id="引导强度的控制">3.3 引导强度的控制</h3>
+<p>超参数 <span class="math inline">\(\gamma\)</span> 控制模型对条件信息的关注程度:</p>
+<ul>
+<li><strong><span class="math inline">\(\gamma = 0\)</span></strong>:条件扩散模型完全忽略条件信息，退化为无条件模型</li>
+<li><strong><span class="math inline">\(\gamma = 1\)</span></strong>:标准的条件得分函数，条件信息与无条件得分等权重</li>
+<li><strong><span class="math inline">\(\gamma &gt; 1\)</span></strong>:条件扩散模型生成的样本会强烈遵循条件信息，但会以牺牲样本多样性为代价</li>
+</ul>
+<p><strong>直观理解</strong>:较大的 <span class="math inline">\(\gamma\)</span> 值会增强条件信息的引导作用，使生成的样本更符合条件 <span class="math inline">\(c\)</span>，但可能会牺牲样本的多样性。</p>
+<p>如图3所示，给出了常规的扩散模型（得分函数）与分类器相结合，并通过引入权重参数调整得分函数的模型架构。</p>
+<div data-align="center">
+<p><img src="pic/dm/cddpm/6.3.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图3</strong> Classifier Guidance架构:常规的扩散模型（得分函数）与分类器相结合，通过权重参数 <span class="math inline">\(\gamma\)</span> 调整分类器的贡献度</small></p>
+<p>分类器 + 引导公式，与常规的扩散模型相结合，作为条件扩散模型来生成数据，这就是分类器引导的核心思想，即所谓的Classifier Guidance。</p>
+<h3 id="局限性">3.4 局限性</h3>
+<p>Classifier Guidance的一个显著缺点是<strong>依赖于单独学习的分类器</strong>:</p>
+<ul>
+<li><strong>需要专门训练</strong>:由于分类器必须处理任意噪声的输入，而大多数现有的预训练分类模型并未针对此进行优化，因此必须与扩散模型一起进行专门的训练</li>
+<li><strong>增加训练复杂度</strong>:需要同时训练和协调两个独立的模型</li>
+<li><strong>计算开销</strong>:在采样时需要同时运行扩散模型和分类器，增加了计算成本</li>
+</ul>
+<p>那么有没有办法去掉分类器呢，这就是我们下一节需要介绍的Classifier-Free Guidance。</p>
+<hr />
+<h2 id="classifier-free-guidance无分类器引导">4. Classifier-Free Guidance（无分类器引导）</h2>
+<p>分类器引导可以生成强调条件的数据。然而，分类器引导在实际应用中存在一个问题，即需要单独准备一个分类器。针对分类器引导的这一缺点进行改进的技术是无分类器引导。</p>
+<h3 id="推导过程">4.1 推导过程</h3>
+<p>为了推导Classifier-Free Guidance下的得分函数，我们首先从方程 (4) 重新整理得到:</p>
+<p><span class="math display">\[\nabla_{x_t} \log p(c|x_t) = \nabla_{x_t} \log p(x_t|c) - \nabla_{x_t} \log p(x_t) \tag{6}\]</span></p>
+<p>然后将此式代入方程 (5)，得到:</p>
+<p><span class="math display">\[\begin{aligned}
+\nabla_{x_t} \log p(x_t|c) &amp;= \nabla_{x_t} \log p(x_t) + \gamma (\nabla_{x_t} \log p(x_t|c) - \nabla_{x_t} \log p(x_t)) \\
+&amp;= \nabla_{x_t} \log p(x_t) + \gamma \nabla_{x_t} \log p(x_t|c) - \gamma \nabla_{x_t} \log p(x_t) \\
+&amp;= \gamma \underbrace{\nabla_{x_t} \log p(x_t|c)}_{\text{条件得分}} + (1 - \gamma) \underbrace{\nabla_{x_t} \log p(x_t)}_{\text{无条件得分}} \tag{7}
+\end{aligned}\]</span></p>
+<p>前面我们使用贝叶斯定理进行了式子的展开，最后得到了公式 (7)。根据公式 (7)，可以推导出无分类器引导。公式 (7) 的意思是从点 <span class="math inline">\(\nabla_{x_t} \log p(x_t)\)</span> 出发，沿着 <span class="math inline">\(\nabla_{x_t} \log p(x_t|c)\)</span> 的方向前进了 <span class="math inline">\(\gamma\)</span> 倍的距离，如图4所示。</p>
+<div data-align="center">
+<p><img src="pic/dm/cddpm/6.4.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图4</strong> 公式 (7) 的可视化:从无条件得分 <span class="math inline">\(\nabla_{x_t} \log p(x_t)\)</span> 出发，沿着条件得分 <span class="math inline">\(\nabla_{x_t} \log p(x_t|c)\)</span> 的方向前进了 <span class="math inline">\(\gamma\)</span> 倍的距离</small></p>
+<h3 id="统一的模型训练">4.2 统一的模型训练</h3>
+<p>公式 (7) 中的 <span class="math inline">\(\nabla_{x_t} \log p(x_t)\)</span> 和 <span class="math inline">\(\nabla_{x_t} \log p(x_t|c)\)</span> 分别表示无条件得分和条件得分。它们可由以下两个神经网络进行推断:</p>
+<ul>
+<li><strong>无条件得分的推断器</strong>:<span class="math inline">\(s_\theta(x_t, t)\)</span></li>
+<li><strong>条件得分的推断器</strong>:<span class="math inline">\(s_\theta(x_t, t, c)\)</span></li>
+</ul>
+<p>不过，准备两个模型很麻烦。由于学习两个独立的扩散模型成本高昂，Classifier-Free Guidance采用了一种优雅的解决方案:<strong>将条件扩散模型和无条件扩散模型一起学习为一个单一的条件模型</strong>。即使用一个条件得分推断器 <span class="math inline">\(s_\theta(x_t, t, c)\)</span>，并按如下方式建模:</p>
+<ul>
+<li><strong>无条件得分的推断器</strong>:<span class="math inline">\(s_\theta(x_t, t, \emptyset)\)</span></li>
+<li><strong>条件得分的推断器</strong>:<span class="math inline">\(s_\theta(x_t, t, c)\)</span></li>
+</ul>
+<p>这里我们用 <span class="math inline">\(\emptyset\)</span> 表示“无条件”对应的类别。条件 <span class="math inline">\(c\)</span> 可以被嵌入层变换为向量，但当类别为 <span class="math inline">\(\emptyset\)</span> 时，它会被变换为“零向量”，使其不包含任何信息。根据以上信息，无分类器引导的数学式可以表示成如下形式:</p>
+<p><span class="math display">\[\nabla_{x_t} \log p(x_t|c) \approx s_\theta(x_t, t, \emptyset) + \gamma (s_\theta(x_t, t, c) - s_\theta(x_t, t, \emptyset)) \tag{8}\]</span></p>
+<p>如图5所示，使用得分函数的神经网络实现的无分类器引导的条件生成模型。</p>
+<div data-align="center">
+<p><img src="pic/dm/cddpm/6.5.jpeg" width="70%"></p>
+</div>
+<p><small><strong>图5</strong> Classifier-Free Guidance架构:使用得分函数的神经网络实现的无分类器引导的条件生成模型</small></p>
+<p><strong>实现方式</strong>:在训练过程中，无条件扩散模型可以通过用固定常数值（如零或空向量）替换条件信息来查询。这本质上是对条件信息执行随机dropout（通常dropout率在10%-20%之间）。</p>
+<p><strong>优势</strong>: - <strong>无需额外模型</strong>:只需要训练一个条件扩散模型 - <strong>训练简单</strong>:通过条件dropout自然实现 - <strong>计算高效</strong>:在采样时不需要运行额外的分类器</p>
+<h3 id="引导强度的控制-1">4.3 引导强度的控制</h3>
+<p>在Classifier-Free Guidance中，<span class="math inline">\(\gamma\)</span> 参数同样控制模型对条件信息的关注程度:</p>
+<ul>
+<li><strong><span class="math inline">\(\gamma = 0\)</span></strong>:学习到的条件模型完全忽略条件器，学习一个无条件扩散模型</li>
+<li><strong><span class="math inline">\(\gamma = 1\)</span></strong>:模型显式学习vanilla条件分布，不进行引导</li>
+<li><strong><span class="math inline">\(\gamma &gt; 1\)</span></strong>:扩散模型不仅优先考虑条件得分函数，而且朝着远离无条件得分函数的方向移动</li>
+</ul>
+<p><strong>直观理解</strong>:当 <span class="math inline">\(\gamma &gt; 1\)</span> 时，模型会降低生成不使用条件信息的样本的概率，有利于明确使用条件信息的样本。这也会以牺牲样本多样性为代价，生成准确匹配条件信息的样本。</p>
+<hr />
+<h2 id="两种方法的对比">5. 两种方法的对比</h2>
+<table>
+<colgroup>
+<col style="width: 11%" />
+<col style="width: 39%" />
+<col style="width: 49%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>特性</th>
+<th>Classifier Guidance</th>
+<th>Classifier-Free Guidance</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>需要额外模型</strong></td>
+<td>是（需要单独训练分类器）</td>
+<td>否（单一条件模型即可）</td>
+</tr>
+<tr class="even">
+<td><strong>训练复杂度</strong></td>
+<td>较高（需要训练两个模型）</td>
+<td>较低（只需训练一个模型）</td>
+</tr>
+<tr class="odd">
+<td><strong>采样复杂度</strong></td>
+<td>较高（需要运行两个模型）</td>
+<td>较低（只需运行一个模型）</td>
+</tr>
+<tr class="even">
+<td><strong>实现方式</strong></td>
+<td><span class="math inline">\(\nabla_{x_t} \log p(x_t) + \gamma \nabla_{x_t} \log p(c\|x_t)\)</span></td>
+<td><span class="math inline">\(\gamma \nabla_{x_t} \log p(x_t\|c) + (1-\gamma) \nabla_{x_t} \log p(x_t)\)</span></td>
+</tr>
+<tr class="odd">
+<td><strong>灵活性</strong></td>
+<td>需要专门设计噪声分类器</td>
+<td>可通过条件dropout统一训练</td>
+</tr>
+<tr class="even">
+<td><strong>应用场景</strong></td>
+<td>已有预训练分类器的情况</td>
+<td>从头训练或需要更好控制的场景</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="总结">6. 总结</h2>
+<p>Classifier Guidance和Classifier-Free Guidance都是实现条件扩散模型的有效方法，它们通过不同的机制来引导生成过程:</p>
+<h3 id="方法特点">6.1 方法特点</h3>
+<ul>
+<li><p><strong>Classifier Guidance</strong>:利用单独训练的分类器提供对抗梯度，增强条件控制。需要额外的分类器模型，训练和采样复杂度较高。</p></li>
+<li><p><strong>Classifier-Free Guidance</strong>:通过条件dropout在单一模型中同时学习条件和无条件得分函数，实现更灵活的控制。只需训练一个模型，实现简单高效。</p></li>
+</ul>
+<h3 id="实际应用建议">6.2 实际应用建议</h3>
+<ol type="1">
+<li><strong>优先考虑Classifier-Free Guidance</strong>:在实际应用中，由于无需额外的分类器模型，Classifier-Free Guidance通常更受欢迎</li>
+<li><strong>引导强度调整</strong>:两种方法都通过超参数 <span class="math inline">\(\gamma\)</span> 来控制对条件信息的关注程度，需要在生成质量和多样性之间进行权衡</li>
+<li><strong><span class="math inline">\(\gamma\)</span> 值选择</strong>:通常 <span class="math inline">\(\gamma \in [1, 3]\)</span> 是一个合理的范围，可以根据具体任务和数据集进行调整</li>
+</ol>
+<p>两种方法都为条件生成提供了灵活的控制机制，使得我们可以根据具体需求在生成质量和多样性之间找到最佳平衡点。</p>
+<hr />
+<h2 id="参考文献">参考文献</h2>
+<ol type="1">
+<li><p>Ho, J., Jain, A., &amp; Abbeel, P. (2020). Denoising diffusion probabilistic models. <em>Advances in Neural Information Processing Systems</em>, 33, 6840-6851.</p></li>
+<li><p>Dhariwal, P., &amp; Nichol, A. (2021). Diffusion models beat gans on image synthesis. <em>Advances in Neural Information Processing Systems</em>, 34, 8780-8794.</p></li>
+<li><p>Ho, J., &amp; Salimans, T. (2022). Classifier-free diffusion guidance. <em>arXiv preprint arXiv:2207.12598</em>.</p></li>
+<li><p>《深度学习5:生成模型》</p></li>
+<li><p>Understanding Diffusion Models: A Unified Perspective. <em>arXiv preprint arXiv:2208.11970</em>. https://arxiv.org/abs/2208.11970</p></li>
+<li><p>深度学习入门5：生成模型</p></li>
+</ol>
+</body>
+</html>

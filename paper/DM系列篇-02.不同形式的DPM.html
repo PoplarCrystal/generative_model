@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>DM系列篇-02.不同形式的DPM</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="dm系列篇-02.不同形式的dpm">DM系列篇-02.不同形式的DPM</h1>
+<h2 id="背景">1. 背景</h2>
+<p>其中均值 <span class="math inline">\(\mu_q(x_t, x_0)\)</span> 和方差 <span class="math inline">\(\Sigma_q(t)\)</span> 分别为:</p>
+<p><span class="math display">\[\mu_q(x_t, x_0) = \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + \sqrt{\bar{\alpha}_{t-1}}(1 - \alpha_t) x_0}{1 - \bar{\alpha}_t}, \quad \Sigma_q(t) = \sigma_q^2(t) I = \frac{(1 - \alpha_t)(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} I \tag{1}\]</span></p>
+<p>在我们的情况下，我们可以将两个高斯分布的方差设置为完全匹配，优化KL散度项简化为最小化两个分布均值之间的差异:</p>
+<p><span class="math display">\[ D_{KL}(q(x_{t-1}|x_t, x_0) \| p_\theta(x_{t-1}|x_t)) =  \frac{1}{2\sigma_q^2(t)} \|\mu_\theta - \mu_q\|_2^2 \tag{2}\]</span></p>
+<hr />
+<h2 id="预测原始数据的神经网络">2. 预测原始数据的神经网络</h2>
+<p>首先，<span class="math inline">\(\mu_q(x_t, x_0)\)</span> 的数学表达式如下所示（再次列出）:</p>
+<p><span class="math display">\[\mu_q(x_t, x_0) = \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + \sqrt{\bar{\alpha}_{t-1}}(1 - \alpha_t) x_0}{1 - \bar{\alpha}_t} \tag{3}\]</span></p>
+<p>换句话说，我们想要优化一个 <span class="math inline">\(\mu_\theta(x_t, t)\)</span>，使其匹配 <span class="math inline">\(\mu_q(x_t, x_0)\)</span>，然后将 <span class="math inline">\(\mu_\theta(x_t, t)\)</span> 调整为与上式相同的形式，如下所示:</p>
+<p><span class="math display">\[\mu_\theta(x_t, t) = \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + \sqrt{\bar{\alpha}_{t-1}}(1 - \alpha_t) \hat{x}_\theta(x_t, t)}{1 - \bar{\alpha}_t} \tag{4}\]</span></p>
+<p>如公式4所示，我们将 <span class="math inline">\(\mu_\theta(x_t, t)\)</span> 调整为与公式3相同的形式。而 <span class="math inline">\(\hat{x}_\theta(x_t, t)\)</span> 表示由神经网络推断的值。我们在这里所做的调整是使神经网络推断的是 <span class="math inline">\(\mu_q(x_t, x_0)\)</span> 的一部分，而不是预测整个公式3。比较公式3和公式4，可以看到 <span class="math inline">\(\hat{x}_\theta(x_t, t)\)</span> 和 <span class="math inline">\(x_0\)</span> 是相对应的部分。</p>
+<p>此外，这种情况下的KL散度可以按照以下式子进行计算:</p>
+<p><span class="math display">\[D_{KL}(q(x_{t-1}|x_t, x_0) \| p_\theta(x_{t-1}|x_t)) = \frac{1}{2\sigma_q^2(t)} \|\mu_\theta(x_t, t) - \mu_q(x_t, x_0)\|_2^2\]</span></p>
+<p><span class="math display">\[= \frac{1}{2\sigma_q^2(t)} \cdot \frac{\bar{\alpha}_{t-1}(1 - \alpha_t)^2}{(1 - \bar{\alpha}_t)^2} \|\hat{x}_\theta(x_t, t) - x_0\|_2^2 \tag{5}\]</span></p>
+<p>由于KL散度是损失函数，而根据上式，损失函数可以表示为 <span class="math inline">\(\hat{x}_\theta(x_t, t)\)</span> 和 <span class="math inline">\(x_0\)</span> 之间的平方误差，因此，神经网络以 <span class="math inline">\(x_0\)</span> 作为训练数据进行训练，使得输出的 <span class="math inline">\(\hat{x}_\theta(x_t, t)\)</span> 与 <span class="math inline">\(x_0\)</span> 相同。</p>
+<div data-align="center">
+<p><img src="pic/dm/dm/2.1.jpeg" alt="以x_0为训练数据的扩散模型" style="width: 65%;"></p>
+</div>
+<p><small><strong>图1</strong> 以 <span class="math inline">\(x_0\)</span> 为训练数据的扩散模型</small></p>
+<p>总之，这里神经网络所执行的处理是:从数据 <span class="math inline">\(x_t\)</span> 和时刻 <span class="math inline">\(t\)</span> 恢复没有噪声的原始数据 <span class="math inline">\(x_0\)</span>。这就是2015年提出的DPM模型。</p>
+<hr />
+<h2 id="预测噪声的神经网络">3. 预测噪声的神经网络</h2>
+<p>还可以考虑神经网络的另一种构成方法。这种方法将 <span class="math inline">\(q(x_t|x_0)\)</span> 表示为以下式子:</p>
+<p><span class="math display">\[q(x_t|x_0) = \mathcal{N}(x_t; \sqrt{\bar{\alpha}_t} x_0, (1 - \bar{\alpha}_t) I) \tag{6}\]</span></p>
+<p>另外，可以将基于 <span class="math inline">\(q(x_t|x_0)\)</span> 采样的样本表示为以下式子:</p>
+<p><span class="math display">\[x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon, \quad \epsilon \sim \mathcal{N}(0, I) \tag{7}\]</span></p>
+<p>由此，有以下式子成立:</p>
+<p><span class="math display">\[x_0 = \frac{x_t - \sqrt{1 - \bar{\alpha}_t} \epsilon}{\sqrt{\bar{\alpha}_t}} \tag{8}\]</span></p>
+<p>然后将上式代入公式3进行展开:</p>
+<p><span class="math display">\[\mu_q(x_t, x_0) = \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + \sqrt{\bar{\alpha}_{t-1}}(1 - \alpha_t) x_0}{1 - \bar{\alpha}_t}\]</span></p>
+<p><span class="math display">\[= \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + \sqrt{\bar{\alpha}_{t-1}}(1 - \alpha_t) \cdot \frac{x_t - \sqrt{1 - \bar{\alpha}_t} \epsilon}{\sqrt{\bar{\alpha}_t}}}{1 - \bar{\alpha}_t}\]</span></p>
+<p><span class="math display">\[= \frac{1}{\sqrt{\alpha_t}} x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar{\alpha}_t} \sqrt{\alpha_t}} \epsilon \tag{9}\]</span></p>
+<p>将 <span class="math inline">\(\mu_\theta(x_t, t)\)</span> 变形为与该式类似的式子，如下所示:</p>
+<p><span class="math display">\[\mu_\theta(x_t, t) = \frac{1}{\sqrt{\alpha_t}} x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar{\alpha}_t} \sqrt{\alpha_t}} \hat{\epsilon}_\theta(x_t, t) \tag{10}\]</span></p>
+<p>上面式子中的 <span class="math inline">\(\hat{\epsilon}_\theta(x_t, t)\)</span> 表示神经网络的输出。此时KL散度按以下式子进行计算:</p>
+<p><span class="math display">\[D_{KL}(q(x_{t-1}|x_t, x_0) \| p_\theta(x_{t-1}|x_t)) = \frac{1}{2\sigma_q^2(t)} \|\mu_\theta(x_t, t) - \mu_q(x_t, x_0)\|_2^2\]</span></p>
+<p><span class="math display">\[= \frac{1}{2\sigma_q^2(t)} \cdot \frac{\bar{\alpha}_{t-1}(1 - \alpha_t)^2}{\bar{\alpha}_t(1 - \bar{\alpha}_t)} \|\hat{\epsilon}_\theta(x_t, t) - \epsilon\|_2^2 \tag{11}\]</span></p>
+<p>结果是 <span class="math inline">\(\hat{\epsilon}_\theta(x_t, t)\)</span> 和 <span class="math inline">\(\epsilon\)</span> 之间的平方误差。因此，神经网络 <span class="math inline">\(\hat{\epsilon}_\theta(x_t, t)\)</span> 预测了基于 <span class="math inline">\(x_0\)</span> 生成 <span class="math inline">\(x_t\)</span> 时使用的噪声分量 <span class="math inline">\(\epsilon\)</span>。</p>
+<div data-align="center">
+<p><img src="pic/dm/dm/2.2.jpeg" alt="使用epsilon作为训练数据的扩散模型" style="width: 65%;"></p>
+</div>
+<p><small><strong>图2</strong> 使用 <span class="math inline">\(\epsilon\)</span> 作为训练数据的扩散模型</small></p>
+<p>根据参考文献可知，预测噪声的模型的效果更好。这也意味着使用下面这个省略了系数的损失函数可以得到同样的结果:</p>
+<p><span class="math display">\[\text{LOSS}(x_0; \theta) = \|\hat{\epsilon}_\theta(x_t, t) - \epsilon\|_2^2 \tag{12}\]</span></p>
+<p>这就是2020年，Ho et al 等人发表了论文 DPM 的改进模型 “Denoising Diffusion Probabilistic Models”提出的改进版的DPM模型，被称为DDPM模型。</p>
+<hr />
+<h2 id="预测得分函数的神经网络">4. 预测得分函数的神经网络</h2>
+<p>在2019年，宋旸等人提出了一种基于分数的扩散模型，实际上这种基于分数的扩散模型和本章基于马尔可夫的扩散模型是等价的，论文给出了这种等价说明。后续的章节我们再单独详细的介绍宋旸论文中基于分数扩散模型的原理，这里我们暂且按照相关内容给出和DDPM等价的分数模型。</p>
+<h3 id="tweedie公式背景知识">4.1 Tweedie公式背景知识</h3>
+<p>首先需要一个关于Tweedie公式（Tweedie’s Formula）的背景知识。在统计学中，经常需要根据观测样本估计一个概率分布的未知参数，估计算法有很多，比如最大似然估计、贝叶斯估计等等。Tweedie公式是一种估计指数族分布均值参数的方法。高斯分布就是指数族分布中的一种，所以可以用Tweedie公式估计高斯分布的均值参数。这里省略Tweedie公式的证明过程，只关注怎么使用Tweedie公式。</p>
+<p>假设有一个（多元）高斯随机变量 <span class="math inline">\(x \sim \mathcal{N}(x; \mu, \Sigma)\)</span>，Tweedie公式可以写为:</p>
+<p><span class="math display">\[\mathbb{E}[\mu|x] = x + \Sigma \nabla_x \log p(x) \tag{13}\]</span></p>
+<p>其中等式左边 <span class="math inline">\(\mathbb{E}[\mu|x]\)</span> 表示:有 <span class="math inline">\(x\)</span> 的样本条件下，<span class="math inline">\(\mu\)</span> 的期望，直观地理解，就是用 <span class="math inline">\(x\)</span> 的样本估计 <span class="math inline">\(\mu\)</span> 的值。等式右边就是具体计算方式，在这里只需要 <span class="math inline">\(x\)</span> 的一条样本就可以。<span class="math inline">\(\log p(x)\)</span> 就是观测样本的对数似然，<span class="math inline">\(\nabla_x \log p(x)\)</span> 就是观测样本的对数似然的一阶导数，又名梯度，也叫Stein分数（Stein score），简称分数(score)。</p>
+<p>注意，还有另外一个分数，Fisher分数，二者不太一样，不要搞混了。Fisher分数是对数似然关于参数的梯度 <span class="math inline">\(\nabla_\theta \log p(x|\theta)\)</span>；Stein分数是对数似然关于观测变量（样本）的梯度 <span class="math inline">\(\nabla_x \log p(x)\)</span>。</p>
+<h3 id="分数表示的推导">4.2 分数表示的推导</h3>
+<p>我们知道在前向过程中，<span class="math inline">\(x_t\)</span> 的边际分布（marginal distribution）是一个高斯分布:</p>
+<p><span class="math display">\[q(x_t|x_0) = \mathcal{N}(x_t; \sqrt{\bar{\alpha}_t} x_0, (1 - \bar{\alpha}_t) I) \tag{14}\]</span></p>
+<p>其中 <span class="math inline">\(x_t\)</span> 的边际分布为 <span class="math inline">\(p(x_t)\)</span>。虽然我们知道给定 <span class="math inline">\(x_0\)</span> 时 <span class="math inline">\(x_t\)</span> 的均值是 <span class="math inline">\(\sqrt{\bar{\alpha}_t} x_0\)</span>，但我们可以利用Tweedie公式，从 <span class="math inline">\(x_t\)</span> 的样本直接估计这个均值参数。根据Tweedie公式（公式13），我们有:</p>
+<p><span class="math display">\[\mathbb{E}[\sqrt{\bar{\alpha}_t} x_0 | x_t] = x_t + (1 - \bar{\alpha}_t) \nabla_{x_t} \log p(x_t) \tag{15}\]</span></p>
+<p>这里我们记 <span class="math inline">\(\nabla_{x_t} \log p(x_t)\)</span> 为 <span class="math inline">\(\nabla \log p(x_t)\)</span> 以简化符号。根据Tweedie公式，对于从均值 <span class="math inline">\(\mu_{x_t} = \sqrt{\bar{\alpha}_t} x_0\)</span> 生成的高斯分布，最佳估计为:</p>
+<p><span class="math display">\[\sqrt{\bar{\alpha}_t} x_0 = x_t + (1 - \bar{\alpha}_t) \nabla \log p(x_t) \tag{16}\]</span></p>
+<p>对上式进行移项可以得到:</p>
+<p><span class="math display">\[x_0 = \frac{x_t + (1 - \bar{\alpha}_t) \nabla \log p(x_t)}{\sqrt{\bar{\alpha}_t}} \tag{17}\]</span></p>
+<p>这个关系式是一个分数表达 <span class="math inline">\(x_0\)</span> 的等式。现在回到逆过程中的真实分布 <span class="math inline">\(q(x_{t-1}|x_t, x_0)\)</span>，它的均值 <span class="math inline">\(\mu_q(x_t, x_0)\)</span> 在公式3中已经给出，这里把公式17带入进去:</p>
+<p><span class="math display">\[\mu_q(x_t, x_0) = \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + \sqrt{\bar{\alpha}_{t-1}}(1 - \alpha_t) x_0}{1 - \bar{\alpha}_t}\]</span></p>
+<p><span class="math display">\[= \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + \sqrt{\bar{\alpha}_{t-1}}(1 - \alpha_t) \cdot \frac{x_t + (1 - \bar{\alpha}_t) \nabla \log p(x_t)}{\sqrt{\bar{\alpha}_t}}}{1 - \bar{\alpha}_t}\]</span></p>
+<p><span class="math display">\[= \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t + (1 - \alpha_t) \cdot \frac{x_t + (1 - \bar{\alpha}_t) \nabla \log p(x_t)}{\sqrt{\alpha_t}}}{1 - \bar{\alpha}_t}\]</span></p>
+<p><span class="math display">\[= \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1}) x_t}{1 - \bar{\alpha}_t} + \frac{(1 - \alpha_t) x_t}{(1 - \bar{\alpha}_t) \sqrt{\alpha_t}} + \frac{(1 - \alpha_t)(1 - \bar{\alpha}_t) \nabla \log p(x_t)}{(1 - \bar{\alpha}_t) \sqrt{\alpha_t}}\]</span></p>
+<p><span class="math display">\[= \left(\frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} + \frac{1 - \alpha_t}{(1 - \bar{\alpha}_t) \sqrt{\alpha_t}}\right) x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} \nabla \log p(x_t)\]</span></p>
+<p><span class="math display">\[= \frac{\alpha_t (1 - \bar{\alpha}_{t-1}) + 1 - \alpha_t}{(1 - \bar{\alpha}_t) \sqrt{\alpha_t}} x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} \nabla \log p(x_t)\]</span></p>
+<p><span class="math display">\[= \frac{\alpha_t - \bar{\alpha}_t + 1 - \alpha_t}{(1 - \bar{\alpha}_t) \sqrt{\alpha_t}} x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} \nabla \log p(x_t)\]</span></p>
+<p><span class="math display">\[= \frac{1 - \bar{\alpha}_t}{(1 - \bar{\alpha}_t) \sqrt{\alpha_t}} x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} \nabla \log p(x_t)\]</span></p>
+<p><span class="math display">\[= \frac{1}{\sqrt{\alpha_t}} x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} \nabla \log p(x_t) \tag{18}\]</span></p>
+<p>重新按照这个形式设定参数化分布 <span class="math inline">\(p_\theta(x_{t-1}|x_t)\)</span> 均值 <span class="math inline">\(\mu_\theta(x_t, t)\)</span> 的表达式:</p>
+<p><span class="math display">\[\mu_\theta(x_t, t) = \frac{1}{\sqrt{\alpha_t}} x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} s_\theta(x_t, t) \tag{19}\]</span></p>
+<p>现在 <span class="math inline">\(s_\theta(x_t, t)\)</span> 是模型学习预测的内容，相当于模型直接预测的是分数 <span class="math inline">\(\nabla \log p(x_t)\)</span>。</p>
+<p>最后我们推导下目标函数ELBO中相关的KL散度:</p>
+<p><span class="math display">\[D_{KL}(q(x_{t-1}|x_t, x_0) \| p_\theta(x_{t-1}|x_t)) = \frac{1}{2\sigma_q^2(t)} \|\mu_\theta(x_t, t) - \mu_q(x_t, x_0)\|_2^2\]</span></p>
+<p><span class="math display">\[= \frac{1}{2\sigma_q^2(t)} \left\|\frac{1}{\sqrt{\alpha_t}} x_t + \frac{1 - \alpha_t}{\sqrt{\alpha_t}} s_\theta(x_t, t) - \frac{1}{\sqrt{\alpha_t}} x_t - \frac{1 - \alpha_t}{\sqrt{\alpha_t}} \nabla \log p(x_t)\right\|_2^2\]</span></p>
+<p><span class="math display">\[= \frac{1}{2\sigma_q^2(t)} \left\|\frac{1 - \alpha_t}{\sqrt{\alpha_t}} (s_\theta(x_t, t) - \nabla \log p(x_t))\right\|_2^2\]</span></p>
+<p><span class="math display">\[= \frac{1}{2\sigma_q^2(t)} \cdot \frac{(1 - \alpha_t)^2}{\alpha_t} \|s_\theta(x_t, t) - \nabla \log p(x_t)\|_2^2 \tag{20}\]</span></p>
+<p>最后的目标函数仍然是均方误差的形式，和原始扩散模型以及基于噪声的扩散模型是高度一致的。公式中的 <span class="math inline">\(\nabla \log p(x_t)\)</span> 是梯度的真实值，这个可以直接计算得到，PyTorch中可以计算指定变量的梯度。<span class="math inline">\(s_\theta(x_t, t)\)</span> 代表一个神经网络模型，它去学习和预测分数函数 <span class="math inline">\(\nabla \log p(x_t)\)</span>，即对于任意噪声水平 <span class="math inline">\(t\)</span>，在数据空间中 <span class="math inline">\(x_t\)</span> 的梯度。</p>
+<h3 id="梯度和噪声的关系">4.3 梯度和噪声的关系</h3>
+<p>接下来看下梯度和噪声的关系，结合公式16和公式8可得:</p>
+<p><span class="math display">\[\nabla_{x_t} \log q(x_t|x_0) = \nabla_{x_t} \log q(x_t|x_0) = -\frac{1}{1 - \bar{\alpha}_t} \cdot \frac{x_t - \sqrt{\bar{\alpha}_t} x_0}{\sqrt{1 - \bar{\alpha}_t}} = -\frac{\epsilon}{\sqrt{1 - \bar{\alpha}_t}} \tag{20}\]</span></p>
+<p>我们知道梯度的方向，是函数极值的方向。梯度 <span class="math inline">\(\nabla_{x_t} \log q(x_t|x_0)\)</span> 指向的是对数概率函数 <span class="math inline">\(\log q(x_t|x_0)\)</span> 概率密度最大的方向，它和添加的噪声相差一个负号，正好是相反的，梯度的方向是噪声的反方向，这十分符合直觉。</p>
+<div data-align="center">
+<p><img src="pic/dm/dm/2.3.jpeg" alt="使用分数作为训练数据的扩散模型" style="width: 65%;"></p>
+</div>
+<p><small><strong>图3</strong> 使用分数作为训练数据的扩散模型</small></p>
+<hr />
+<h2 id="参考">📚 参考</h2>
+<ul>
+<li>https://www.zhangzhenhu.com/aigc/%E6%89%A9%E6%95%A3%E6%A6%82%E7%8E%87%E6%A8%A1%E5%9E%8B.html</li>
+<li>Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising diffusion probabilistic models. 2020. arXiv:2006.11239.</li>
+<li>Understanding Diffusion Models: A Unified Perspective</li>
+<li>深度学习入门5：生成模型</li>
+</ul>
+</body>
+</html>

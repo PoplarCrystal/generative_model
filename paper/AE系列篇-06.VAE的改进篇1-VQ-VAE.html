@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>AE系列篇-06.VAE的改进篇1: VQ-VAE</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="ae系列篇-06.vae的改进篇1-vq-vae">AE系列篇-06.VAE的改进篇1: VQ-VAE</h1>
+<p>标准 VAE 使用连续潜在变量，其分布为高斯形式，对离散的、多模态的数据结构表达有限。VQ-VAE（Vector Quantized Variational Autoencoder）通过向量量化将连续潜在变量离散化，在保持 VAE 表达能力的同时获得离散表示的优势，并为 VQ-VAE-2、DALL-E 等自回归生成模型奠定基础。本章将介绍 VQ-VAE 的动机、理论、损失设计与代码实现。</p>
+<hr />
+<h2 id="vq-vae-的动机">1. VQ-VAE 的动机</h2>
+<h3 id="回顾原始-vae-的局限">1.1 回顾:原始 VAE 的局限</h3>
+<p>标准 VAE 使用<strong>连续</strong>隐变量 <span class="math inline">\(z \in \mathbb{R}^d\)</span>，例如 <span class="math inline">\(z \sim \mathcal{N}(\mu_\phi(x), \Sigma_\phi(x))\)</span>。</p>
+<ul>
+<li><strong>优点</strong>:可微、易于优化（重参数化技巧），适合密度估计与平滑插值。</li>
+<li><strong>缺点</strong>:隐空间是稠密且无结构的，难以自然表示<strong>离散、符号化或高度多模态</strong>的数据。</li>
+</ul>
+<p>数学上仍写作:</p>
+<p><span class="math display">\[q_\phi(z|x) = \mathcal{N}(z | \mu_\phi(x), \Sigma_\phi(x)) \tag{1}\]</span></p>
+<p>具体局限包括:（1）连续潜在空间难以表达离散、多模态结构；（2）语言、类别等符号数据缺乏天然的连续表示；（3）连续表示的信息容量无界，不利于学习紧凑、有界的离散码。</p>
+<h3 id="为什么需要离散隐变量">1.2 为什么需要离散隐变量？</h3>
+<p>离散表示在许多场景中更自然、更有效:</p>
+<table>
+<thead>
+<tr class="header">
+<th>应用场景</th>
+<th>离散性的必要性</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>多模态分布建模</strong></td>
+<td>一个输入可能对应多个合理输出（如“下雨”→“带伞”或“取消出行”），连续隐变量难以捕捉这种跳跃性</td>
+</tr>
+<tr class="even">
+<td><strong>分类属性</strong></td>
+<td>社保号、邮政编码等:数字本身无序，不能用连续值插值</td>
+</tr>
+<tr class="odd">
+<td><strong>符号系统</strong></td>
+<td>语言（词/子词）、语音（音素）、规划（动作序列）——本质是离散符号</td>
+</tr>
+</tbody>
+</table>
+<p><strong>离散隐变量 = 符号化表示（symbolic representation）</strong>，更接近人类认知和传统 AI 的“符号主义”，也为与自回归模型、Transformer 等结合铺平道路。</p>
+<h3 id="离散-vae-的核心挑战">1.3 离散 VAE 的核心挑战</h3>
+<p>我们仍希望最大化 ELBO:</p>
+<p><span class="math display">\[\text{ELBO} = \underbrace{\mathbb{E}_{q_\phi(z|x)}[\log p_\theta(x|z)]}_{\text{重构损失}} - \underbrace{\text{KL}(q_\phi(z|x) \| p(z))}_{\text{正则化损失}} \tag{2}\]</span></p>
+<div data-align="center">
+<p><img src="pic/ae/vq_vae/6.1.jpeg" alt="VAE离散化的结构图" style="width: 70%;"></p>
+</div>
+<p><small><strong>图1</strong> VAE 离散化的结构图。</small></p>
+<ul>
+<li><strong>重构损失</strong>:只要能从 <span class="math inline">\(z\)</span> 解码出 <span class="math inline">\(\hat{x}\)</span>，就可以计算（如 L2、交叉熵），离散 <span class="math inline">\(z\)</span> 下没问题。</li>
+<li><strong>正则化损失</strong>:对离散 <span class="math inline">\(z\)</span> 也可定义（如分类 KL）。</li>
+</ul>
+<div data-align="center">
+<p><img src="pic/ae/vq_vae/6.2.jpeg" alt="离散VAE的重构损失" style="width: 70%;"></p>
+</div>
+<p><small><strong>图2</strong> 离散 VAE 的重构损失。</small></p>
+<div data-align="center">
+<p><img src="pic/ae/vq_vae/6.3.jpeg" alt="离散VAE的正则化损失" style="width: 70%;"></p>
+</div>
+<p><small><strong>图3</strong> 离散 VAE 的正则化损失。</small></p>
+<p><strong>关键问题</strong>:若 <span class="math inline">\(z\)</span> 是离散的（如 one-hot 或 <span class="math inline">\(\arg\max\)</span> 得到的索引），采样过程不可导，梯度无法从解码器流回编码器，无法端到端训练。因此需要<strong>可微的离散近似</strong>或<strong>梯度代理</strong>。</p>
+<h3 id="启发从-k-means-到可学习码本">1.4 启发:从 K-means 到可学习码本</h3>
+<p>K-means 虽简单，但提供了重要启示:</p>
+<div data-align="center">
+<p><img src="pic/ae/vq_vae/6.4.jpeg" alt="K-means作为AE的结构图" style="width: 70%;"></p>
+</div>
+<p><small><strong>图4</strong> K-means 作为自编码的结构图。</small></p>
+<ul>
+<li><strong>自编码视角</strong>:编码 <span class="math inline">\(x \to \text{最近簇索引 } k\)</span>，解码 <span class="math inline">\(k \to \mu_k\)</span>（码本中心）。</li>
+<li><strong>明确的重构目标</strong>:最小化 <span class="math inline">\(\|x - \mu_k\|^2\)</span>。</li>
+<li><strong>隐式鼓励码本均匀使用</strong>:每个中心由其分配到的点更新，避免塌缩。</li>
+</ul>
+<p>这启发我们:可以用类似“硬分配 + 码本更新”的方式处理离散隐变量，并用<strong>直通估计器</strong>解决不可微问题，从而得到可端到端训练的离散 VAE——即 VQ-VAE。</p>
+<h3 id="vq-vae-的改进目标">1.5 VQ-VAE 的改进目标</h3>
+<p>VQ-VAE 旨在:</p>
+<ul>
+<li><strong>离散潜在表示</strong>:用 codebook 将编码器输出量化为离散索引，得到离散潜在变量。</li>
+<li><strong>保留表达能力</strong>:编码器-解码器仍为连续映射，量化仅在中间一步完成。</li>
+<li><strong>可扩展生成</strong>:离散码可交由自回归模型（如 PixelCNN、Transformer）建模，用于高质量生成。</li>
+</ul>
+<div data-align="center">
+<p><img src="pic/ae/vq_vae/6.5.jpeg" alt="VQ-VAE架构图" style="width: 65%;"></p>
+</div>
+<p><small><strong>图5</strong> VQ-VAE 架构图:输入经编码器得到连续表示 <span class="math inline">\(z_e\)</span>，经向量量化得到离散码 <span class="math inline">\(z_q\)</span>（对应 codebook 中的向量），再经解码器重构。量化通过最近邻查找实现，训练时用直通估计器保证梯度可传。</small></p>
+<hr />
+<h2 id="vq-vae-的理论基础">2. VQ-VAE 的理论基础</h2>
+<h3 id="整体结构">2.1 整体结构</h3>
+<p>数据流为:</p>
+<p><span class="math display">\[x \xrightarrow{\text{编码器 } E_\phi} z_e \xrightarrow{\text{向量量化 } Q} z_q \xrightarrow{\text{解码器 } D_\theta} \hat{x} \tag{3}\]</span></p>
+<p><strong>组件说明</strong>:</p>
+<ul>
+<li><strong>编码器</strong> <span class="math inline">\(E_\phi\)</span>:<span class="math inline">\(x \to z_e\)</span>，将输入映射到连续潜在空间 <span class="math inline">\(\mathbb{R}^d\)</span>。</li>
+<li><strong>Codebook</strong> <span class="math inline">\(\mathcal{E} = \{e_1, e_2, \ldots, e_K\}\)</span>:<span class="math inline">\(K\)</span> 个可学习的 <span class="math inline">\(d\)</span> 维向量。</li>
+<li><strong>向量量化</strong> <span class="math inline">\(Q\)</span>:<span class="math inline">\(z_e \to z_q\)</span>，将 <span class="math inline">\(z_e\)</span> 映射到最近的 codebook 向量。</li>
+<li><strong>解码器</strong> <span class="math inline">\(D_\theta\)</span>:<span class="math inline">\(z_q \to \hat{x}\)</span>，从量化向量重构输入。</li>
+</ul>
+<h3 id="数学表示">2.2 数学表示</h3>
+<p><strong>编码</strong>:</p>
+<p><span class="math display">\[z_e = E_\phi(x) \in \mathbb{R}^d \tag{4}\]</span></p>
+<p><strong>量化（最近邻）</strong>:</p>
+<p><span class="math display">\[k = \arg\min_{j \in \{1,\ldots,K\}} \|z_e - e_j\|^2, \qquad z_q = e_k \tag{5}\]</span></p>
+<p><strong>解码</strong>:</p>
+<p><span class="math display">\[\hat{x} = D_\theta(z_q) \tag{6}\]</span></p>
+<p>距离采用欧氏距离的平方:<span class="math inline">\(\|z_e - e_j\|^2 = (z_e - e_j)^T(z_e - e_j)\)</span>，实现时可利用展开形式或预计算 <span class="math inline">\(e_j^T e_j\)</span> 以加速。</p>
+<h3 id="损失函数">2.3 损失函数</h3>
+<p>总损失由三部分组成:</p>
+<p><span class="math display">\[\mathcal{L}_{total} = \mathcal{L}_{recon} + \mathcal{L}_{codebook} + \beta\,\mathcal{L}_{commitment} \tag{7}\]</span></p>
+<p><strong>重构损失</strong>:衡量解码器重构质量。</p>
+<p><span class="math display">\[\mathcal{L}_{recon} = \|x - D_\theta(z_q)\|^2 = \|x - \hat{x}\|^2 \tag{8}\]</span></p>
+<div data-align="center">
+<p><img src="pic/ae/vq_vae/6.6.jpeg" alt="VQ-VAE的重构损失" style="width: 70%;"></p>
+</div>
+<p><small><strong>图6</strong> VQ-VAE 的重构损失。</small></p>
+<p><strong>Codebook 损失（Embedding 损失）</strong>:把被选中的 codebook 向量 <span class="math inline">\(e_k\)</span> 拉向编码器输出 <span class="math inline">\(z_e\)</span>（更新 codebook）。</p>
+<p><span class="math display">\[\mathcal{L}_{codebook} = \|z_e - \text{sg}(z_q)\|^2 \tag{9}\]</span></p>
+<p>其中 <span class="math inline">\(\text{sg}(\cdot)\)</span> 表示停止梯度。梯度只更新 <span class="math inline">\(e_k\)</span>，不经过 <span class="math inline">\(z_e\)</span>。</p>
+<p><strong>Commitment 损失</strong>:把编码器输出 <span class="math inline">\(z_e\)</span> 拉向量化结果 <span class="math inline">\(z_q\)</span>，避免编码器输出在 codebook 之间剧烈抖动。</p>
+<p><span class="math display">\[\mathcal{L}_{commitment} = \|\text{sg}(z_q) - z_e\|^2 \tag{10}\]</span></p>
+<p><span class="math inline">\(\beta\)</span> 为 commitment 权重。</p>
+<div data-align="center">
+<p><img src="pic/ae/vq_vae/6.7.jpg" alt="VAE正则化损失到VQ-VAE的Codebook与Commitment损失" style="width: 70%;"></p>
+</div>
+<p><small><strong>图7</strong> 从 VAE 的正则化损失到 VQ-VAE 的 Codebook 损失与 Commitment 损失。</small></p>
+<p><strong>直观理解</strong>:VQ-VAE 的损失设计本质上是<strong>可微分的 K-means</strong>——编码器和解码器是深度网络，码本通过“把 <span class="math inline">\(e_k\)</span> 拉向 <span class="math inline">\(z_e\)</span>”（codebook 损失）和“把 <span class="math inline">\(z_e\)</span> 拉向 <span class="math inline">\(z_q\)</span>”（commitment 损失）类似 K-means 的方式更新。</p>
+<p><strong>梯度流向</strong>:</p>
+<ul>
+<li>解码器:只受 <span class="math inline">\(\mathcal{L}_{recon}\)</span> 影响</li>
+<li>编码器:受 <span class="math inline">\(\mathcal{L}_{recon}\)</span>（经直通）和 <span class="math inline">\(\beta\,\mathcal{L}_{commitment}\)</span> 影响</li>
+<li>Codebook:只受 <span class="math inline">\(\mathcal{L}_{codebook}\)</span> 影响</li>
+</ul>
+<h3 id="直通估计器straight-through-estimator">2.4 直通估计器（Straight-Through Estimator）</h3>
+<p>量化 <span class="math inline">\(Q(z_e)=e_k\)</span> 不可微（<span class="math inline">\(\arg\min\)</span> 为离散操作），无法直接对 <span class="math inline">\(z_e\)</span> 反传梯度。</p>
+<p><strong>一般形式</strong>（用于近似离散采样的梯度）:前向使用 <strong>hardmax</strong>（<span class="math inline">\(\arg\max\)</span> + one-hot）得到离散 <span class="math inline">\(z\)</span>，反向时<strong>假装</strong>前向用的是 softmax，用 softmax 的梯度回传。实现技巧（PyTorch 风格）:令 <span class="math inline">\(y = \text{encoder}(x)\)</span>（logits），<span class="math inline">\(z_{\text{hard}} = \text{hardmax}(y)\)</span>，<span class="math inline">\(z_{\text{soft}} = \text{softmax}(y)\)</span>，则 <span class="math display">\[z = z_{\text{hard}} - z_{\text{soft}}.detach() + z_{\text{soft}} \tag{11}\]</span> 前向取值等于 <span class="math inline">\(z_{\text{hard}}\)</span>，反向梯度等于对 <span class="math inline">\(z_{\text{soft}}\)</span> 的梯度。这是一种<strong>梯度代理（gradient surrogate）</strong>，虽无严格理论保证，但在实践中有效（Gumbel-Softmax 等也基于类似思想）。</p>
+<div data-align="center">
+<p><img src="pic/ae/vq_vae/6.8.png" alt="梯度代理结构图" style="width: 75%;"></p>
+</div>
+<p><small><strong>图8</strong> 梯度代理（直通估计器一般形式）:前向使用 hardmax 得到离散 <span class="math inline">\(z_{\text{hard}}\)</span>，反向用 softmax 的梯度回传；通过 <span class="math inline">\(z = z_{\text{hard}} - z_{\text{soft}}.detach() + z_{\text{soft}}\)</span> 实现前向离散、反向可微。</small></p>
+<p><strong>VQ-VAE 中的直通</strong>:前向使用量化结果 <span class="math inline">\(z_q\)</span>，反传时把损失对 <span class="math inline">\(z_q\)</span> 的梯度原样传给 <span class="math inline">\(z_e\)</span>。实现可写为:</p>
+<p><span class="math display">\[z_q^{ST} = z_e + (z_q - \text{sg}(z_e)) \tag{12}\]</span></p>
+<p>前向:<span class="math inline">\(z_q^{ST}\)</span> 的取值等于 <span class="math inline">\(z_q\)</span>；反向:<span class="math inline">\(\frac{\partial z_q^{ST}}{\partial z_e} = I\)</span>，因此 <span class="math inline">\(\frac{\partial \mathcal{L}}{\partial z_e} = \frac{\partial \mathcal{L}}{\partial z_q^{ST}}\)</span>，解码器传来的梯度得以穿过量化层更新编码器。</p>
+<div data-align="center">
+<p><img src="pic/ae/vq_vae/6.9.png" alt="VQ-VAE直通估计器" style="width: 75%;"></p>
+</div>
+<p><small><strong>图9</strong> VQ-VAE 的直通:编码器输出 <span class="math inline">\(z_e\)</span> 经向量量化得 <span class="math inline">\(z_q\)</span>；解码器输入为 <span class="math inline">\(z_e + (z_q - z_e).detach()\)</span>，前向取值 <span class="math inline">\(z_q\)</span>、反向梯度传给 <span class="math inline">\(z_e\)</span>，使量化层可端到端训练。</small></p>
+<hr />
+<h2 id="空间分词器与两阶段生成">3. 空间分词器与两阶段生成</h2>
+<h3 id="为何需要多-token单离散码的局限">3.1 为何需要多 token:单离散码的局限</h3>
+<p>整图仅用一个离散 token（如全局 K-means 的簇索引）时，表达能力不足，无法刻画内部结构与空间布局。故需<strong>多 token、空间化</strong>的离散表示。</p>
+<h3 id="空间分词器spatial-tokenizer">3.2 空间分词器（Spatial Tokenizer）</h3>
+<div data-align="center">
+<p><img src="pic/ae/vq_vae/6.10.jpeg" alt="VQ-VAE as Tokenizer" style="width: 70%;"></p>
+</div>
+<p><small><strong>图10</strong> VQ-VAE 作为分词器:图像 → 特征图 → 逐位置量化 → 离散 token 序列 → 解码重建。</small></p>
+<p>编码器输出特征图 <span class="math inline">\(H \times W \times D\)</span>，对每个位置 <span class="math inline">\((i,j)\)</span> 独立做向量量化，得到 <span class="math inline">\(H \times W\)</span> 个离散 token；解码器（ConvNet 或 Transformer）从该 token 网格重建图像。例如:<span class="math inline">\(16\times 16\)</span> 网格、码本大小 512，即 256 个 token 表示一图。</p>
+<h3 id="先验的局限i.i.d.-与真实相关性的矛盾">3.3 先验的局限:i.i.d. 与真实相关性的矛盾</h3>
+<p>空间隐表示（spatial latents）下，若假设先验为 i.i.d.，则与真实 token 的强空间/序列相关性不符，直接从前验采样难以得到可用样本:</p>
+<table>
+<thead>
+<tr class="header">
+<th>问题</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>先验 <span class="math inline">\(p(z)\)</span> 常取为 i.i.d.</strong></td>
+<td>如 <span class="math inline">\(z_{ij} \sim \text{Categorical}(1/K)\)</span>，位置间独立</td>
+</tr>
+<tr class="even">
+<td><strong>真实 token 高度相关</strong></td>
+<td>相邻 patch、词序等具有强依赖</td>
+</tr>
+<tr class="odd">
+<td><strong>i.i.d. 采样质量差</strong></td>
+<td>得到杂乱无章的图像</td>
+</tr>
+</tbody>
+</table>
+<h3 id="两阶段生成范式">3.4 两阶段生成范式</h3>
+<p><strong>做法</strong>:先训练 VQ-VAE 作为<strong>分词器</strong>；再在离散空间上用自回归模型（PixelCNN、Transformer）或扩散模型学习 <span class="math inline">\(p(z_1, \ldots, z_N)\)</span>。生成时先采样得到结构化 token 序列，再经 VQ-VAE 解码器得到图像。即 <strong>VQ-VAE-2</strong>（VQ-VAE + PixelCNN）、<strong>VQ-GAN</strong> 等两阶段生成的基本范式。</p>
+<hr />
+<h2 id="代码实现">4. 代码实现</h2>
+<p>本节基于项目 <code>code/dl/ae/vq_vae/</code> 说明关键模块。<strong>训练流程</strong>:<span class="math inline">\(x\)</span> → 编码得 <span class="math inline">\(z_e\)</span> → 最近邻得 <span class="math inline">\(z_q\)</span> → 直通得 <span class="math inline">\(z_q^{ST}\)</span> → 解码得 <span class="math inline">\(\hat{x}\)</span> → 计算三项损失并反传，更新 <span class="math inline">\(E_\phi\)</span>、<span class="math inline">\(D_\theta\)</span> 与 codebook。<strong>生成</strong>:可均匀采样 codebook 索引再解码；实际多在此离散空间上另训自回归模型（如 PixelCNN）建模 <span class="math inline">\(p(z)\)</span> 后采样解码。</p>
+<h3 id="模型结构vqvae-类">4.1 模型结构:VQVAE 类</h3>
+<p>Encoder:卷积下采样 + 残差块；Codebook:<code>nn.Embedding(n_embedding, dim)</code>；Decoder:转置卷积上采样。以 MNIST 为例:28×28 → 14×14 → 7×7，再解码回 28×28。</p>
+<div data-align="center">
+<p><img src="pic/ae/vq_vae/6.11.png" alt="VQ-VAE 网络框架" style="width: 75%;"></p>
+</div>
+<p><small><strong>图11</strong> VQ-VAE 代码实现的网络框架:Encoder → <span class="math inline">\(z_e\)</span> → VQ（最近邻 + 直通）→ Decoder → <span class="math inline">\(\hat{x}\)</span>。</small></p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="kw">class</span> VQVAE(nn.Module):</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;VQ-VAE 模型（CNN 架构）&quot;&quot;&quot;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, input_dim, dim, n_embedding):</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>        <span class="co"># Encoder: 卷积下采样</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>        <span class="va">self</span>.encoder <span class="op">=</span> nn.Sequential(</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>            nn.Conv2d(input_dim, dim, <span class="dv">4</span>, <span class="dv">2</span>, <span class="dv">1</span>),   <span class="co"># 28x28 -&gt; 14x14</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>            nn.ReLU(),</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>            nn.Conv2d(dim, dim, <span class="dv">4</span>, <span class="dv">2</span>, <span class="dv">1</span>),        <span class="co"># 14x14 -&gt; 7x7</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>            nn.ReLU(),</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>            nn.Conv2d(dim, dim, <span class="dv">3</span>, <span class="dv">1</span>, <span class="dv">1</span>),</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a>            ResidualBlock(dim),</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a>            ResidualBlock(dim)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true"></a>        )</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true"></a>        <span class="co"># Codebook:可学习的嵌入表</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true"></a>        <span class="va">self</span>.vq_embedding <span class="op">=</span> nn.Embedding(n_embedding, dim)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true"></a>        <span class="va">self</span>.vq_embedding.weight.data.uniform_(<span class="op">-</span><span class="fl">1.0</span> <span class="op">/</span> n_embedding, <span class="fl">1.0</span> <span class="op">/</span> n_embedding)</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true"></a>        <span class="co"># Decoder: 转置卷积上采样</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true"></a>        <span class="va">self</span>.decoder <span class="op">=</span> nn.Sequential(</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true"></a>            nn.Conv2d(dim, dim, <span class="dv">3</span>, <span class="dv">1</span>, <span class="dv">1</span>),</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true"></a>            ResidualBlock(dim),</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true"></a>            ResidualBlock(dim),</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true"></a>            nn.ConvTranspose2d(dim, dim, <span class="dv">4</span>, <span class="dv">2</span>, <span class="dv">1</span>),   <span class="co"># 7x7 -&gt; 14x14</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true"></a>            nn.ReLU(),</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true"></a>            nn.ConvTranspose2d(dim, input_dim, <span class="dv">4</span>, <span class="dv">2</span>, <span class="dv">1</span>)  <span class="co"># 14x14 -&gt; 28x28</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true"></a>        )</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true"></a>        <span class="va">self</span>.n_downsample <span class="op">=</span> <span class="dv">2</span></span></code></pre></div>
+<h3 id="前向传播量化与直通">4.2 前向传播:量化与直通</h3>
+<p><code>forward</code>:编码 → 最近邻量化得 <span class="math inline">\(z_q\)</span> → 直通 <code>ze + (zq - ze).detach()</code> → 解码。</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="kw">def</span> forward(<span class="va">self</span>, x):</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>    <span class="co"># 编码: x -&gt; z_e</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>    ze <span class="op">=</span> <span class="va">self</span>.encoder(x)  <span class="co"># (N, C, H, W)</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>    <span class="co"># 向量量化:最近邻查找</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a>    embedding <span class="op">=</span> <span class="va">self</span>.vq_embedding.weight.data   <span class="co"># (K, C)</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>    N, C, H, W <span class="op">=</span> ze.shape</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a>    K, _ <span class="op">=</span> embedding.shape</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a>    embedding_broadcast <span class="op">=</span> embedding.reshape(<span class="dv">1</span>, K, C, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a>    ze_broadcast <span class="op">=</span> ze.reshape(N, <span class="dv">1</span>, C, H, W)</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a>    distance <span class="op">=</span> torch.<span class="bu">sum</span>((embedding_broadcast <span class="op">-</span> ze_broadcast) <span class="op">**</span> <span class="dv">2</span>, <span class="dv">2</span>)</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true"></a>    nearest_neighbor <span class="op">=</span> torch.argmin(distance, <span class="dv">1</span>)  <span class="co"># (N, H, W)</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true"></a></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true"></a>    <span class="co"># zq: (N, C, H, W)</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true"></a>    zq <span class="op">=</span> <span class="va">self</span>.vq_embedding(nearest_neighbor).permute(<span class="dv">0</span>, <span class="dv">3</span>, <span class="dv">1</span>, <span class="dv">2</span>)</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true"></a></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true"></a>    <span class="co"># 直通估计器:前向用 zq，反向梯度传给 ze</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true"></a>    decoder_input <span class="op">=</span> ze <span class="op">+</span> (zq <span class="op">-</span> ze).detach()</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true"></a></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true"></a>    x_hat <span class="op">=</span> <span class="va">self</span>.decoder(decoder_input)</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true"></a>    <span class="cf">return</span> x_hat, ze, zq</span></code></pre></div>
+<p>即 <span class="math inline">\(z_q^{ST} = z_e + (z_q - \text{sg}(z_e))\)</span>，解码器输入为 <code>decoder_input</code>。</p>
+<h3 id="损失函数-1">4.3 损失函数</h3>
+<p>重构:MSE(<span class="math inline">\(\hat{x}\)</span>, <span class="math inline">\(x\)</span>)。Codebook 损失:MSE(<code>ze.detach()</code>, <code>zq</code>)（仅更新 codebook）。Commitment 损失:MSE(<code>ze</code>, <code>zq.detach()</code>)（仅更新编码器）。权重 <span class="math inline">\(\beta=0.25\)</span>。</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="kw">def</span> loss_function(x_hat, x, ze, zq, embedding_loss_weight<span class="op">=</span><span class="fl">1.0</span>, commitment_loss_weight<span class="op">=</span><span class="fl">0.25</span>):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>    recon_loss <span class="op">=</span> F.mse_loss(x_hat, x)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>    <span class="co"># 将 codebook 向量拉向 ze</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a>    embedding_loss <span class="op">=</span> F.mse_loss(ze.detach(), zq)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a>    <span class="co"># 将 ze 拉向 codebook 向量</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a>    commit_loss <span class="op">=</span> F.mse_loss(ze, zq.detach())</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true"></a>    total_loss <span class="op">=</span> recon_loss <span class="op">+</span> embedding_loss_weight <span class="op">*</span> embedding_loss <span class="op">+</span> commitment_loss_weight <span class="op">*</span> commit_loss</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true"></a>    <span class="cf">return</span> total_loss, recon_loss, embedding_loss, commit_loss</span></code></pre></div>
+<h3 id="编码与解码接口推理">4.4 编码与解码接口（推理）</h3>
+<p><code>encode(x)</code>:返回 codebook 索引 <code>(N, H, W)</code>，供自回归等使用。<code>decode(indices)</code>:由索引查 codebook 再解码为图像。二者均用 <code>@torch.no_grad()</code>。</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a><span class="at">@torch.no_grad</span>()</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a><span class="kw">def</span> encode(<span class="va">self</span>, x):</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;编码为 codebook 索引 (N, H, W)，供自回归模型等使用&quot;&quot;&quot;</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a>    ze <span class="op">=</span> <span class="va">self</span>.encoder(x)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a>    <span class="co"># 与 forward 中相同的最近邻查找</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a>    embedding <span class="op">=</span> <span class="va">self</span>.vq_embedding.weight.data</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a>    N, C, H, W <span class="op">=</span> ze.shape</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a>    K, _ <span class="op">=</span> embedding.shape</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a>    embedding_broadcast <span class="op">=</span> embedding.reshape(<span class="dv">1</span>, K, C, <span class="dv">1</span>, <span class="dv">1</span>)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true"></a>    ze_broadcast <span class="op">=</span> ze.reshape(N, <span class="dv">1</span>, C, H, W)</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true"></a>    distance <span class="op">=</span> torch.<span class="bu">sum</span>((embedding_broadcast <span class="op">-</span> ze_broadcast) <span class="op">**</span> <span class="dv">2</span>, <span class="dv">2</span>)</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true"></a>    nearest_neighbor <span class="op">=</span> torch.argmin(distance, <span class="dv">1</span>)</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true"></a>    <span class="cf">return</span> nearest_neighbor</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true"></a></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true"></a><span class="at">@torch.no_grad</span>()</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true"></a><span class="kw">def</span> decode(<span class="va">self</span>, discrete_latent):</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;从索引 (N, H, W) 解码为图像&quot;&quot;&quot;</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true"></a>    zq <span class="op">=</span> <span class="va">self</span>.vq_embedding(discrete_latent).permute(<span class="dv">0</span>, <span class="dv">3</span>, <span class="dv">1</span>, <span class="dv">2</span>)</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true"></a>    <span class="cf">return</span> <span class="va">self</span>.decoder(zq)</span></code></pre></div>
+<h3 id="训练循环与配置">4.5 训练循环与配置</h3>
+<p>每 batch:<code>x_hat, ze, zq = model(x)</code> → <code>loss_function(...)</code> → <code>loss.backward()</code> → <code>optimizer.step()</code>。配置示例:<code>input_dim=1</code>，<code>dim=64</code>，<code>n_embedding=32</code>，<code>commitment_loss_weight=0.25</code>。</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a><span class="cf">for</span> x, label <span class="kw">in</span> train_loader:</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a>    x <span class="op">=</span> x.to(device)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true"></a>    x_hat, ze, zq <span class="op">=</span> model(x)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true"></a>    loss, recon_loss, embedding_loss, commit_loss <span class="op">=</span> loss_function(</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true"></a>        x_hat, x, ze, zq, embedding_loss_weight, commitment_loss_weight)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true"></a>    optimizer.zero_grad()</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true"></a>    loss.backward()</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true"></a>    optimizer.step()</span></code></pre></div>
+<h3 id="推理重构与生成">4.6 推理:重构与生成</h3>
+<p><strong>重构</strong>:<code>x_hat, ze, zq = model(x)</code>，对比 <span class="math inline">\(x\)</span> 与 <span class="math inline">\(\hat{x}\)</span>。<strong>从 codebook 生成</strong>:<code>indices = model.encode(x)</code> → <code>model.decode(indices)</code> 可视化解码；若要从先验生成，需在离散空间上另训 PixelCNN 等（见 <code>train_pixelcnn.py</code>、<code>gen_with_pixelcnn.py</code>）。</p>
+<hr />
+<h2 id="结果">5. 结果</h2>
+<h3 id="推理1重建能力reconstruction">5.1 推理1:重建能力（Reconstruction）</h3>
+<p>从测试集取样本，经 VQ-VAE 编码→量化→解码，得到重构图像:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true"></a><span class="co"># 推理1 - 重建</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true"></a>model.<span class="bu">eval</span>()</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true"></a><span class="cf">with</span> torch.no_grad():</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true"></a>    x, _ <span class="op">=</span> <span class="bu">next</span>(<span class="bu">iter</span>(test_loader))</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true"></a>    x_test <span class="op">=</span> x[:sample_size].to(device)</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true"></a>    x_hat, ze, zq <span class="op">=</span> model(x_test)</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true"></a>    original_images <span class="op">=</span> x_test.cpu()</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true"></a>    reconstructed_images <span class="op">=</span> x_hat.cpu()</span></code></pre></div>
+<p><strong>说明</strong>:输入 <span class="math inline">\(x\)</span> 经编码得 <span class="math inline">\(z_e\)</span>，向量量化得 <span class="math inline">\(z_q\)</span>，解码得 <span class="math inline">\(\hat{x}\)</span>。对比原图与重构图可评估离散 codebook 对信息的保留程度。</p>
+<div data-align="center">
+<p><img src="pic/ae/vq_vae/6.12.png" alt="VQ-VAE重建" style="width: 70%;"></p>
+</div>
+<p><small><strong>图12</strong> VQ-VAE 的重建能力:左列为原始图像，右列为重构图像。</small></p>
+<h3 id="推理2生成能力pixelcnn-vq-vae">5.2 推理2:生成能力（PixelCNN + VQ-VAE）</h3>
+<p>若仅从 codebook 均匀采样 token 再解码，生成质量差（i.i.d. 先验与真实 token 相关性不符）。<strong>两阶段生成</strong>:先在离散空间上训练 PixelCNN 建模 <span class="math inline">\(p(z_{1:N})\)</span>，再从中采样 token 序列，经 VQ-VAE 解码器得到图像:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true"></a><span class="co"># 推理2 - 生成（需先训练 PixelCNN 先验）</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true"></a>model.<span class="bu">eval</span>()</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true"></a><span class="cf">with</span> torch.no_grad():</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true"></a>    <span class="co"># 从 PixelCNN 采样离散 token 序列 (N, H, W)</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true"></a>    indices <span class="op">=</span> pixelcnn_model.sample(batch_size, shape<span class="op">=</span>(h, w))</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true"></a>    generated_images <span class="op">=</span> model.decode(indices).cpu()</span></code></pre></div>
+<div data-align="center">
+<p><img src="pic/ae/vq_vae/6.13.png" alt="PixelCNN+VQ-VAE生成" style="width: 70%;"></p>
+</div>
+<p><small><strong>图13</strong> PixelCNN + VQ-VAE 的生成能力:从学习到的离散先验采样 token，再解码为图像。</small></p>
+<hr />
+<h2 id="总结">6. 总结</h2>
+<h3 id="vq-vae-与标准-vae-的对比">6.1 VQ-VAE 与标准 VAE 的对比</h3>
+<table>
+<colgroup>
+<col style="width: 9%" />
+<col style="width: 24%" />
+<col style="width: 66%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>特性</th>
+<th>标准 VAE</th>
+<th>VQ-VAE</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>潜在变量</td>
+<td>连续 <span class="math inline">\(z \sim q_\phi(z \mid x)\)</span></td>
+<td>离散 <span class="math inline">\(z = e_k\)</span>，<span class="math inline">\(k = \arg\min_j \lVert z_e - e_j \rVert^2\)</span></td>
+</tr>
+<tr class="even">
+<td>正则化</td>
+<td>KL 散度</td>
+<td>Codebook 损失 + Commitment 损失</td>
+</tr>
+<tr class="odd">
+<td>先验</td>
+<td><span class="math inline">\(p(z)=\mathcal{N}(0,I)\)</span></td>
+<td>训练时可视为在 codebook 上均匀；生成时常另训自回归先验</td>
+</tr>
+<tr class="even">
+<td>梯度传递</td>
+<td>重参数化</td>
+<td>直通估计器穿过量化层</td>
+</tr>
+</tbody>
+</table>
+<h3 id="要点回顾">6.2 要点回顾</h3>
+<ol type="1">
+<li><strong>架构</strong>:编码器 → 最近邻量化（codebook）→ 直通 → 解码器；损失为重构 + codebook + commitment。</li>
+<li><strong>直通估计器</strong>:量化不可微，用直通使梯度穿过量化层更新编码器（梯度代理）。</li>
+<li><strong>双损失</strong>:codebook 损失更新码本，commitment 损失约束编码器靠近码本，无需 KL 先验；本质为可微分的 K-means。</li>
+<li><strong>实用形态</strong>:空间分词器（每位置一离散 token），为两阶段生成提供离散潜像；高质量生成需在离散空间上另学 <span class="math inline">\(p(z)\)</span>（自回归或扩散），而非 i.i.d. 采样。</li>
+</ol>
+<p><strong>VQ-VAE 的真正价值</strong>在于将高维数据（图像、语音等）压缩为<strong>离散符号序列</strong>，为符号化深度学习与大规模生成模型（如 DALL·E、Stable Diffusion 的 VQ-GAN 阶段）提供基础；而非作为单独的生成模型使用。</p>
+<p><strong>复现</strong>:项目内 <code>vq_vae/vq_vae.py</code>、<code>train_infer.py</code> 及配置文件可复现训练与重构；完整生成需再训离散先验（如 PixelCNN）。</p>
+<hr />
+<h2 id="参考文献">参考文献</h2>
+<ol type="1">
+<li>van den Oord, A., Vinyals, O., &amp; Kavukcuoglu, K. (2017). Neural Discrete Representation Learning. <em>Advances in Neural Information Processing Systems</em>.</li>
+<li>Kingma, D. P., &amp; Welling, M. (2014). Auto-Encoding Variational Bayes. <em>International Conference on Learning Representations</em>.</li>
+<li>Kaiming He, Deep Generative Models.</li>
+</ol>
+</body>
+</html>

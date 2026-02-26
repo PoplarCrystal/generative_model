@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>GAN系列篇-04.CGAN代码篇: 从"无条件生成"到"条件生成"</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="gan系列篇-04.cgan代码篇-从无条件生成到条件生成">GAN系列篇-04.CGAN代码篇: 从“无条件生成”到“条件生成”</h1>
+<p>接下来我们进行CGAN的实现。CGAN在GAN的基础上引入条件变量 <span class="math inline">\(c\)</span>，实现可控的条件生成。</p>
+<hr />
+<h2 id="实现的策略">1. 实现的策略</h2>
+<p>根据理论篇的内容可知，CGAN的目标函数为:</p>
+<p><span class="math display">\[\min_G \max_D L(D, G) = \mathbb{E}_{x \sim p_{data}(x|c)} \left[ \log D(x \vert c) \right] + \mathbb{E}_{z \sim p_z(z)} \left[ \log \left(1 - D(G(z \vert c) \vert c) \right) \right] \tag{1}\]</span></p>
+<p>在实现时，我们将这个极小-极大博弈分解为两个独立的优化问题:</p>
+<h3 id="判别器的损失函数d-step">1.1 判别器的损失函数（D-step）</h3>
+<p>在固定生成器 <span class="math inline">\(G\)</span> 的情况下，判别器的目标是最大化:</p>
+<p><span class="math display">\[L(D) = \mathbb{E}_{x \sim p_{data}(x|c)}[\log D(x \vert c)] + \mathbb{E}_{z \sim p_z(z)}[\log(1 - D(G(z \vert c) \vert c))]\]</span></p>
+<p>这等价于最小化二分类交叉熵损失（BCE Loss）:</p>
+<p><span class="math display">\[\text{Loss}_D = -\frac{1}{N}\sum_{i=1}^{N}[\log D(x_i \vert c_i) + \log(1 - D(G(z_i \vert c_i) \vert c_i))]\]</span></p>
+<p>其中:</p>
+<ul>
+<li><span class="math inline">\(x_i\)</span> 是真实样本，标签为 1，条件为 <span class="math inline">\(c_i\)</span></li>
+<li><span class="math inline">\(G(z_i \vert c_i)\)</span> 是生成样本，标签为 0，条件为 <span class="math inline">\(c_i\)</span></li>
+<li><strong>关键</strong>:判别器不仅要判断样本是否真实，还要判断样本是否与条件匹配</li>
+</ul>
+<h3 id="生成器的损失函数g-step">1.2 生成器的损失函数（G-step）</h3>
+<p>在固定判别器 <span class="math inline">\(D\)</span> 的情况下，生成器的目标是让判别器把假样本误认为真样本（在给定条件下）。</p>
+<p>理论上，生成器希望最小化:</p>
+<p><span class="math display">\[\text{Loss}_G = \frac{1}{N}\sum_{i=1}^{N}\log(1 - D(G(z_i \vert c_i) \vert c_i))\]</span></p>
+<p>但这个目标在训练初期梯度会很小（因为 <span class="math inline">\(D(G(z \vert c) \vert c) \approx 0\)</span>，所以 <span class="math inline">\(\log(1 - D) \approx 0\)</span>，梯度接近 0，导致梯度消失）。</p>
+<p>因此，实践中通常将生成器的目标改为最大化:</p>
+<p><span class="math display">\[\mathbb{E}_{z \sim p_z(z)}[\log D(G(z \vert c) \vert c)]\]</span></p>
+<p>这等价于最小化:</p>
+<p><span class="math display">\[\text{Loss}_G = -\frac{1}{N}\sum_{i=1}^{N}\log D(G(z_i \vert c_i) \vert c_i)\]</span></p>
+<p>且在训练早期能提供更强的梯度。</p>
+<p>⚠️ <strong>注意</strong>:这是工程上的改进，两种形式在理论上等价，但在实际训练中，最大化 <span class="math inline">\(\log D(G(z \vert c) \vert c)\)</span> 能提供更好的梯度信号。</p>
+<h3 id="训练策略">1.3 训练策略</h3>
+<p>CGAN的训练采用交替优化的策略:</p>
+<ol type="1">
+<li><strong>训练判别器</strong>:固定生成器，更新判别器参数，使其能更好地区分真实样本和生成样本，并判断样本是否与条件匹配</li>
+<li><strong>训练生成器</strong>:固定判别器，更新生成器参数，使其能生成与条件匹配的逼真样本</li>
+</ol>
+<p>在实际实现中，通常会让判别器训练 <span class="math inline">\(k\)</span> 步（<span class="math inline">\(k \geq 1\)</span>），然后训练生成器 1 步，以保持训练的平衡。</p>
+<h3 id="条件编码">1.4 条件编码</h3>
+<p>条件变量 <span class="math inline">\(c\)</span> 需要编码成数值向量才能输入神经网络。我们使用 <strong>Embedding编码</strong>:</p>
+<ul>
+<li>方法:使用可学习的嵌入层将类别索引映射为低维向量</li>
+<li>例如:类别3 → 可学习的N维向量（默认5维）</li>
+<li>优点:维度可自定义，通常比one-hot更紧凑；可以学习到类别之间的语义关系</li>
+</ul>
+<hr />
+<h2 id="代码实现">2. 代码实现</h2>
+<h3 id="网络定义">2.1 网络定义</h3>
+<p>CGAN的网络结构包含两个独立的网络:条件生成器（ConditionalGenerator）和条件判别器（ConditionalDiscriminator）。</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="im">import</span> torch</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="im">import</span> torch.nn <span class="im">as</span> nn</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a><span class="im">import</span> torch.nn.functional <span class="im">as</span> F</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a><span class="kw">class</span> ConditionalGenerator(nn.Module):</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;条件生成器:从噪声和标签生成图像&quot;&quot;&quot;</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, noise_dim, num_labels, label_embed_dim, hidden_dim, output_dim):</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>        <span class="va">self</span>.num_labels <span class="op">=</span> num_labels</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>        <span class="va">self</span>.label_embed <span class="op">=</span> nn.Embedding(num_labels, label_embed_dim)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>        <span class="co"># 输入:噪声 + 标签嵌入</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a>        input_dim <span class="op">=</span> noise_dim <span class="op">+</span> label_embed_dim</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a>        <span class="va">self</span>.linear1 <span class="op">=</span> nn.Linear(input_dim, hidden_dim)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true"></a>        <span class="va">self</span>.bn1 <span class="op">=</span> nn.BatchNorm1d(hidden_dim)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true"></a>        <span class="va">self</span>.linear2 <span class="op">=</span> nn.Linear(hidden_dim, hidden_dim <span class="op">*</span> <span class="dv">2</span>)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true"></a>        <span class="va">self</span>.bn2 <span class="op">=</span> nn.BatchNorm1d(hidden_dim <span class="op">*</span> <span class="dv">2</span>)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true"></a>        <span class="va">self</span>.linear3 <span class="op">=</span> nn.Linear(hidden_dim <span class="op">*</span> <span class="dv">2</span>, hidden_dim <span class="op">*</span> <span class="dv">4</span>)</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true"></a>        <span class="va">self</span>.bn3 <span class="op">=</span> nn.BatchNorm1d(hidden_dim <span class="op">*</span> <span class="dv">4</span>)</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true"></a>        <span class="va">self</span>.linear4 <span class="op">=</span> nn.Linear(hidden_dim <span class="op">*</span> <span class="dv">4</span>, output_dim)</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true"></a></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, z, labels):</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true"></a>        <span class="co"># 标签嵌入</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true"></a>        label_emb <span class="op">=</span> <span class="va">self</span>.label_embed(labels)  <span class="co"># [B, label_embed_dim]</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true"></a>        <span class="co"># 拼接噪声和标签嵌入</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true"></a>        z_cond <span class="op">=</span> torch.cat([z, label_emb], dim<span class="op">=</span><span class="dv">1</span>)  <span class="co"># [B, noise_dim + label_embed_dim]</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true"></a>        h <span class="op">=</span> F.leaky_relu(<span class="va">self</span>.bn1(<span class="va">self</span>.linear1(z_cond)), <span class="fl">0.2</span>)</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true"></a>        h <span class="op">=</span> F.leaky_relu(<span class="va">self</span>.bn2(<span class="va">self</span>.linear2(h)), <span class="fl">0.2</span>)</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true"></a>        h <span class="op">=</span> F.leaky_relu(<span class="va">self</span>.bn3(<span class="va">self</span>.linear3(h)), <span class="fl">0.2</span>)</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true"></a>        x <span class="op">=</span> torch.tanh(<span class="va">self</span>.linear4(h))  <span class="co"># 输出范围 [-1, 1]</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true"></a>        <span class="cf">return</span> x</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true"></a></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true"></a><span class="kw">class</span> ConditionalDiscriminator(nn.Module):</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;条件判别器:判断输入图像和标签的组合是真实还是生成&quot;&quot;&quot;</span></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, input_dim, num_labels, label_embed_dim, hidden_dim):</span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true"></a>        <span class="va">self</span>.num_labels <span class="op">=</span> num_labels</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true"></a>        <span class="va">self</span>.label_embed <span class="op">=</span> nn.Embedding(num_labels, label_embed_dim)</span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true"></a>        <span class="co"># 输入:图像 + 标签嵌入</span></span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true"></a>        cond_input_dim <span class="op">=</span> input_dim <span class="op">+</span> label_embed_dim</span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true"></a>        <span class="va">self</span>.linear1 <span class="op">=</span> nn.Linear(cond_input_dim, hidden_dim <span class="op">*</span> <span class="dv">4</span>)</span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true"></a>        <span class="va">self</span>.dropout1 <span class="op">=</span> nn.Dropout(<span class="fl">0.3</span>)</span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true"></a>        <span class="va">self</span>.linear2 <span class="op">=</span> nn.Linear(hidden_dim <span class="op">*</span> <span class="dv">4</span>, hidden_dim <span class="op">*</span> <span class="dv">2</span>)</span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true"></a>        <span class="va">self</span>.dropout2 <span class="op">=</span> nn.Dropout(<span class="fl">0.3</span>)</span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true"></a>        <span class="va">self</span>.linear3 <span class="op">=</span> nn.Linear(hidden_dim <span class="op">*</span> <span class="dv">2</span>, hidden_dim)</span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true"></a>        <span class="va">self</span>.dropout3 <span class="op">=</span> nn.Dropout(<span class="fl">0.3</span>)</span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true"></a>        <span class="va">self</span>.linear4 <span class="op">=</span> nn.Linear(hidden_dim, <span class="dv">1</span>)</span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true"></a></span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, x, labels):</span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true"></a>        <span class="co"># 标签嵌入</span></span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true"></a>        label_emb <span class="op">=</span> <span class="va">self</span>.label_embed(labels)  <span class="co"># [B, label_embed_dim]</span></span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true"></a>        <span class="co"># 拼接图像和标签嵌入</span></span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true"></a>        x_cond <span class="op">=</span> torch.cat([x, label_emb], dim<span class="op">=</span><span class="dv">1</span>)  <span class="co"># [B, input_dim + label_embed_dim]</span></span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true"></a>        h <span class="op">=</span> <span class="va">self</span>.dropout1(F.leaky_relu(<span class="va">self</span>.linear1(x_cond), <span class="fl">0.2</span>))</span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true"></a>        h <span class="op">=</span> <span class="va">self</span>.dropout2(F.leaky_relu(<span class="va">self</span>.linear2(h), <span class="fl">0.2</span>))</span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true"></a>        h <span class="op">=</span> <span class="va">self</span>.dropout3(F.leaky_relu(<span class="va">self</span>.linear3(h), <span class="fl">0.2</span>))</span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true"></a>        out <span class="op">=</span> torch.sigmoid(<span class="va">self</span>.linear4(h))</span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true"></a>        <span class="cf">return</span> out</span></code></pre></div>
+<h3 id="conditionalgenerator类的实现">2.1.1 ConditionalGenerator类的实现</h3>
+<p><strong>ConditionalGenerator类</strong>是一个多层全连接网络，将噪声向量 <span class="math inline">\(z\)</span> 和条件标签 <span class="math inline">\(c\)</span> 映射为图像。前向传播的计算过程如下:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="kw">def</span> forward(<span class="va">self</span>, z, labels):</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>    <span class="co"># 1. 标签嵌入:将类别索引转换为嵌入向量</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>    label_emb <span class="op">=</span> <span class="va">self</span>.label_embed(labels)  <span class="co"># [B, label_embed_dim]</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>    </span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>    <span class="co"># 2. 拼接噪声和标签嵌入</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a>    z_cond <span class="op">=</span> torch.cat([z, label_emb], dim<span class="op">=</span><span class="dv">1</span>)  <span class="co"># [B, noise_dim + label_embed_dim]</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>    </span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a>    <span class="co"># 3. 前向传播</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a>    h <span class="op">=</span> F.leaky_relu(<span class="va">self</span>.bn1(<span class="va">self</span>.linear1(z_cond)), <span class="fl">0.2</span>)</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a>    h <span class="op">=</span> F.leaky_relu(<span class="va">self</span>.bn2(<span class="va">self</span>.linear2(h)), <span class="fl">0.2</span>)</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a>    h <span class="op">=</span> F.leaky_relu(<span class="va">self</span>.bn3(<span class="va">self</span>.linear3(h)), <span class="fl">0.2</span>)</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true"></a>    x <span class="op">=</span> torch.tanh(<span class="va">self</span>.linear4(h))  <span class="co"># 输出范围 [-1, 1]</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true"></a>    <span class="cf">return</span> x</span></code></pre></div>
+<p><strong>关键设计点</strong>:</p>
+<ol type="1">
+<li><strong>Embedding编码</strong>:使用 <code>nn.Embedding</code> 将类别标签映射为可学习的嵌入向量</li>
+<li><strong>条件拼接</strong>:将噪声 <span class="math inline">\(z\)</span> 和标签嵌入 <span class="math inline">\(c\)</span> 拼接后输入网络</li>
+<li><strong>Batch Normalization</strong>:在生成器的每一层（除了输出层）使用批归一化，有助于稳定训练</li>
+<li><strong>LeakyReLU</strong>:使用 LeakyReLU（负斜率 0.2）代替 ReLU，避免梯度消失问题</li>
+<li><strong>Tanh 输出</strong>:最后一层使用 <code>tanh</code> 激活函数，将输出限制在 <span class="math inline">\([-1, 1]\)</span> 范围内</li>
+</ol>
+<h3 id="conditionaldiscriminator类的实现">2.1.2 ConditionalDiscriminator类的实现</h3>
+<p><strong>ConditionalDiscriminator类</strong>也是一个多层全连接网络，将图像 <span class="math inline">\(x\)</span> 和条件标签 <span class="math inline">\(c\)</span> 映射为一个标量概率值。前向传播的计算过程如下:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="kw">def</span> forward(<span class="va">self</span>, x, labels):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>    <span class="co"># 1. 标签嵌入:将类别索引转换为嵌入向量</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>    label_emb <span class="op">=</span> <span class="va">self</span>.label_embed(labels)  <span class="co"># [B, label_embed_dim]</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a>    </span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a>    <span class="co"># 2. 拼接图像和标签嵌入</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a>    x_cond <span class="op">=</span> torch.cat([x, label_emb], dim<span class="op">=</span><span class="dv">1</span>)  <span class="co"># [B, input_dim + label_embed_dim]</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true"></a>    </span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true"></a>    <span class="co"># 3. 前向传播</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true"></a>    h <span class="op">=</span> <span class="va">self</span>.dropout1(F.leaky_relu(<span class="va">self</span>.linear1(x_cond), <span class="fl">0.2</span>))</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true"></a>    h <span class="op">=</span> <span class="va">self</span>.dropout2(F.leaky_relu(<span class="va">self</span>.linear2(h), <span class="fl">0.2</span>))</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true"></a>    h <span class="op">=</span> <span class="va">self</span>.dropout3(F.leaky_relu(<span class="va">self</span>.linear3(h), <span class="fl">0.2</span>))</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true"></a>    out <span class="op">=</span> torch.sigmoid(<span class="va">self</span>.linear4(h))  <span class="co"># 输出 [0, 1] 的概率值</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true"></a>    <span class="cf">return</span> out</span></code></pre></div>
+<p><strong>关键设计点</strong>:</p>
+<ol type="1">
+<li><strong>Embedding编码</strong>:同样使用 <code>nn.Embedding</code> 进行标签嵌入</li>
+<li><strong>条件拼接</strong>:将图像 <span class="math inline">\(x\)</span> 和标签嵌入 <span class="math inline">\(c\)</span> 拼接后输入网络</li>
+<li><strong>Dropout</strong>:在判别器的每一层使用 Dropout（0.3），防止过拟合</li>
+<li><strong>LeakyReLU</strong>:同样使用 LeakyReLU 激活函数</li>
+<li><strong>Sigmoid 输出</strong>:最后一层使用 <code>sigmoid</code> 激活函数，输出 <span class="math inline">\([0, 1]\)</span> 范围内的概率值，表示输入在给定条件下是真实样本的概率</li>
+</ol>
+<h3 id="训练过程">2.2 训练过程</h3>
+<p>CGAN的训练过程包含两个交替的步骤:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a><span class="im">import</span> torch.nn <span class="im">as</span> nn</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a><span class="im">import</span> torch.optim <span class="im">as</span> optim</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a><span class="co"># 损失函数:二分类交叉熵（用于判别器）</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a>criterion <span class="op">=</span> nn.BCELoss()</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a><span class="co"># 优化器</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a>g_optimizer <span class="op">=</span> optim.Adam(generator.parameters(), lr<span class="op">=</span>learning_rate, betas<span class="op">=</span>(<span class="fl">0.5</span>, <span class="fl">0.999</span>))</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a>d_optimizer <span class="op">=</span> optim.Adam(discriminator.parameters(), lr<span class="op">=</span>learning_rate, betas<span class="op">=</span>(<span class="fl">0.5</span>, <span class="fl">0.999</span>))</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true"></a><span class="co"># 训练循环</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true"></a><span class="cf">for</span> epoch <span class="kw">in</span> <span class="bu">range</span>(epochs):</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true"></a>    <span class="cf">for</span> images, labels <span class="kw">in</span> train_loader:</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true"></a>        images <span class="op">=</span> images.view(<span class="op">-</span><span class="dv">1</span>, input_dim).to(device)  <span class="co"># [B, 784]</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true"></a>        labels <span class="op">=</span> labels.to(device)  <span class="co"># [B]</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true"></a>        </span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true"></a>        <span class="co"># 真实标签和虚假标签</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true"></a>        real_labels <span class="op">=</span> torch.ones(<span class="bu">len</span>(images), <span class="dv">1</span>, device<span class="op">=</span>device)</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true"></a>        fake_labels <span class="op">=</span> torch.zeros(<span class="bu">len</span>(images), <span class="dv">1</span>, device<span class="op">=</span>device)</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true"></a></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true"></a>        <span class="co"># ========== 训练判别器 n_critic 次 ==========</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true"></a>        d_loss_batch <span class="op">=</span> <span class="fl">0.0</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true"></a>        <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(n_critic):</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true"></a>            d_optimizer.zero_grad()</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true"></a>            </span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true"></a>            <span class="co"># 真实图像的损失（使用真实条件标签）</span></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true"></a>            real_output <span class="op">=</span> discriminator(images, labels)</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true"></a>            d_loss_real <span class="op">=</span> criterion(real_output, real_labels)</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true"></a>            </span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true"></a>            <span class="co"># 生成虚假图像（使用真实条件标签）</span></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true"></a>            noise <span class="op">=</span> torch.randn(<span class="bu">len</span>(images), noise_dim, device<span class="op">=</span>device)</span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true"></a>            fake_images <span class="op">=</span> generator(noise, labels)</span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true"></a>            </span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true"></a>            <span class="co"># 虚假图像的损失（注意:使用 detach() 断开梯度）</span></span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true"></a>            fake_output <span class="op">=</span> discriminator(fake_images.detach(), labels)</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true"></a>            d_loss_fake <span class="op">=</span> criterion(fake_output, fake_labels)</span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true"></a>            </span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true"></a>            <span class="co"># 判别器总损失</span></span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true"></a>            d_loss <span class="op">=</span> d_loss_real <span class="op">+</span> d_loss_fake</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true"></a>            d_loss.backward()</span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true"></a>            d_optimizer.step()</span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true"></a>            </span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true"></a>            d_loss_batch <span class="op">+=</span> d_loss.item()</span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true"></a>        </span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true"></a>        <span class="co"># ========== 训练生成器 1 次 ==========</span></span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true"></a>        g_optimizer.zero_grad()</span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true"></a>        </span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true"></a>        <span class="co"># 生成虚假图像（使用真实条件标签）</span></span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true"></a>        noise <span class="op">=</span> torch.randn(<span class="bu">len</span>(images), noise_dim, device<span class="op">=</span>device)</span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true"></a>        fake_images <span class="op">=</span> generator(noise, labels)</span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true"></a>        </span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true"></a>        <span class="co"># 生成器希望判别器认为虚假图像是真实的（在给定条件下）</span></span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true"></a>        fake_output <span class="op">=</span> discriminator(fake_images, labels)  <span class="co"># 注意:这里不使用 detach()</span></span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true"></a>        <span class="co"># 使用非饱和 loss:-log(D(x_fake|c))</span></span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true"></a>        fake_output_clamped <span class="op">=</span> torch.clamp(fake_output, <span class="bu">min</span><span class="op">=</span><span class="fl">1e-8</span>, <span class="bu">max</span><span class="op">=</span><span class="fl">1.0</span>)</span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true"></a>        g_loss <span class="op">=</span> <span class="op">-</span>torch.mean(torch.log(fake_output_clamped))</span>
+<span id="cb4-57"><a href="#cb4-57" aria-hidden="true"></a>        </span>
+<span id="cb4-58"><a href="#cb4-58" aria-hidden="true"></a>        g_loss.backward()</span>
+<span id="cb4-59"><a href="#cb4-59" aria-hidden="true"></a>        g_optimizer.step()</span></code></pre></div>
+<p><strong>关键点说明</strong>:</p>
+<ol type="1">
+<li><strong>判别器训练</strong>:
+<ul>
+<li>对真实图像，希望输出接近 1（<code>real_labels</code>），且条件匹配</li>
+<li>对生成图像，希望输出接近 0（<code>fake_labels</code>），即使条件匹配</li>
+<li>使用 <code>fake_images.detach()</code> 断开梯度，因为此时只训练判别器</li>
+<li><strong>重要</strong>:判别器训练 <code>n_critic</code> 次（通常为 1-5），让判别器训练更充分</li>
+</ul></li>
+<li><strong>生成器训练</strong>:
+<ul>
+<li>生成器希望判别器认为生成的图像在给定条件下是真实的</li>
+<li><strong>使用非饱和损失（non-saturating loss）</strong>:<code>-log(D(x_fake|c))</code> 而不是 BCE loss</li>
+<li>这样可以避免梯度消失问题，训练更稳定</li>
+<li>对 <code>fake_output</code> 进行 <code>clamp(min=1e-8, max=1.0)</code> 操作，避免 <code>log(0)</code> 的数值稳定性问题</li>
+<li>不使用 <code>detach()</code>，因为需要反向传播更新生成器参数</li>
+</ul></li>
+<li><strong>条件使用</strong>:
+<ul>
+<li>在训练时，我们从数据集中采样 <span class="math inline">\((x, c)\)</span> 对</li>
+<li>生成器使用真实条件标签 <span class="math inline">\(c\)</span> 生成图像，确保生成图像与条件匹配</li>
+<li>判别器同时接收图像和条件标签，判断 <span class="math inline">\((x, c)\)</span> 是否匹配</li>
+</ul></li>
+<li><strong>优化器设置</strong>:
+<ul>
+<li>使用 Adam 优化器，<span class="math inline">\(\beta_1 = 0.5, \beta_2 = 0.999\)</span>（这是 GAN 训练中的常见设置）</li>
+</ul></li>
+</ol>
+<hr />
+<h2 id="结果分析">3. 结果分析</h2>
+<h3 id="loss曲线">3.1 Loss曲线</h3>
+<p>根据理论篇的推导，在最优情况下（<span class="math inline">\(p_g(x|c) = p_{data}(x|c)\)</span>），CGAN 的目标函数值为:</p>
+<p><span class="math display">\[L(D^*, G^*) = -2 \log 2 = -\log 4 \approx -1.39\]</span></p>
+<p>此时判别器对真实样本和生成样本的输出都接近 <span class="math inline">\(0.5\)</span>，无法区分真假。判别器的 BCE 损失为:</p>
+<p><span class="math display">\[\text{Loss}_D = -\log(0.5) - \log(0.5) = 2 \log 2 \approx 1.39\]</span></p>
+<p>这与标准GAN的理论值相同，因为CGAN只是在标准GAN的基础上条件化，最优情况下的损失值是一致的。</p>
+<p>实际训练50个epochs后的损失曲线显示:</p>
+<div data-align="center">
+<p><img src="pic/gan/4.1.png" width="70%"></p>
+</div>
+<p><small><strong>图1</strong> 实际训练50个epochs后的损失曲线:展示了条件生成器和条件判别器在实际训练过程中的损失变化。</small></p>
+<ul>
+<li><strong>判别器损失</strong>:在训练后期稳定在 <span class="math inline">\(1.36\)</span> 附近，与理论值 <span class="math inline">\(2 \log 2 \approx 1.39\)</span> 更加接近</li>
+<li><strong>生成器损失</strong>:随着训练进行逐渐降低，说明生成器生成的质量不断提升</li>
+<li><strong>训练稳定性</strong>:损失曲线相对平滑，说明使用非饱和损失、条件信息和 <code>n_critic</code> 策略有助于稳定训练</li>
+</ul>
+<p>实际训练结果与理论预期高度一致，验证了代码实现的正确性。相比标准GAN，CGAN的训练通常更稳定，因为条件信息为生成器和判别器提供了额外的监督信号。</p>
+<h3 id="生成器条件生成能力">3.2 生成器:条件生成能力</h3>
+<p>代码中的 <code>infer</code> 部分展示了CGAN的<strong>条件生成能力</strong>:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a><span class="co"># 模型推理 - 条件生成新图像</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a><span class="cf">if</span> infer:</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true"></a>    generator.<span class="bu">eval</span>()</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true"></a>    <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true"></a>        <span class="co"># 指定条件标签（例如:生成数字0-9各一张）</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true"></a>        labels <span class="op">=</span> torch.tensor([<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>, <span class="dv">6</span>, <span class="dv">7</span>, <span class="dv">8</span>, <span class="dv">9</span>], device<span class="op">=</span>device)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true"></a>        </span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true"></a>        <span class="co"># 从标准正态分布采样噪声向量</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true"></a>        noise <span class="op">=</span> torch.randn(<span class="bu">len</span>(labels), noise_dim, device<span class="op">=</span>device)</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true"></a>        </span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true"></a>        <span class="co"># 使用生成器和条件标签生成图像</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true"></a>        fake_images <span class="op">=</span> generator(noise, labels)  <span class="co"># 条件生成</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true"></a>        fake_images <span class="op">=</span> fake_images.view(<span class="bu">len</span>(labels), <span class="dv">1</span>, <span class="dv">28</span>, <span class="dv">28</span>)</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true"></a>        </span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true"></a>        <span class="co"># 将输出从 [-1, 1] 转换回 [0, 1] 用于显示</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true"></a>        fake_images <span class="op">=</span> (fake_images <span class="op">+</span> <span class="dv">1</span>) <span class="op">/</span> <span class="dv">2</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true"></a>        fake_images <span class="op">=</span> torch.clamp(fake_images, <span class="fl">0.0</span>, <span class="fl">1.0</span>)</span></code></pre></div>
+<div data-align="center">
+<p><img src="pic/gan/4.2.png" width="70%"></p>
+</div>
+<p><small><strong>图2</strong> CGAN的条件生成能力:根据指定标签生成的MNIST数字图像</small></p>
+<p>从图2中我们可以得到以下结论:</p>
+<ul>
+<li><strong>生成质量</strong>:生成器能稳定地生成清晰、多样、类 MNIST 的数字图像</li>
+<li><strong>条件控制</strong>:生成的图像与指定的条件标签匹配，实现了可控生成</li>
+</ul>
+<h3 id="判别器判断能力">3.3 判别器:判断能力</h3>
+<p>代码中还展示了判别器对真实图像和生成图像的判断能力:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true"></a><span class="co"># 可视化:真实图像和生成图像的混合，观察判别器的判断</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true"></a>generator.<span class="bu">eval</span>()</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true"></a>discriminator.<span class="bu">eval</span>()</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true"></a><span class="co"># 获取真实图像和对应标签</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true"></a>real_image, real_label <span class="op">=</span> <span class="bu">next</span>(<span class="bu">iter</span>(train_loader))</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true"></a>real_image_flat <span class="op">=</span> real_image[<span class="dv">0</span>:<span class="dv">1</span>].view(<span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>).to(device)</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true"></a>real_label_tensor <span class="op">=</span> real_label[<span class="dv">0</span>:<span class="dv">1</span>].to(device)</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true"></a></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true"></a><span class="co"># 生成一张新图像（使用相同标签）</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true"></a>noise <span class="op">=</span> torch.randn(<span class="dv">1</span>, noise_dim, device<span class="op">=</span>device)</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true"></a>fake_image_flat <span class="op">=</span> generator(noise, real_label_tensor)</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true"></a></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true"></a><span class="co"># 测试判别器的输出</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true"></a>real_pred <span class="op">=</span> discriminator(real_image_flat, real_label_tensor)</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true"></a>fake_pred <span class="op">=</span> discriminator(fake_image_flat, real_label_tensor)</span></code></pre></div>
+<div data-align="center">
+<p><img src="pic/gan/4.3.png" width="70%"></p>
+</div>
+<p><small><strong>图3</strong> 判别器对真实图像和生成图像的判断:展示了16张真实图像和16张生成图像及其对应的判别器输出值</small></p>
+<p>根据图2和图3的判别器输出统计:</p>
+<ul>
+<li><strong>真实图像（图3）</strong>:平均输出为 <strong>0.5009</strong>，说明判别器对真实图像的平均判断接近 0.5</li>
+<li><strong>生成图像（图2）</strong>:平均输出为 <strong>0.4855</strong>，说明判别器对生成图像的平均判断也接近 0.5</li>
+<li><strong>两者差异</strong>:|0.5009 - 0.4855| = 0.0154，差异很小，说明判别器难以明确区分真假图像</li>
+</ul>
+<hr />
+<h2 id="cgan-vs-标准gan对比总结">4. CGAN vs 标准GAN对比总结</h2>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 42%" />
+<col style="width: 28%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>特性</th>
+<th>标准GAN</th>
+<th>CGAN</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>生成器输入</strong></td>
+<td><span class="math inline">\(z\)</span></td>
+<td><span class="math inline">\(z, c\)</span></td>
+</tr>
+<tr class="even">
+<td><strong>判别器输入</strong></td>
+<td><span class="math inline">\(x\)</span></td>
+<td><span class="math inline">\(x, c\)</span></td>
+</tr>
+<tr class="odd">
+<td><strong>生成控制</strong></td>
+<td>无</td>
+<td>可控（由 <span class="math inline">\(c\)</span> 决定）</td>
+</tr>
+<tr class="even">
+<td><strong>损失函数</strong></td>
+<td><span class="math inline">\(\log D(x) + \log(1-D(G(z)))\)</span></td>
+<td><span class="math inline">\(\log D(x \vert c) + \log(1-D(G(z \vert c) \vert c))\)</span></td>
+</tr>
+<tr class="odd">
+<td><strong>条件编码</strong></td>
+<td>无</td>
+<td>Embedding编码</td>
+</tr>
+<tr class="even">
+<td><strong>应用</strong></td>
+<td>无条件生成</td>
+<td>条件生成、图像合成、数据增强等</td>
+</tr>
+</tbody>
+</table>
+<h2 id="总结">5. 总结</h2>
+<p><strong>条件生成对抗网络（CGAN）</strong> 通过以下关键创新实现了可控生成:</p>
+<ol type="1">
+<li><strong>条件对抗</strong>:形成条件对抗，生成器生成与条件匹配的样本，判别器判断样本是否真实且与条件匹配</li>
+<li><strong>条件生成</strong>:将条件 <span class="math inline">\(c\)</span> 注入到生成器和判别器中，通过指定不同的条件 <span class="math inline">\(c\)</span>，生成不同类别的样本</li>
+</ol>
+<p>CGAN的成功证明了<strong>条件信息</strong>对于可控生成的重要性，为后续的条件生成模型（如Pix2Pix、CycleGAN等）奠定了基础。</p>
+<hr />
+<h2 id="参考">📚 参考</h2>
+<ul>
+<li>Mirza, M., &amp; Osindero, S. (2014). Conditional generative adversarial nets. <em>arXiv preprint arXiv:1411.1784</em>.</li>
+<li>Goodfellow et al., <em>Generative Adversarial Nets</em>, NeurIPS 2014.</li>
+</ul>
+</body>
+</html>

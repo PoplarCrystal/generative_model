@@ -206,8 +206,9 @@
         </style>
 </head>
 <body>
-<h1 id="ae系列篇03.-vae-从重建模型到生成模型代码篇">AE系列篇03. VAE: 从“重建模型”到“生成模型”(代码篇)</h1>
+<h1 id="ae系列篇-03.vae代码篇-从重建模型到生成模型">AE系列篇-03.VAE代码篇: 从“重建模型”到“生成模型”</h1>
 <p>接下来进行VAE的实现。VAE能够学习高维和复杂数据的分布。</p>
+<hr />
 <h2 id="实现的策略">1. 实现的策略</h2>
 <p>根据理论篇的内容可知，VAE的ELBO可以用以下式子表示:</p>
 <p><span class="math display">\[\text{ELBO}(\mathbf{x}; \theta, \phi) = -\frac{1}{2}\|\mathbf{x} - \hat{\mathbf{x}}\|^2 - \frac{1}{2}\sum_{i=1}^{H}[\mu_i^2 + \sigma_i^2 - 1 - \log \sigma_i^2] + \text{const}\]</span></p>
@@ -215,7 +216,7 @@
 <p><span class="math display">\[\text{Loss}(\mathbf{x}; \theta, \phi) = \|\mathbf{x} - \hat{\mathbf{x}}\|^2 + \sum_{i=1}^{H}[1 + \log \sigma_i^2 - \mu_i^2 - \sigma_i^2]\]</span></p>
 <p>在上式中，ELBO被乘以 <span class="math inline">\(-2\)</span>。这种乘以常数倍的做法是没有问题的，因为只要调整优化器的学习率，问题的设置最终就是相同的。此外，在优化参数时，常数项（<span class="math inline">\(\text{const}\)</span>）可以省略。图1是这个损失函数的计算图。</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.14.jpeg" width="70%"></p>
+<p><img src="pic/ae/vae/2.14.jpeg" width="70%"></p>
 </div>
 <p><small><strong>图1</strong> VAE损失函数的计算图</small></p>
 <hr />
@@ -286,11 +287,11 @@
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a>    sigma <span class="op">=</span> torch.exp(<span class="fl">0.5</span> <span class="op">*</span> logvar)</span>
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>    <span class="cf">return</span> mu, sigma</span></code></pre></div>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.15.jpeg" width="70%"></p>
+<p><img src="pic/ae/vae/2.15.jpeg" width="70%"></p>
 </div>
 <p><small><strong>图2</strong> 编码器的前向传播的计算图和代码</small></p>
 <p>也可以考虑让神经网络使用的线性变换（<code>nn.Linear</code>）直接输出标准差 <span class="math inline">\(\sigma\)</span>，但必须满足 <span class="math inline">\(\sigma\)</span> 的每个元素都是正数的约束条件。因此，我们让神经网络输出方差的对数 <span class="math inline">\(\log \sigma^2\)</span>。<span class="math inline">\(\log \sigma^2\)</span> 的取值范围为 <span class="math inline">\(-\infty\)</span> 到 <span class="math inline">\(+\infty\)</span>，因此没有线性变换的输出的约束条件的限制。线性变换输出 <span class="math inline">\(\log \sigma^2\)</span> 后，根据以下计算式求出 <span class="math inline">\(\sigma\)</span>:</p>
-<p><span class="math display">\[\sigma = \exp(0.5 \times \log \sigma^2)\]</span></p>
+<p><span class="math display">\[\sigma = \exp(0.5 \cdot \log \sigma^2)\]</span></p>
 <h3 id="decoder类的实现">2.1.2 Decoder类的实现</h3>
 <p><strong>Decoder类</strong>也是一个两层神经网络（参见图3）。前向传播的最后一层通过 <code>sigmoid</code> 函数输出 <span class="math inline">\(0.0\)</span> 和 <span class="math inline">\(1.0\)</span> 之间的实数。为了方便训练，我们要将MNIST图像归一化为 <span class="math inline">\(0.0\)</span> 和 <span class="math inline">\(1.0\)</span> 之间的数据，因此会使用 <code>sigmoid</code> 函数来匹配这个范围。</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="kw">def</span> forward(<span class="va">self</span>, z):</span>
@@ -300,7 +301,7 @@
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a>    x_hat <span class="op">=</span> F.sigmoid(h)</span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a>    <span class="cf">return</span> x_hat</span></code></pre></div>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.16.jpeg" width="70%"></p>
+<p><img src="pic/ae/vae/2.16.jpeg" width="70%"></p>
 </div>
 <p><small><strong>图3</strong> 解码器的前向传播的计算图和代码</small></p>
 <h3 id="vae类和重参数化技巧">2.1.3 VAE类和重参数化技巧</h3>
@@ -326,7 +327,7 @@
 <span id="cb4-19"><a href="#cb4-19" aria-hidden="true"></a>        <span class="cf">return</span> (L1 <span class="op">+</span> L2) <span class="op">/</span> batch_size</span></code></pre></div>
 <p>上面代码中的函数 <code>reparameterize(mu, sigma)</code> 是重参数化技巧的实现，它的计算图如图4所示:</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.17.jpeg" width="70%"></p>
+<p><img src="pic/ae/vae/2.17.jpeg" width="70%"></p>
 </div>
 <p><small><strong>图4</strong> 重参数化技巧的计算图和代码</small></p>
 <p><code>torch.randn_like(sigma)</code> 生成了与 <code>sigma</code> 相同形状的张量。该张量的每个元素都是基于标准正态分布（均值为 <span class="math inline">\(0\)</span>，标准差为 <span class="math inline">\(1\)</span>）随机采样的。</p>
@@ -352,11 +353,11 @@
 <span id="cb5-16"><a href="#cb5-16" aria-hidden="true"></a>        labels_cpu <span class="op">=</span> labels_test.numpy()</span></code></pre></div>
 <p><strong>代码说明</strong>: 1. <strong>获取测试样本</strong>:从测试集第一个批次中取 <code>sample_size</code> 个样本 2. <strong>编码-重参数化-解码重构</strong>:通过 <code>model(x_test)</code> 进行前向传播，得到重构图像和分布参数 3. <strong>格式转换</strong>:将张量转换为图像格式（28×28）用于可视化</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.18.png" width="70%"></p>
+<p><img src="pic/ae/vae/2.18.png" width="70%"></p>
 </div>
 <p><small><strong>图5</strong> VAE的重建能力:左列为原始图像，右列为重构图像</small></p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.19.png" width="70%"></p>
+<p><img src="pic/ae/vae/2.19.png" width="70%"></p>
 </div>
 <p><small><strong>图6</strong> AE的重建能力:左列为原始图像，右列为重构图像</small></p>
 <p>图5展示了VAE的重建能力，两者非常相似，说明潜在空间成功捕获了输入的关键信息。图6展示了AE的重建能力作为对比。与AE相比，VAE的重建质量可能略低（上图其实不是很明显），但这是为了获得生成能力而付出的代价。</p>
@@ -370,21 +371,16 @@
 <span id="cb6-6"><a href="#cb6-6" aria-hidden="true"></a>        z <span class="op">=</span> torch.randn(sample_size, latent_dim).to(device)</span>
 <span id="cb6-7"><a href="#cb6-7" aria-hidden="true"></a>        x <span class="op">=</span> model.decoder(z)  <span class="co"># 仅使用解码器生成图像</span></span>
 <span id="cb6-8"><a href="#cb6-8" aria-hidden="true"></a>        generated_images <span class="op">=</span> x.view(sample_size, <span class="dv">1</span>, <span class="dv">28</span>, <span class="dv">28</span>).cpu()</span></code></pre></div>
-<p><strong>关键优势</strong>:</p>
-<ul>
-<li>从标准正态分布随机采样潜在向量 <span class="math inline">\(z\)</span></li>
-<li>直接通过解码器生成图像</li>
-<li><strong>结果</strong>:生成的图像是<strong>有意义的</strong>，因为VAE的潜在空间是正则化的</li>
-</ul>
+<p><strong>关键优势</strong>: - 从标准正态分布随机采样潜在向量 <span class="math inline">\(z\)</span> - 直接通过解码器生成图像 - <strong>结果</strong>:生成的图像是<strong>有意义的</strong>，因为VAE的潜在空间是正则化的</p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.20.png" width="70%"></p>
+<p><img src="pic/ae/vae/2.20.png" width="70%"></p>
 </div>
 <p><small><strong>图7</strong> VAE的生成能力</small></p>
 <div data-align="center">
-<p><img src="pic/dl/vae/2.21.png" width="70%"></p>
+<p><img src="pic/ae/vae/2.21.png" width="70%"></p>
 </div>
 <p><small><strong>图8</strong> AE的生成能力</small></p>
-<p>图7展示了VAE的生成能力:从标准正态分布随机采样潜在向量 <span class="math inline">\(z\)</span>，直接通过解码器生成图像。结果生成的图像是<strong>有意义的</strong>，这是因为VAE的潜在空间是正则化的，整个空间都具有生成能力。图8展示了AE的生成能力作为对比:从标准正态分布随机采样潜在向量 <span class="math inline">\(z\)</span>，通过解码器生成的图像通常是<strong>无意义的</strong>或<strong>模糊的</strong>，这是因为AE的潜在空间是非正则化的，存在大量"空洞"区域。</p>
+<p>图7展示了VAE的生成能力:从标准正态分布随机采样潜在向量 <span class="math inline">\(z\)</span>，直接通过解码器生成图像。结果生成的图像是<strong>有意义的</strong>，这是因为VAE的潜在空间是正则化的，整个空间都具有生成能力。图8展示了AE的生成能力作为对比:从标准正态分布随机采样潜在向量 <span class="math inline">\(z\)</span>，通过解码器生成的图像通常是<strong>无意义的</strong>或<strong>模糊的</strong>，这是因为AE的潜在空间是非正则化的，存在大量“空洞”区域。</p>
 <h3 id="与ae的对比总结">3.3 与AE的对比总结</h3>
 <table>
 <thead>

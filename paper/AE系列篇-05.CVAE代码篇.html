@@ -206,12 +206,13 @@
         </style>
 </head>
 <body>
-<h1 id="ae系列篇05.-cvae-从无条件生成到条件生成代码篇">AE系列篇05. CVAE: 从“无条件生成”到“条件生成”(代码篇)</h1>
+<h1 id="ae系列篇-05.cvae代码篇-从无条件生成到条件生成">AE系列篇-05.CVAE代码篇: 从“无条件生成”到“条件生成”</h1>
 <p>接下来进行CVAE的实现。CVAE在VAE的基础上引入条件变量 <span class="math inline">\(c\)</span>，实现可控的条件生成。</p>
 <div data-align="center">
-<p><img src="pic/dl/cvae/3.6.jpeg" width="70%"></p>
+<p><img src="pic/ae/cvae/3.6.jpeg" width="70%"></p>
 </div>
 <p><small><strong>图1</strong> CVAE的完整架构图</small></p>
+<hr />
 <h2 id="实现的策略">1. 实现的策略</h2>
 <p>根据理论篇的内容，CVAE的ELBO可以表示为:</p>
 <p><span class="math display">\[\mathcal{L}(x,c; \theta, \phi) = \mathbb{E}_{z \sim q_\phi(z|x,c)}[\log p_\theta(x|z,c)] - \text{KL}(q_\phi(z|x,c) \| p_\theta(z|c))\]</span></p>
@@ -230,16 +231,8 @@
 <h2 id="代码实现">2. 代码实现</h2>
 <h3 id="条件编码">2.1 条件编码</h3>
 <p>条件变量 <span class="math inline">\(c\)</span> 需要编码成数值向量才能输入神经网络。我们实现了两种编码方式:</p>
-<p><strong>One-Hot编码</strong>:</p>
-<ul>
-<li>将类别索引转换为独热向量</li>
-<li>例如:类别3 → <span class="math inline">\([0, 0, 0, 1, 0, 0, 0, 0, 0, 0]\)</span>（MNIST的10个类别）</li>
-</ul>
-<p><strong>Embedding编码</strong>:</p>
-<ul>
-<li>使用可学习的嵌入层将类别索引映射为低维向量</li>
-<li>例如:类别3 → 可学习的N维向量（默认5维）</li>
-</ul>
+<p><strong>One-Hot编码</strong>: - 将类别索引转换为独热向量 - 例如:类别3 → <span class="math inline">\([0, 0, 0, 1, 0, 0, 0, 0, 0, 0]\)</span>（MNIST的10个类别）</p>
+<p><strong>Embedding编码</strong>: - 使用可学习的嵌入层将类别索引映射为低维向量 - 例如:类别3 → 可学习的N维向量（默认5维）</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="kw">class</span> OneHotEncoder(nn.Module):</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;One-hot编码器模块&quot;&quot;&quot;</span></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, n_classes):</span>
@@ -306,15 +299,11 @@
 <span id="cb2-25"><a href="#cb2-25" aria-hidden="true"></a>        h <span class="op">=</span> <span class="va">self</span>.linear2(h)</span>
 <span id="cb2-26"><a href="#cb2-26" aria-hidden="true"></a>        x_hat <span class="op">=</span> F.sigmoid(h)</span>
 <span id="cb2-27"><a href="#cb2-27" aria-hidden="true"></a>        <span class="cf">return</span> x_hat</span></code></pre></div>
-<p><strong>关键区别</strong>:</p>
-<ul>
-<li><strong>Encoder的输入维度</strong>:<code>input_dim + condition_dim</code>（当条件用于编码时）</li>
-<li><strong>Decoder的输入维度</strong>:<code>latent_dim + condition_dim</code>（条件与潜在向量拼接）</li>
-</ul>
+<p><strong>关键区别</strong>: - <strong>Encoder的输入维度</strong>:<code>input_dim + condition_dim</code>（当条件用于编码时） - <strong>Decoder的输入维度</strong>:<code>latent_dim + condition_dim</code>（条件与潜在向量拼接）</p>
 <h4 id="cvae标准形式">2.2.2 CVAE:标准形式</h4>
 <p>条件同时加在编码器和解码器:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="kw">class</span> CVAE(nn.Module):</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;CVAE: 条件在编码时与输入拼接，先验 p(z) = N(0, I)&quot;&quot;&quot;</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;CVAE: 条件在编码时与输入拼接，先验 p(z) = \mathcal{N}(0, I)&quot;&quot;&quot;</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, input_dim, output_dim, condition_dim, hidden_dim, latent_dim, </span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a>                 condition_encoder<span class="op">=</span><span class="va">None</span>):</span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
@@ -344,7 +333,7 @@
 <span id="cb3-29"><a href="#cb3-29" aria-hidden="true"></a>        z <span class="op">=</span> mu <span class="op">+</span> eps <span class="op">*</span> sigma</span>
 <span id="cb3-30"><a href="#cb3-30" aria-hidden="true"></a>        <span class="cf">return</span> z</span></code></pre></div>
 <p><strong>计算流程</strong>:</p>
-<ol>
+<ol type="1">
 <li>条件编码:<span class="math inline">\(c = \text{ConditionEncoder}(label)\)</span></li>
 <li>编码:将 <span class="math inline">\(x\)</span> 和 <span class="math inline">\(c\)</span> 拼接，输入编码器得到 <span class="math inline">\((\mu, \sigma)\)</span></li>
 <li>重参数化:<span class="math inline">\(z = \mu + \epsilon \cdot \sigma\)</span>，其中 <span class="math inline">\(\epsilon \sim \mathcal{N}(0, I)\)</span></li>
@@ -378,7 +367,7 @@
 <h4 id="prior-network学习条件先验">2.2.4 Prior Network:学习条件先验</h4>
 <p>当条件 <span class="math inline">\(c\)</span> 和潜在变量 <span class="math inline">\(z\)</span> 非独立时，需要Prior网络学习条件先验 <span class="math inline">\(p(z|c)\)</span>:</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a><span class="kw">class</span> PriorNetwork(nn.Module):</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;先验网络:学习条件先验分布 p(z|c) = N(μ_prior(c), σ_prior(c))&quot;&quot;&quot;</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;先验网络:学习条件先验分布 p(z|c) = \mathcal{N}(\mu_{prior}(c), \sigma_{prior}(c))&quot;&quot;&quot;</span></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, condition_dim, hidden_dim, latent_dim):</span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
 <span id="cb5-5"><a href="#cb5-5" aria-hidden="true"></a>        <span class="va">self</span>.linear <span class="op">=</span> nn.Linear(condition_dim, hidden_dim)</span>
@@ -393,7 +382,7 @@
 <span id="cb5-14"><a href="#cb5-14" aria-hidden="true"></a>        <span class="cf">return</span> mu_prior, sigma_prior</span></code></pre></div>
 <h4 id="cvae_prior带prior网络的cvae">2.2.5 CVAE_prior:带Prior网络的CVAE</h4>
 <div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true"></a><span class="kw">class</span> CVAE_prior(nn.Module):</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;CVAE with Prior Network: p(z|c) = N(μ_prior(c), σ_prior(c))&quot;&quot;&quot;</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;CVAE with Prior Network: p(z|c) = \mathcal{N}(\mu_{prior}(c), \sigma_{prior}(c))&quot;&quot;&quot;</span></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, input_dim, output_dim, condition_dim, hidden_dim, latent_dim,</span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true"></a>                 condition_encoder<span class="op">=</span><span class="va">None</span>):</span>
 <span id="cb6-5"><a href="#cb6-5" aria-hidden="true"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
@@ -423,7 +412,7 @@
 <span id="cb6-29"><a href="#cb6-29" aria-hidden="true"></a>        <span class="cf">return</span> x_hat, mu_q, sigma_q, mu_prior, sigma_prior</span>
 <span id="cb6-30"><a href="#cb6-30" aria-hidden="true"></a>    </span>
 <span id="cb6-31"><a href="#cb6-31" aria-hidden="true"></a>    <span class="kw">def</span> sample_prior(<span class="va">self</span>, c_or_labels):</span>
-<span id="cb6-32"><a href="#cb6-32" aria-hidden="true"></a>        <span class="co">&quot;&quot;&quot;从条件先验分布采样:p(z|c) = N(μ_prior(c), σ_prior(c))&quot;&quot;&quot;</span></span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true"></a>        <span class="co">&quot;&quot;&quot;从条件先验分布采样:p(z|c) = \mathcal{N}(\mu_{prior}(c), \sigma_{prior}(c))&quot;&quot;&quot;</span></span>
 <span id="cb6-33"><a href="#cb6-33" aria-hidden="true"></a>        <span class="cf">if</span> <span class="va">self</span>.condition_encoder <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
 <span id="cb6-34"><a href="#cb6-34" aria-hidden="true"></a>            c <span class="op">=</span> <span class="va">self</span>.condition_encoder(c_or_labels)</span>
 <span id="cb6-35"><a href="#cb6-35" aria-hidden="true"></a>        <span class="cf">else</span>:</span>
@@ -434,20 +423,20 @@
 <span id="cb6-40"><a href="#cb6-40" aria-hidden="true"></a>        <span class="cf">return</span> z</span></code></pre></div>
 <h3 id="损失函数">2.3 损失函数</h3>
 <div class="sourceCode" id="cb7"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true"></a><span class="kw">def</span> loss_function_wo_prior(x_hat, x, mu_q, sigma_q):</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;损失函数 - 无Prior网络情况: p(z|c) = p(z) = N(0, I)&quot;&quot;&quot;</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;损失函数 - 无Prior网络情况: p(z|c) = p(z) = \mathcal{N}(0, I)&quot;&quot;&quot;</span></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true"></a>    batch_size <span class="op">=</span> x.shape[<span class="dv">0</span>]</span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true"></a>    </span>
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true"></a>    <span class="co"># 重构损失</span></span>
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true"></a>    recon_loss <span class="op">=</span> F.mse_loss(x_hat, x, reduction<span class="op">=</span><span class="st">&#39;sum&#39;</span>)</span>
 <span id="cb7-7"><a href="#cb7-7" aria-hidden="true"></a>    </span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true"></a>    <span class="co"># KL散度: KL(q(z|x,c) || N(0, I))</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true"></a>    <span class="co"># KL散度: KL(q(z|x,c) || \mathcal{N}(0, I))</span></span>
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true"></a>    kl_loss <span class="op">=</span> <span class="op">-</span><span class="fl">0.5</span> <span class="op">*</span> torch.<span class="bu">sum</span>(<span class="dv">1</span> <span class="op">+</span> <span class="dv">2</span> <span class="op">*</span> torch.log(sigma_q <span class="op">+</span> <span class="fl">1e-8</span>) <span class="op">-</span> mu_q <span class="op">**</span> <span class="dv">2</span> <span class="op">-</span> sigma_q <span class="op">**</span> <span class="dv">2</span>)</span>
 <span id="cb7-10"><a href="#cb7-10" aria-hidden="true"></a>    </span>
 <span id="cb7-11"><a href="#cb7-11" aria-hidden="true"></a>    <span class="cf">return</span> (recon_loss <span class="op">+</span> kl_loss) <span class="op">/</span> batch_size</span>
 <span id="cb7-12"><a href="#cb7-12" aria-hidden="true"></a></span>
 <span id="cb7-13"><a href="#cb7-13" aria-hidden="true"></a></span>
 <span id="cb7-14"><a href="#cb7-14" aria-hidden="true"></a><span class="kw">def</span> loss_function_prior(x_hat, x, mu_q, sigma_q, mu_prior, sigma_prior):</span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;损失函数 - 有Prior网络情况: p(z|c) = N(μ_prior(c), σ_prior(c))&quot;&quot;&quot;</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;损失函数 - 有Prior网络情况: p(z|c) = \mathcal{N}(\mu_{prior}(c), \sigma_{prior}(c))&quot;&quot;&quot;</span></span>
 <span id="cb7-16"><a href="#cb7-16" aria-hidden="true"></a>    batch_size <span class="op">=</span> x.shape[<span class="dv">0</span>]</span>
 <span id="cb7-17"><a href="#cb7-17" aria-hidden="true"></a>    </span>
 <span id="cb7-18"><a href="#cb7-18" aria-hidden="true"></a>    <span class="co"># 重构损失</span></span>
@@ -481,7 +470,12 @@
 <span id="cb8-11"><a href="#cb8-11" aria-hidden="true"></a>        <span class="co"># 转换为图像格式用于显示</span></span>
 <span id="cb8-12"><a href="#cb8-12" aria-hidden="true"></a>        original_images <span class="op">=</span> x_test.view(sample_size, <span class="dv">1</span>, <span class="dv">28</span>, <span class="dv">28</span>).cpu()</span>
 <span id="cb8-13"><a href="#cb8-13" aria-hidden="true"></a>        reconstructed_images <span class="op">=</span> x_reconstructed.view(sample_size, <span class="dv">1</span>, <span class="dv">28</span>, <span class="dv">28</span>).cpu()</span></code></pre></div>
-<p><strong>代码说明</strong>: 1. <strong>获取测试样本</strong>:从测试集中取样本及其对应的标签 2. <strong>条件重建</strong>:通过 <code>model(x_test, labels_test)</code> 进行前向传播，条件信息帮助模型更好地重建 3. <strong>格式转换</strong>:将张量转换为图像格式（28×28）用于可视化</p>
+<p><strong>代码说明</strong>:</p>
+<ol type="1">
+<li><strong>获取测试样本</strong>: 从测试集中取样本及其对应的标签</li>
+<li><strong>条件重建</strong>: 通过 <code>model(x_test, labels_test)</code> 进行前向传播，条件信息帮助模型更好地重建</li>
+<li><strong>格式转换</strong>: 将张量转换为图像格式（28×28）用于可视化</li>
+</ol>
 <p>CVAE在重建时利用条件信息，相比VAE能够更准确地重建特定类别的图像。</p>
 <h3 id="推理2条件生成能力conditional-generation">3.2 推理2:条件生成能力（Conditional Generation）</h3>
 <p>代码中的 <code>infer2</code> 部分展示了CVAE的<strong>条件生成能力</strong>:</p>
@@ -498,7 +492,7 @@
 <span id="cb9-11"><a href="#cb9-11" aria-hidden="true"></a>            z <span class="op">=</span> model.sample_prior(conditions)</span>
 <span id="cb9-12"><a href="#cb9-12" aria-hidden="true"></a>            c <span class="op">=</span> condition_encoder(conditions)</span>
 <span id="cb9-13"><a href="#cb9-13" aria-hidden="true"></a>        <span class="cf">else</span>:</span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true"></a>            <span class="co"># 标准形式:从 p(z) = N(0, I) 采样</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true"></a>            <span class="co"># 标准形式:从 p(z) = \mathcal{N}(0, I) 采样</span></span>
 <span id="cb9-15"><a href="#cb9-15" aria-hidden="true"></a>            z <span class="op">=</span> torch.randn(sample_size, latent_dim).to(device)</span>
 <span id="cb9-16"><a href="#cb9-16" aria-hidden="true"></a>            c <span class="op">=</span> condition_encoder(conditions)</span>
 <span id="cb9-17"><a href="#cb9-17" aria-hidden="true"></a>        </span>
@@ -508,15 +502,10 @@
 <span id="cb9-21"><a href="#cb9-21" aria-hidden="true"></a>        generated_images <span class="op">=</span> x.view(sample_size, <span class="dv">1</span>, <span class="dv">28</span>, <span class="dv">28</span>).cpu()</span></code></pre></div>
 如图2展示了cvae_prior的生成能力
 <div data-align="center">
-<p><img src="pic/dl/cvae/3.7.png" width="70%"></p>
+<p><img src="pic/ae/cvae/3.7.png" width="70%"></p>
 </div>
 <p><small><strong>图2</strong> CVAE的生成能力，基于条件生成对应的图像</small></p>
-<p><strong>关键优势</strong>:</p>
-<ul>
-<li><strong>可控生成</strong>:通过指定条件 <span class="math inline">\(c\)</span>（如数字标签），可以生成特定类别的图像</li>
-<li><strong>条件先验</strong>:如果使用Prior网络，不同条件对应不同的先验分布 <span class="math inline">\(p(z|c)\)</span></li>
-<li><strong>结果</strong>:生成的图像不仅是有意义的，而且是<strong>符合指定条件的</strong></li>
-</ul>
+<p><strong>关键优势</strong>: - <strong>可控生成</strong>:通过指定条件 <span class="math inline">\(c\)</span>（如数字标签），可以生成特定类别的图像 - <strong>条件先验</strong>:如果使用Prior网络，不同条件对应不同的先验分布 <span class="math inline">\(p(z|c)\)</span> - <strong>结果</strong>:生成的图像不仅是有意义的，而且是<strong>符合指定条件的</strong></p>
 <h3 id="cvae-vs-vae-对比总结">3.3 CVAE vs VAE 对比总结</h3>
 <table>
 <thead>
@@ -534,7 +523,7 @@
 </tr>
 <tr class="even">
 <td><strong>潜在空间</strong></td>
-<td>固定的标准正态分布 <span class="math inline">\(p(z) = N(0, I)\)</span></td>
+<td>固定的标准正态分布 <span class="math inline">\(p(z) = \mathcal{N}(0, I)\)</span></td>
 <td>可依赖条件的分布 <span class="math inline">\(p(z\|c)\)</span></td>
 </tr>
 <tr class="odd">
@@ -585,39 +574,33 @@
 <td><strong>CVAE</strong></td>
 <td><span class="math inline">\(q(z\|x,c)\)</span></td>
 <td><span class="math inline">\(p(x\|z,c)\)</span></td>
-<td><span class="math inline">\(p(z) = N(0,I)\)</span></td>
+<td><span class="math inline">\(p(z) = \mathcal{N}(0,I)\)</span></td>
 <td>标准形式，条件影响编码和解码</td>
 </tr>
 <tr class="even">
 <td><strong>CVAE1</strong></td>
 <td><span class="math inline">\(q(z\|x)\)</span></td>
 <td><span class="math inline">\(p(x\|z,c)\)</span></td>
-<td><span class="math inline">\(p(z) = N(0,I)\)</span></td>
+<td><span class="math inline">\(p(z) = \mathcal{N}(0,I)\)</span></td>
 <td>条件只影响解码，<span class="math inline">\(z\)</span>与<span class="math inline">\(c\)</span>编码时独立</td>
 </tr>
 <tr class="odd">
 <td><strong>CVAE_prior</strong></td>
 <td><span class="math inline">\(q(z\|x,c)\)</span></td>
 <td><span class="math inline">\(p(x\|z,c)\)</span></td>
-<td><span class="math inline">\(p(z\|c) = N(\mu(c),\sigma(c))\)</span></td>
+<td><span class="math inline">\(p(z\|c) = \mathcal{N}(\mu(c),\sigma(c))\)</span></td>
 <td>有Prior网络，条件先验</td>
 </tr>
 <tr class="even">
 <td><strong>CVAE1_prior</strong></td>
 <td><span class="math inline">\(q(z\|x)\)</span></td>
 <td><span class="math inline">\(p(x\|z,c)\)</span></td>
-<td><span class="math inline">\(p(z\|c) = N(\mu(c),\sigma(c))\)</span></td>
+<td><span class="math inline">\(p(z\|c) = \mathcal{N}(\mu(c),\sigma(c))\)</span></td>
 <td>条件只影响解码，但有Prior网络</td>
 </tr>
 </tbody>
 </table>
-<p><strong>选择建议</strong>:</p>
-<ul>
-<li><strong>标准CVAE</strong>:适合大多数条件生成任务</li>
-<li><strong>CVAE1</strong>:当希望潜在表示与条件解耦时使用</li>
-<li><strong>CVAE_prior</strong>:当不同条件需要不同的潜在空间结构时使用</li>
-<li><strong>CVAE1_prior</strong>:结合CVAE1和Prior网络的优点</li>
-</ul>
+<p><strong>选择建议</strong>: - <strong>标准CVAE</strong> : 适合大多数条件生成任务 - <strong>CVAE1</strong> : 当希望潜在表示与条件解耦时使用 - <strong>CVAE_prior</strong> : 当不同条件需要不同的潜在空间结构时使用 - <strong>CVAE1_prior</strong> : 结合CVAE1和Prior网络的优点</p>
 <hr />
 <h2 id="总结">5. 总结</h2>
 <p><strong>条件变分自编码器（CVAE）</strong> 通过以下关键创新实现了可控生成:</p>

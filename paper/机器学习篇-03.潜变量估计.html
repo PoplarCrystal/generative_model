@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>机器学习篇-03.潜变量估计</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="机器学习篇-03.潜变量估计">机器学习篇-03.潜变量估计</h1>
+<h2 id="高斯混合模型">1. 高斯混合模型</h2>
+<h3 id="我们身边的多峰分布">1.1 我们身边的多峰分布</h3>
+<p>在现实生活中，具有多个峰值的分布颇为常见，这些分布被称为“多峰分布”。本节将介绍我们身边的一些多峰分布的例子。此外，我们还会给出具体的多峰数据集，并通过可视化的方式来展示它们。</p>
+<h4 id="混合性别的身高分布">1.1.1 混合性别的身高分布</h4>
+<p>我们知道，对于特定的年龄和性别的人群（比如17岁的男性），他们的身高呈正态分布。那么，在性别不受限制的男女混合的情况下，身高分布又是怎样的呢？图1展示了17岁的日本男性和女性的身高分布。从该图可以看出，男性和女性的身高峰值是不同的。对于这个总体，最好将其作为拥有两个峰值的分布进行建模。</p>
+<p><img src="pic/ml/3-1.jpg" alt="图 3-1:17岁男性和17岁女性的身高分布" style="width: 65%;"></p>
+<p><small><strong>图1</strong> 17岁男性和17岁女性的身高分布</small></p>
+<h4 id="间歇泉喷发">1.1.2 间歇泉喷发</h4>
+<p>定期喷发热水的温泉叫作“间歇泉”。美国黄石国家公园有一个著名的间歇泉，叫作“老忠实间歇泉”（Old Faithful Geyser）。这个间歇泉的喷发是有规律的，从中也可以观察到多峰分布（参见图2）。</p>
+<p><img src="pic/ml/3-2.jpg" alt="图 3-2:老忠实间歇泉（左）和间歇泉喷发的散点图（右）" style="width: 65%;"></p>
+<p><small><strong>图2</strong> 老忠实间歇泉（左）和间歇泉喷发的散点图（右）</small></p>
+<p>图2的右图显示了一段时间内记录的272个数据，横轴代表喷发持续时间，纵轴代表喷发间隔时间。可以看出，喷发持续时间大致为1.5～5分钟，喷发间隔时间为50～90分钟。</p>
+<p><strong>多峰分布的数据集</strong></p>
+<p>下面是用Python读取图2的老忠实间歇泉数据集的代码。数据集在 <code>04/old_faithful.txt</code> 文件中。首先从文件的读取开始。</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="im">import</span> os</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>path <span class="op">=</span> os.path.join(os.path.dirname(<span class="va">__file__</span>), <span class="st">&#39;old_faithful.txt&#39;</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>xs <span class="op">=</span> np.loadtxt(path)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a><span class="bu">print</span>(xs.shape)  <span class="co"># (272, 2)</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a><span class="bu">print</span>(xs[<span class="dv">0</span>])  <span class="co"># [3.6 79.]</span></span></code></pre></div>
+<p>上面的代码将数据集读取为 <code>np.ndarray</code> 实例，其中包含272个二维数据，形状为 <code>(272, 2)</code>。第一个数据是 <code>[3.6 79.]</code>，表示喷发持续时间为3.6分钟，距离下一次喷发的间隔时间为79分钟。接下来绘制272个数据的图形。代码如下，散点图如图3所示。</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a>plt.scatter(xs[:, <span class="dv">0</span>], xs[:, <span class="dv">1</span>])</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>plt.xlabel(<span class="st">&#39;Eruptions (Min)&#39;</span>)  <span class="co"># 喷发持续时间（分钟）</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>plt.ylabel(<span class="st">&#39;Waiting (Min)&#39;</span>)    <span class="co"># 喷发间隔时间（分钟）</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>plt.show()</span></code></pre></div>
+<p><img src="pic/ml/3-3.jpg" alt="图 3-3:老忠实间歇泉喷发的散点图" style="width: 65%;"></p>
+<p><small><strong>图3</strong> 老忠实间歇泉喷发的散点图</small></p>
+<p>这样我们就完成了数据集的读取和散点图的绘制。</p>
+<h3 id="高斯混合模型的数据生成">1.2 高斯混合模型的数据生成</h3>
+<p>在现实生活中，我们可以看到多峰性的数据分布。这种多峰性分布可以通过组合多个正态分布来表示。由多个正态分布组成的模型称为<strong>高斯混合模型（Gaussian Mixture Model）</strong>，有时我们也用<strong>GMM</strong>来称呼它。</p>
+<p>接下来，我们的目标是创建基于GMM的生成模型，这将涉及以下两项任务:</p>
+<ol type="1">
+<li><strong>建模</strong>:假设观测数据的分布可以用GMM表示。</li>
+<li><strong>参数估计</strong>:估计GMM的参数。</li>
+</ol>
+<p>通过这两个步骤就可以创建基于GMM的生成模型。另外，在完成参数估计后，还可以应用训练后的GMM生成新的数据（参见图4）。</p>
+<p><img src="pic/ml/3-4.jpg" alt="图 3-4:GMM的参数估计和数据生成" style="width: 65%;"></p>
+<p><small><strong>图4</strong> GMM的参数估计和数据生成</small></p>
+<p>麻烦的是，GMM的参数估计非常难。它无法通过最大似然估计以解析的方式求解，而必须依赖EM算法这样的复杂算法。我们将在步骤5中详细介绍EM算法。这里先介绍如何使用GMM生成数据。假设GMM的参数估计已经完成，接下来我们将使用参数估计后的GMM生成数据。</p>
+<h4 id="利用gmm生成数据">1.2.1 利用GMM生成数据</h4>
+<p>本节将介绍生成图5所示数据的过程。</p>
+<p>图5中的数据可以通过以下步骤生成:</p>
+<ol type="1">
+<li>准备两个正态分布。</li>
+<li>重复:
+<ul>
+<li>①基于某个概率分布，从两个正态分布中选择一个</li>
+<li>②基于所选的正态分布生成数据。</li>
+</ul></li>
+</ol>
+<p>首先，准备两个正态分布。然后，在重复处理的过程中，执行由两个阶段构成的处理:从多个正态分布中选择其中一个，再基于这个正态分布生成数据。重复这两个阶段的处理，就可以得到图5所示的样本。</p>
+<p><img src="pic/ml/3-5.jpg" alt="图 3-5:由GMM生成的样本的散点图" style="width: 65%;"></p>
+<p><small><strong>图5</strong> 由GMM生成的样本的散点图</small></p>
+<h4 id="生成数据的代码">1.2.2 生成数据的代码</h4>
+<p>生成图5中样本的代码如下所示。</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>mus <span class="op">=</span> np.array([[<span class="fl">2.0</span>, <span class="fl">54.5</span>],</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a>                [<span class="fl">4.3</span>, <span class="fl">80.0</span>]])</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a>covs <span class="op">=</span> np.array([[[<span class="fl">0.87</span>, <span class="fl">0.44</span>],</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a>                  [<span class="fl">0.44</span>, <span class="fl">33.7</span>]],</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true"></a>                 [[<span class="fl">0.17</span>, <span class="fl">0.94</span>],</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true"></a>                  [<span class="fl">0.94</span>, <span class="fl">36.0</span>]]])</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true"></a>phis <span class="op">=</span> np.array([<span class="fl">0.35</span>, <span class="fl">0.65</span>])</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true"></a><span class="kw">def</span> sample():</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true"></a>    z <span class="op">=</span> np.random.choice(<span class="dv">2</span>, p<span class="op">=</span>phis)</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true"></a>    mu, cov <span class="op">=</span> mus[z], covs[z]</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true"></a>    x <span class="op">=</span> np.random.multivariate_normal(mu, cov)</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true"></a>    <span class="cf">return</span> x</span></code></pre></div>
+<p>在上面的代码中，两个正态分布的参数分别为 <code>mus</code> 和 <code>covs</code>。均值向量被汇总到 <code>mus</code> 中，协方差矩阵被汇总到 <code>covs</code> 中。例如，<code>mus[0]</code> 和 <code>covs[0]</code> 对应于第一个正态分布的参数。此外，<code>phis</code> 表示每个正态分布被选中的概率，它的值是 <code>[0.35, 0.65]</code>，这意味着第一个正态分布被选中的概率为0.35，第二个正态分布被选中的概率为0.65。然后按以下步骤进行采样:</p>
+<ol type="1">
+<li><code>np.random.choice(2, p=phis)</code>:根据 <code>phis</code> 指定的概率分布对0或1进行采样。<code>phis</code> 中每个元素的和必须设为1，否则会出错。</li>
+<li><code>np.random.multivariate_normal(mu, cov)</code>:从多维正态分布中采样一个数据。</li>
+</ol>
+<p>代码中实现的 <code>sample()</code> 函数用于对一些数据进行采样。下面是采样500个数据并绘制散点图的代码。</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a>N <span class="op">=</span> <span class="dv">500</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a>xs <span class="op">=</span> np.zeros([N, <span class="dv">2</span>])</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(N):</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a>    xs[i] <span class="op">=</span> sample()</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a>plt.scatter(xs[:, <span class="dv">0</span>], xs[:, <span class="dv">1</span>], c<span class="op">=</span><span class="st">&#39;orange&#39;</span>, alpha<span class="op">=</span><span class="fl">0.7</span>)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a>plt.xlabel(<span class="st">&#39;x&#39;</span>)</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a>plt.ylabel(<span class="st">&#39;y&#39;</span>)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true"></a>plt.show()</span></code></pre></div>
+<p>运行此代码后会得到一张有两个“簇”的散点图（参见图5）。</p>
+<h3 id="gmm的数学式">1.3 GMM的数学式</h3>
+<p>在1.2节中，我们通过GMM生成了数据。我们的下一个目标是用数学式来表示GMM。</p>
+<h4 id="gmm的数学式-1">1.3.1 GMM的数学式</h4>
+<p>首先回顾一下GMM的内容。GMM通过以下步骤生成数据:</p>
+<ol type="1">
+<li>准备 <span class="math inline">\(K\)</span> 个正态分布。</li>
+<li>重复:
+<ul>
+<li>①基于某个概率分布，从 <span class="math inline">\(K\)</span> 个正态分布中选择其中一个</li>
+<li>②基于所选的正态分布生成数据。</li>
+</ul></li>
+</ol>
+<p>①是从多个候选分布中选择一个的行为。这一行为相对应的概率分布是图6所示的<strong>分类分布（categorical distribution）</strong>。</p>
+<p><img src="pic/ml/3-6.jpg" alt="图 3-6:参数为φ＝(0.35, 0.65)的分类分布" style="width: 65%;"></p>
+<p><small><strong>图6</strong> 参数为φ＝(0.35, 0.65)的分类分布</small></p>
+<p>分类分布的数学式如下所示:</p>
+<p><span class="math display">\[p(z = k; \phi) = \phi_k \tag{3.1}\]</span></p>
+<p>式3.1中的 <span class="math inline">\(z\)</span> 是离散型随机变量，取1和 <span class="math inline">\(K\)</span> 之间的整数。<span class="math inline">\(\phi\)</span> 读作 <code>phi</code>，表示分类分布的参数。具体来说，它有 <span class="math inline">\(K\)</span> 个值，即 <span class="math inline">\(\phi = (\phi_1, \phi_2, \ldots, \phi_K)\)</span>，其中 <span class="math inline">\(\phi_k\)</span> 是第 <span class="math inline">\(k\)</span> 个类别出现的概率。例如，两类别的分类分布的参数为 <span class="math inline">\(\phi = (0.35, 0.65)\)</span>。</p>
+<p>分类分布的参数 <span class="math inline">\(\phi = (\phi_1, \phi_2, \ldots, \phi_K)\)</span> 必须满足以下条件: - 对于所有 <span class="math inline">\(k\)</span>，<span class="math inline">\(\phi_k \geq 0\)</span>（所有元素均大于或等于0） - <span class="math inline">\(\sum_{k=1}^{K} \phi_k = 1\)</span>（所有元素之和为1）</p>
+<p>接下来是多个正态分布的数学式。这里准备如下所示的 <span class="math inline">\(K\)</span> 个正态分布的参数:</p>
+<p><span class="math display">\[\mu = (\mu_1, \mu_2, \ldots, \mu_K)\]</span></p>
+<p><span class="math display">\[\Sigma = (\Sigma_1, \Sigma_2, \ldots, \Sigma_K)\]</span></p>
+<p>这里考虑准备了 <span class="math inline">\(K\)</span> 个正态分布的情况。在这种情况下，<span class="math inline">\(z\)</span> 的取值决定了所使用的正态分布。例如，当 <span class="math inline">\(z = k\)</span> 时，<span class="math inline">\(x\)</span> 服从的概率分布就是第 <span class="math inline">\(k\)</span> 个正态分布。因此，有下面的式子成立:</p>
+<p><span class="math display">\[p(x|z = k; \mu_k, \Sigma_k) = \mathcal{N}(x; \mu_k, \Sigma_k) \tag{3.2}\]</span></p>
+<p>生成模型的目标是表示观测数据 <span class="math inline">\(x\)</span> 的概率分布 <span class="math inline">\(p(x)\)</span>。对于GMM的情况，通过概率边际化，可以使用 <span class="math inline">\(p(x, z)\)</span> 将 <span class="math inline">\(p(x)\)</span> 表示为以下式子:</p>
+<p><span class="math display">\[p(x) = \sum_{k=1}^{K} p(x, z = k)\]</span></p>
+<p>然后将联合概率 <span class="math inline">\(p(x, z = k)\)</span> 表示为以下式子:</p>
+<p><span class="math display">\[\begin{aligned}
+p(x, z = k) &amp;= p(x|z = k) p(z = k) \quad \text{（乘法定理）} \\
+&amp;= \phi_k \mathcal{N}(x; \mu_k, \Sigma_k) \quad \text{（代入式3.1和式3.2）}
+\end{aligned}\]</span></p>
+<p>基于以上数学式，可以将 <span class="math inline">\(p(x)\)</span> 表示为以下式子:</p>
+<p><span class="math display">\[p(x) = \sum_{k=1}^{K} \phi_k \mathcal{N}(x; \mu_k, \Sigma_k) \tag{3.3}\]</span></p>
+<p>式3.3就是GMM的数学式，即每个正态分布都乘以权重，然后再相加。换言之，它表示的是正态分布的加权和。</p>
+<p>在GMM中出现了两个随机变量 <span class="math inline">\(x\)</span> 和 <span class="math inline">\(z\)</span>。在参数估计中，<span class="math inline">\(x\)</span> 对应于用于训练的观测数据，而 <span class="math inline">\(z\)</span> 并不在观测数据中。<span class="math inline">\(x\)</span> 是观测值，<span class="math inline">\(z\)</span> 则不是。由于 <span class="math inline">\(z\)</span> 不是观测出来的，因此被称为<strong>潜变量（latent variable）</strong>。</p>
+<h4 id="gmm的实现">1.3.3 GMM的实现</h4>
+<p>接下来进行GMM的实现。表示GMM的式3.3可以实现为如下代码。</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true"></a>mus <span class="op">=</span> np.array([[<span class="fl">2.0</span>, <span class="fl">54.5</span>],</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true"></a>                [<span class="fl">4.3</span>, <span class="fl">80.0</span>]])</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true"></a>covs <span class="op">=</span> np.array([[[<span class="fl">0.87</span>, <span class="fl">0.44</span>],</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true"></a>                  [<span class="fl">0.44</span>, <span class="fl">33.7</span>]],</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true"></a>                 [[<span class="fl">0.17</span>, <span class="fl">0.94</span>],</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true"></a>                  [<span class="fl">0.94</span>, <span class="fl">36.0</span>]]])</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true"></a>phis <span class="op">=</span> np.array([<span class="fl">0.35</span>, <span class="fl">0.65</span>])</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true"></a></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true"></a><span class="kw">def</span> multivariate_normal(x, mu, cov):</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true"></a>    det <span class="op">=</span> np.linalg.det(cov)</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true"></a>    inv <span class="op">=</span> np.linalg.inv(cov)</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true"></a>    d <span class="op">=</span> <span class="bu">len</span>(x)</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true"></a>    z <span class="op">=</span> <span class="dv">1</span> <span class="op">/</span> np.sqrt((<span class="dv">2</span> <span class="op">*</span> np.pi) <span class="op">**</span> d <span class="op">*</span> det)</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true"></a>    y <span class="op">=</span> z <span class="op">*</span> np.exp(<span class="op">-</span>(x <span class="op">-</span> mu).T <span class="op">@</span> inv <span class="op">@</span> (x <span class="op">-</span> mu) <span class="op">/</span> <span class="fl">2.0</span>)</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true"></a>    <span class="cf">return</span> y</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true"></a></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true"></a><span class="kw">def</span> gmm(x, phis, mus, covs):</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true"></a>    K <span class="op">=</span> <span class="bu">len</span>(phis)</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true"></a>    y <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true"></a>    <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(K):</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true"></a>        phi, mu, cov <span class="op">=</span> phis[k], mus[k], covs[k]</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true"></a>        y <span class="op">+=</span> phi <span class="op">*</span> multivariate_normal(x, mu, cov)</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true"></a>    <span class="cf">return</span> y</span></code></pre></div>
+<p>在上面的代码中，①处的代码非常重要。在这里，我们将取出参数并计算正态分布的加权和。以上就是GMM的实现。接下来我们对GMM进行可视化。代码如下所示。</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true"></a>xs <span class="op">=</span> np.arange(<span class="dv">1</span>, <span class="dv">6</span>, <span class="fl">0.1</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true"></a>ys <span class="op">=</span> np.arange(<span class="dv">40</span>, <span class="dv">100</span>, <span class="fl">0.1</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true"></a>X, Y <span class="op">=</span> np.meshgrid(xs, ys)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true"></a>Z <span class="op">=</span> np.zeros_like(X)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(X.shape[<span class="dv">0</span>]):</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true"></a>    <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(X.shape[<span class="dv">1</span>]):</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true"></a>        x <span class="op">=</span> np.array([X[i, j], Y[i, j]])</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true"></a>        Z[i, j] <span class="op">=</span> gmm(x, phis, mus, covs)</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true"></a></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true"></a>fig <span class="op">=</span> plt.figure()</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true"></a>ax1 <span class="op">=</span> fig.add_subplot(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">1</span>, projection<span class="op">=</span><span class="st">&#39;3d&#39;</span>)</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true"></a>ax1.set_xlabel(<span class="st">&#39;x&#39;</span>)</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true"></a>ax1.set_ylabel(<span class="st">&#39;y&#39;</span>)</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true"></a>ax1.set_zlabel(<span class="st">&#39;z&#39;</span>)</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true"></a>ax1.plot_surface(X, Y, Z, cmap<span class="op">=</span><span class="st">&#39;viridis&#39;</span>)</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true"></a>ax2 <span class="op">=</span> fig.add_subplot(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">2</span>)</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true"></a>ax2.set_xlabel(<span class="st">&#39;x&#39;</span>)</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true"></a>ax2.set_ylabel(<span class="st">&#39;y&#39;</span>)</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true"></a>ax2.contour(X, Y, Z)</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true"></a>plt.show()</span></code></pre></div>
+<p>关于这段代码的说明，可以参见3.3节。运行结果如图7所示。</p>
+<p><img src="pic/ml/3-7.jpg" alt="图 3-7:GMM的热力图（左）及其等高线（右）" style="width: 65%;"></p>
+<p><small><strong>图7</strong> GMM的热力图（左）及其等高线（右）</small></p>
+<p>如图7所示，我们完成了一个有两个峰值的分布的可视化。需要关注的是 <code>phis</code> 的设置值。这里 <code>phis = [0.35, 0.65]</code>，这表明峰值之间存在差异。</p>
+<h3 id="参数估计中的难点">1.4 参数估计中的难点</h3>
+<p>我们已经学习了GMM。剩下的挑战是GMM的参数估计。但这个问题并不容易解决。本节将使用数学式来说明GMM参数估计的难点所在。</p>
+<p><strong>GMM的参数估计</strong></p>
+<p>GMM的数学式如下所示（这里再次列出式3.3）:</p>
+<p><span class="math display">\[p(x) = \sum_{k=1}^{K} \phi_k \mathcal{N}(x; \mu_k, \Sigma_k) \tag{3.3}\]</span></p>
+<p>我们来思考一下获得了样本 <span class="math inline">\(\mathcal{D} = \{x_1, x_2, \ldots, x_N\}\)</span> 的情况。另外，参数 <span class="math inline">\(\{\phi, \mu, \Sigma\}\)</span> 汇总表示为 <span class="math inline">\(\theta\)</span>。此时，似然 <span class="math inline">\(p(\mathcal{D}; \theta)\)</span> 的数学式如下所示:</p>
+<p><span class="math display">\[p(\mathcal{D}; \theta) = p(x_1; \theta) p(x_2; \theta) \ldots p(x_N; \theta) = \prod_{i=1}^{N} p(x_i; \theta)\]</span></p>
+<p>前面我们在步骤2中学习了最大似然估计。最大似然估计的目标是找到使似然最大的参数 <span class="math inline">\(\theta\)</span>。但由于取对数后计算更方便，因此可以考虑将似然 <span class="math inline">\(p(\mathcal{D}; \theta)\)</span> 的最大化问题替换为对数似然 <span class="math inline">\(\log p(\mathcal{D}; \theta)\)</span> 的最大化问题。</p>
+<p><span class="math display">\[\log p(\mathcal{D}; \theta) = \log \prod_{i=1}^{N} p(x_i; \theta) = \sum_{i=1}^{N} \log p(x_i; \theta) = \sum_{i=1}^{N} \log \left[\sum_{k=1}^{K} \phi_k \mathcal{N}(x_i; \mu_k, \Sigma_k)\right] \tag{3.4}\]</span></p>
+<p>最大似然估计的目标是找到使 <span class="math inline">\(\log p(\mathcal{D}; \theta)\)</span> 最大的参数 <span class="math inline">\(\theta\)</span>。对于简单的问题，可以采用先求出参数的梯度，然后求解梯度为0时的方程的做法。对于这里的问题，可以采用以下方程（这里定义 <span class="math inline">\(L(\theta) = \log p(\mathcal{D}; \theta)\)</span>）:</p>
+<p><span class="math display">\[\frac{\partial L(\theta)}{\partial \phi_k} = 0, \quad \frac{\partial L(\theta)}{\partial \mu_k} = 0, \quad \frac{\partial L(\theta)}{\partial \Sigma_k} = 0\]</span></p>
+<p>如果能解出这3个方程自然最好，但可惜它们无法通过解析的方式求解。这是因为式3.4是“<span class="math inline">\(\log\sum\ldots\)</span>”的形式。这种形式也叫作“<span class="math inline">\(\log\)</span>-sum”。</p>
+<p><span class="math inline">\(\log\)</span>-sum很难解析，在多数情况下无法通过解析的方式求解。<span class="math inline">\(\sum\)</span>-<span class="math inline">\(\log\)</span> 则很容易解析。</p>
+<p>如果 <span class="math inline">\(K = 1\)</span>（单个正态分布的情况），则式3.4可以通过解析的方式求解。正态分布是 <span class="math inline">\(\exp(\ldots)\)</span> 的形式。如果只有一个正态分布，那么由于 <span class="math inline">\(\log\)</span> 和 <span class="math inline">\(\exp\)</span> 会相互抵消，因此式子就会变为简单的形式（也就可以通过解析的方式求解了）。但是，如果 <span class="math inline">\(\log\)</span> 中存在两个以上的正态分布，那么数学式就会变得复杂，因此也就无法通过解析的方式求解了。</p>
+<p><strong>GMM的参数估计无法通过解析的方式求解。</strong></p>
+<hr />
+<h2 id="一般化的潜变量模型">2. 一般化的潜变量模型</h2>
+<p>这里用 <span class="math inline">\(x\)</span> 表示可观测的随机变量，<span class="math inline">\(z\)</span> 表示潜变量，<span class="math inline">\(\theta\)</span> 表示参数。利用概率的边际化，可以将单个数据的对数似然表示为下面的式子:</p>
+<p><span class="math display">\[\log p_\theta(x) = \log \sum_z p_\theta(x, z)\]</span></p>
+<p>这里假定潜变量 <span class="math inline">\(z\)</span> 是离散型的，对于连续型的变量，只需将 <span class="math inline">\(\sum\)</span> 变为 <span class="math inline">\(\int\)</span> 即可，之后的探讨是相同的。同样，这里假定 <span class="math inline">\(x\)</span>、<span class="math inline">\(z\)</span> 和 <span class="math inline">\(\theta\)</span> 都是标量，但即使它们是向量，后面的探讨也是相同的。</p>
+<p>接下来思考获得了样本 <span class="math inline">\(\mathcal{D} = \{x_1, x_2, \ldots, x_N\}\)</span> 的情况。获得该样本时的对数似然的数学式如下所示:</p>
+<p><span class="math display">\[\begin{aligned}
+\log p_\theta(\mathcal{D}) &amp;= \log [p_\theta(x_1) p_\theta(x_2) \ldots p_\theta(x_N)] \\
+&amp;= \sum_{i=1}^{N} \log p_\theta(x_i) \\
+&amp;= \sum_{i=1}^{N} \log \sum_z p_\theta(x_i, z)
+\end{aligned}\]</span></p>
+<p>我们想将这个对数似然最大化，但由于现在式子是 <span class="math inline">\(\log\)</span>-<span class="math inline">\(\sum\)</span> 的形式，无法通过解析的方式求解。EM算法通过将其转换为 <span class="math inline">\(\sum\)</span>-<span class="math inline">\(\log\)</span> 的形式来解决这个问题。</p>
+<p>下面我们探讨单个数据 <span class="math inline">\(x\)</span> 的对数似然 <span class="math inline">\(\log p_\theta(x)\)</span>。<span class="math inline">\(\log p_\theta(x)\)</span> 的图形具有复杂的形状，如图8所示。</p>
+<p><img src="pic/ml/3-8.jpg" alt="图 3-8:$\log p_\theta(x)$ 的图形的示意图" style="width: 65%;"></p>
+<p><small><strong>图8</strong> <span class="math inline">\(\log p_\theta(x)\)</span> 的图形的示意图</small></p>
+<p><span class="math inline">\(\log p_\theta(x)\)</span> 的形状之所以复杂，是因为它是下面这样的 <span class="math inline">\(\log\)</span>-<span class="math inline">\(\sum\)</span> 的形式:</p>
+<p><span class="math display">\[\log p_\theta(x) = \log \sum_z p_\theta(x, z)\]</span></p>
+<p>为了解决 <span class="math inline">\(\log\)</span>-<span class="math inline">\(\sum\)</span> 问题，我们首先使用概率的乘法定理来表示它:</p>
+<p><span class="math display">\[\log p_\theta(x) = \log \sum_z p_\theta(x|z) p_\theta(z)\]</span></p>
+<p>乍一看似乎解决了 <span class="math inline">\(\log\)</span>-<span class="math inline">\(\sum\)</span> 问题，但条件概率 <span class="math inline">\(p_\theta(z|x)\)</span> 仍是“棘手的问题”。这是因为根据贝叶斯定理，<span class="math inline">\(p_\theta(z|x)\)</span> 可以表示为下面的式子:</p>
+<p><span class="math display">\[p_\theta(z|x) = \frac{p_\theta(x|z) p_\theta(z)}{\sum_z p_\theta(x|z) p_\theta(z)}\]</span></p>
+<p>由于 <span class="math inline">\(\sum\)</span>（sum）出现在了上式的分母中，因此最终 <span class="math inline">\(\log p_\theta(x)\)</span> 仍然是 <span class="math inline">\(\log\)</span>-<span class="math inline">\(\sum\)</span> 的形式。</p>
+</body>
+</html>

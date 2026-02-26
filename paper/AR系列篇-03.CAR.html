@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>AR系列篇-03.CAR: 从"无条件生成"到"条件生成"</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+        </script>
+
+        <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            line-height: 1.7;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            color: #333;
+            background-color: #fff;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            font-weight: 600;
+        }
+        h1 {
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.5em;
+        }
+        h4 {
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin: 1em 0;
+            text-align: justify;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            line-height: 1.45;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+            font-size: 0.9em;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.5em 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 1.5em 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1.5em auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        .math {
+            font-size: 1.05em;
+        }
+        .math.display {
+            margin: 1.5em 0;
+            text-align: center;
+        }
+        .math.inline {
+            margin: 0 2px;
+        }
+        </style>
+</head>
+<body>
+<h1 id="ar系列篇-03.car-从无条件生成到条件生成">AR系列篇-03.CAR: 从“无条件生成”到“条件生成”</h1>
+<h2 id="ar-的问题与-car-的引入">1. AR 的问题与 CAR 的引入</h2>
+<h3 id="无条件-ar-的局限性">1.1 无条件 AR 的局限性</h3>
+<p>自回归（AR）模型通过链式法则将联合分布分解为 <span class="math inline">\(p(x) = \prod_{t=1}^T p(x_t \mid x_{&lt;t})\)</span>，可结合 RNN、CNN、Transformer 等架构实现序列生成。标准 AR 模型从历史序列 <span class="math inline">\(x_{&lt;t}\)</span> 预测下一个元素 <span class="math inline">\(x_t\)</span>，生成的内容取决于模型学习到的数据分布。</p>
+<p>然而，在需要<strong>可控生成</strong>的任务中，传统 AR 显得力不从心:</p>
+<p><strong>无法控制生成内容</strong>:标准 AR 从序列历史 <span class="math inline">\(x_{&lt;t}\)</span> 预测 <span class="math inline">\(x_t\)</span>，生成过程仅依赖已生成部分，无法指定生成特定类别的样本。例如，在 MNIST 上无法控制生成数字“7”的图像，只能随机生成任意数字。</p>
+<h3 id="car-的解决方案">1.2 CAR 的解决方案</h3>
+<p>为了增强 AR 的灵活性和可控性，提出了<strong>条件自回归模型（Conditional Autoregressive Model, CAR）</strong>。CAR 允许在生成过程中加入额外条件 <span class="math inline">\(c\)</span>（如类别标签、文本前缀等），实现可控的序列生成。</p>
+<p><strong>核心思想</strong>:在 AR 的基础上引入条件变量 <span class="math inline">\(c\)</span>，将目标从建模 <span class="math inline">\(p(x)\)</span> 改为建模 <span class="math inline">\(p(x \mid c)\)</span>。通过指定条件 <span class="math inline">\(c\)</span> 来指导模型生成符合该条件的序列。</p>
+<p><strong>无条件 AR</strong>: - 目标分布:<span class="math inline">\(p(x)\)</span> - 分解:<span class="math inline">\(p(x) = \prod_{t=1}^T p(x_t \mid x_{&lt;t})\)</span> - 网络输入:<span class="math inline">\(x_{&lt;t}\)</span></p>
+<p><strong>条件 AR（CAR）</strong>: - 目标分布:<span class="math inline">\(p(x \mid c)\)</span> - 分解:<span class="math inline">\(p(x \mid c) = \prod_{t=1}^T p(x_t \mid x_{&lt;t}, c)\)</span> - 网络输入:<span class="math inline">\(x_{&lt;t}\)</span> 和 <span class="math inline">\(c\)</span></p>
+<hr />
+<h2 id="car-的核心问题">2. CAR 的核心问题</h2>
+<h3 id="问题-1条件-c-如何加入模型">2.1 问题 1:条件 <span class="math inline">\(c\)</span> 如何加入模型？</h3>
+<p>在 CAR 中，条件 <span class="math inline">\(c\)</span> 需要加入到网络的每一步预测中，使 <span class="math inline">\(p_\theta(x_t \mid x_{&lt;t}, c)\)</span> 同时依赖历史与条件。</p>
+<p><strong>网络输入</strong>: - 历史序列:<span class="math inline">\(x_{&lt;t} = (x_1, \ldots, x_{t-1})\)</span> - 条件:<span class="math inline">\(c\)</span>（对所有时间步共享且不变）</p>
+<p><strong>实现方式因架构而异</strong>: - <strong>RNN</strong>:将 <span class="math inline">\(c\)</span> 的嵌入加到每步的输入特征上，或作为初始隐藏状态 - <strong>CNN</strong>:将 <span class="math inline">\(c\)</span> 的嵌入 broadcast 并与中间特征相加（参考 cddpm） - <strong>Transformer</strong>:将 <span class="math inline">\(c\)</span> 编码为前缀 token 或通过 cross-attention 引入</p>
+<p>✅ <strong>关键</strong>:条件 <span class="math inline">\(c\)</span> 对所有时间步<strong>共享</strong>，不随时间变化，满足 <span class="math inline">\(p(x_t \mid x_{&lt;t}, c)\)</span> 的建模形式。</p>
+<h3 id="问题-2条件-c-如何编码">2.2 问题 2:条件 <span class="math inline">\(c\)</span> 如何编码？</h3>
+<p>条件变量 <span class="math inline">\(c\)</span> 通常是离散标签（如 MNIST 的 0~9），需要转换为数值向量才能输入神经网络。与 CGAN、CVAE、CDDPM 等类似，常见方式有:</p>
+<p><strong>方式 1:One-Hot 编码</strong> - 类别 <span class="math inline">\(k\)</span> → <span class="math inline">\([0, \ldots, 1, \ldots, 0]\)</span>（第 <span class="math inline">\(k\)</span> 位为 1） - 优点:简单，无额外参数 - 缺点:维度等于类别数，无法学习类别语义</p>
+<p><strong>方式 2:Embedding 编码</strong>（本实现采用） - 使用 <code>nn.Embedding(num_labels, label_embed_dim)</code> 将类别索引映射为可学习向量 - 优点:维度可自定义，可学习类别间的语义关系 - 缺点:需额外可学习参数</p>
+<hr />
+<h2 id="car-的损失函数与训练">3. CAR 的损失函数与训练</h2>
+<h3 id="条件对数似然">3.1 条件对数似然</h3>
+<p>CAR 的目标是最大化条件对数似然:</p>
+<p><span class="math display">\[\mathcal{L}(\theta) = \mathbb{E}_{(x, c) \sim \mathcal{D}} \left[ \log p_\theta(x \mid c) \right] = \mathbb{E}_{(x, c)} \left[ \sum_{t=1}^T \log p_\theta(x_t \mid x_{&lt;t}, c) \right]\]</span></p>
+<p><strong>训练（条件 Teacher Forcing）</strong>: - 使用真实历史 <span class="math inline">\(x_{&lt;t}\)</span> 作为输入（非模型生成） - 条件 <span class="math inline">\(c\)</span> 来自数据集（如类别标签） - 梯度可并行计算（因输入已知）</p>
+<h3 id="与无条件-ar-的对比">3.2 与无条件 AR 的对比</h3>
+<table>
+<thead>
+<tr class="header">
+<th>项目</th>
+<th>无条件 AR</th>
+<th>条件 AR（CAR）</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>目标分布</td>
+<td><span class="math inline">\(p(x)\)</span></td>
+<td><span class="math inline">\(p(x \mid c)\)</span></td>
+</tr>
+<tr class="even">
+<td>分解形式</td>
+<td><span class="math inline">\(\prod_t p(x_t \mid x_{&lt;t})\)</span></td>
+<td><span class="math inline">\(\prod_t p(x_t \mid x_{&lt;t}, c)\)</span></td>
+</tr>
+<tr class="odd">
+<td>网络输入</td>
+<td><span class="math inline">\(x_{&lt;t}\)</span></td>
+<td><span class="math inline">\(x_{&lt;t}\)</span> 和 <span class="math inline">\(c\)</span></td>
+</tr>
+<tr class="even">
+<td>应用场景</td>
+<td>无监督生成</td>
+<td>可控生成（指定类别等）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="推理条件自回归采样">3.3 推理:条件自回归采样</h3>
+<p>生成过程为递归采样，每步依赖历史与固定条件 <span class="math inline">\(c\)</span>:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a>x <span class="op">=</span> []</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="cf">for</span> t <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, T<span class="op">+</span><span class="dv">1</span>):</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>    p_xt <span class="op">=</span> model(x[:t<span class="op">-</span><span class="dv">1</span>], c)   <span class="co"># p(x_t | x_{&lt;t}, c)</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>    x_t <span class="op">=</span> sample(p_xt)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>    x.append(x_t)</span></code></pre></div>
+<hr />
+<h2 id="car-代码实现以-car_rnn-为例">4. CAR 代码实现（以 CAR_RNN 为例）</h2>
+<p>下面以 MNIST 条件生成为例，给出基于 RNN 的 CAR 实现。架构参考 cddpm 的条件注入方式:使用 <code>nn.Embedding</code> 将标签嵌入，再与特征相加。</p>
+<div data-align="center">
+<p><img src="pic/ar/3.1.png" width="70%"></p>
+</div>
+<p><small><strong>图 3.1</strong> CAR_RNN 网络架构图:标签经 Embedding 后与序列特征相加，再经 LSTM 与输出层预测下一像素</small></p>
+<h3 id="模型结构">4.1 模型结构</h3>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="kw">class</span> CAR_RNN(nn.Module):</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>    <span class="co">&quot;&quot;&quot;条件自回归 RNN 模型，用于条件生成 MNIST 图像</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a><span class="co">    在 AR_RNN (LSTM) 基础上增加标签条件:</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a><span class="co">    1. 使用 nn.Embedding 将类别标签嵌入为向量</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a><span class="co">    2. 将标签嵌入加到每步的输入特征上，实现条件控制</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a><span class="co">    &quot;&quot;&quot;</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, input_dim<span class="op">=</span><span class="dv">1</span>, hidden_dim<span class="op">=</span><span class="dv">256</span>, num_layers<span class="op">=</span><span class="dv">2</span>, dropout<span class="op">=</span><span class="fl">0.2</span>,</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a>                 num_labels<span class="op">=</span><span class="dv">10</span>, label_embed_dim<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a>        <span class="bu">super</span>().<span class="fu">__init__</span>()</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a>        <span class="cf">if</span> label_embed_dim <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true"></a>            label_embed_dim <span class="op">=</span> hidden_dim</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true"></a></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true"></a>        <span class="va">self</span>.label_emb <span class="op">=</span> nn.Embedding(num_labels, label_embed_dim)</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true"></a>        <span class="cf">if</span> label_embed_dim <span class="op">!=</span> hidden_dim:</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true"></a>            <span class="va">self</span>.label_proj <span class="op">=</span> nn.Linear(label_embed_dim, hidden_dim)</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true"></a>        <span class="cf">else</span>:</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true"></a>            <span class="va">self</span>.label_proj <span class="op">=</span> nn.Identity()</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true"></a></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true"></a>        <span class="va">self</span>.input_proj <span class="op">=</span> nn.Linear(input_dim, hidden_dim)</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true"></a>        <span class="va">self</span>.lstm <span class="op">=</span> nn.LSTM(hidden_dim, hidden_dim, num_layers<span class="op">=</span>num_layers,</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true"></a>                            dropout<span class="op">=</span>dropout <span class="cf">if</span> num_layers <span class="op">&gt;</span> <span class="dv">1</span> <span class="cf">else</span> <span class="dv">0</span>, batch_first<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true"></a>        <span class="va">self</span>.output <span class="op">=</span> nn.Sequential(</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true"></a>            nn.Linear(hidden_dim, hidden_dim), nn.ReLU(),</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true"></a>            nn.Linear(hidden_dim, input_dim)</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true"></a>        )</span></code></pre></div>
+<h3 id="训练阶段forward">4.2 训练阶段（forward）</h3>
+<p>标签嵌入 broadcast 到序列各位置，与输入特征相加:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="kw">def</span> forward(<span class="va">self</span>, x, labels):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>    x_proj <span class="op">=</span> <span class="va">self</span>.input_proj(x)                    <span class="co"># (B, L, hidden_dim)</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>    label_emb <span class="op">=</span> <span class="va">self</span>.label_emb(labels)             <span class="co"># (B, label_embed_dim)</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a>    label_emb <span class="op">=</span> <span class="va">self</span>.label_proj(label_emb)         <span class="co"># (B, hidden_dim)</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a>    label_emb <span class="op">=</span> label_emb.unsqueeze(<span class="dv">1</span>)             <span class="co"># (B, 1, hidden_dim)</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a>    x_proj <span class="op">=</span> x_proj <span class="op">+</span> label_emb                    <span class="co"># broadcast 到 (B, L, hidden_dim)</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true"></a>    lstm_out, _ <span class="op">=</span> <span class="va">self</span>.lstm(x_proj)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true"></a>    <span class="cf">return</span> <span class="va">self</span>.output(lstm_out)                   <span class="co"># (B, L, input_dim) Logits</span></span></code></pre></div>
+<h3 id="推理阶段generate">4.3 推理阶段（generate）</h3>
+<p>每步将标签嵌入加到当前输入特征上，配合 hidden_state 传递历史:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a><span class="kw">def</span> generate(<span class="va">self</span>, batch_size<span class="op">=</span><span class="dv">1</span>, seq_len<span class="op">=</span><span class="dv">784</span>, labels<span class="op">=</span><span class="va">None</span>, device<span class="op">=</span><span class="st">&#39;cpu&#39;</span>, temperature<span class="op">=</span><span class="fl">1.0</span>):</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a>    <span class="cf">if</span> labels <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a>        labels <span class="op">=</span> torch.randint(<span class="dv">0</span>, <span class="va">self</span>.num_labels, (batch_size,), device<span class="op">=</span>device)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a>    label_emb <span class="op">=</span> <span class="va">self</span>.label_emb(labels)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a>    label_emb <span class="op">=</span> <span class="va">self</span>.label_proj(label_emb)         <span class="co"># (B, hidden_dim)</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a>    generated_seq <span class="op">=</span> torch.zeros(batch_size, seq_len, <span class="va">self</span>.input_dim, device<span class="op">=</span>device)</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a>    hidden_state <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true"></a>    <span class="cf">for</span> t <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, seq_len):</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true"></a>        last_pixel <span class="op">=</span> generated_seq[:, t<span class="op">-</span><span class="dv">1</span>:t, :]</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true"></a>        current_feature <span class="op">=</span> <span class="va">self</span>.input_proj(last_pixel)</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true"></a>        current_feature <span class="op">=</span> current_feature <span class="op">+</span> label_emb.unsqueeze(<span class="dv">1</span>)   <span class="co"># 注入条件</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true"></a></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true"></a>        lstm_out, hidden_state <span class="op">=</span> <span class="va">self</span>.lstm(current_feature, hidden_state)</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true"></a>        logits <span class="op">=</span> <span class="va">self</span>.output(lstm_out[:, <span class="op">-</span><span class="dv">1</span>, :])</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true"></a>        next_pixel <span class="op">=</span> torch.bernoulli(torch.sigmoid(logits <span class="op">/</span> temperature))</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true"></a>        generated_seq[:, t, :] <span class="op">=</span> next_pixel</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true"></a></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true"></a>    <span class="cf">return</span> generated_seq, labels</span></code></pre></div>
+<h3 id="损失函数">4.4 损失函数</h3>
+<p>与无条件 AR 相同，二值像素使用 BCEWithLogits:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a><span class="kw">def</span> loss_function(pred, target):</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a>    <span class="cf">return</span> F.binary_cross_entropy_with_logits(pred.reshape(<span class="op">-</span><span class="dv">1</span>), target.reshape(<span class="op">-</span><span class="dv">1</span>))</span></code></pre></div>
+<p>训练时，<code>forward</code> 需传入 <code>(x, labels)</code>，其中 <code>labels</code> 来自数据集的类别标注。</p>
+<hr />
+<h2 id="car-的作用与本质">5. CAR 的作用与本质</h2>
+<h3 id="car-的作用">5.1 CAR 的作用</h3>
+<ol type="1">
+<li><strong>控制生成内容</strong>:通过指定条件 <span class="math inline">\(c\)</span>（如数字标签 0~9），生成对应类别的样本</li>
+<li><strong>有监督学习</strong>:利用数据集中的 <span class="math inline">\((x, c)\)</span> 对，学习条件分布 <span class="math inline">\(p(x \mid c)\)</span></li>
+<li><strong>与无条件 AR 兼容</strong>:若 <span class="math inline">\(c\)</span> 随机采样，可退化为近似无条件生成</li>
+</ol>
+<h3 id="car-的本质条件分布建模">5.2 CAR 的本质:条件分布建模</h3>
+<p><strong>核心思想</strong>:CAR 将无条件自回归 <span class="math inline">\(p(x) = \prod_t p(x_t \mid x_{&lt;t})\)</span> 拓展为条件自回归 <span class="math inline">\(p(x \mid c) = \prod_t p(x_t \mid x_{&lt;t}, c)\)</span>，通过引入外部条件 <span class="math inline">\(c\)</span> 实现可控生成。</p>
+<p>条件 <span class="math inline">\(c\)</span> 将边缘分布 <span class="math inline">\(p(x)\)</span> 分解为条件分布 <span class="math inline">\(p(x \mid c)\)</span>，使得生成过程可按需控制，广泛应用于 class-conditional Image GPT、prompt-based 文本生成、text-to-speech 等任务。</p>
+<hr />
+<h2 id="条件生成结果">6. 条件生成结果</h2>
+<p>在 MNIST 数据集上训练 CAR_RNN 后，按指定标签 <span class="math inline">\(c \in \{0, 1, \ldots, 9\}\)</span> 生成数字图像。下图展示了条件生成的样例:每张图上方标注对应的 Label，可见模型能够根据标签生成相应类别的数字。</p>
+<div data-align="center">
+<p><img src="pic/ar/3.2.png" width="70%"></p>
+</div>
+<p><small><strong>图 3.2</strong> CAR_RNN 条件生成结果:按指定标签（0~9）生成的 MNIST 数字图像</small></p>
+<hr />
+<h2 id="结论">7. 结论</h2>
+<ol type="1">
+<li><p><strong>CAR 实现了可控生成</strong>:在 AR 基础上引入条件 <span class="math inline">\(c\)</span>，将建模目标从 <span class="math inline">\(p(x)\)</span> 拓展为 <span class="math inline">\(p(x \mid c)\)</span>，可通过指定类别标签生成对应样本，解决了无条件 AR 无法控制生成内容的问题。</p></li>
+<li><p><strong>条件注入方式简洁</strong>:采用 Embedding 编码标签，并将标签嵌入与序列特征相加（broadcast），与 CDDPM、CGAN 等条件生成模型的做法一致，实现简单且有效。</p></li>
+<li><p><strong>训练与推理高效</strong>:训练时使用条件 Teacher Forcing，梯度可并行计算；推理时逐像素自回归采样，每步依赖历史与固定条件 <span class="math inline">\(c\)</span>，在 Transformer 等架构下还可通过 KV Cache 等方式加速。</p></li>
+<li><p><strong>适用场景广泛</strong>:CAR 可用于 class-conditional 图像生成、prompt-based 文本生成、text-to-speech 等多类可控生成任务，是自回归建模范式的重要扩展。</p></li>
+</ol>
+<hr />
+<h2 id="参考">📚 参考</h2>
+<ul>
+<li>Van den Oord et al., <em>Pixel Recurrent Neural Networks</em>, ICML 2016.</li>
+<li>Mirza, M., &amp; Osindero, S. (2014). Conditional generative adversarial nets. <em>arXiv preprint arXiv:1411.1784</em>.</li>
+</ul>
+</body>
+</html>
